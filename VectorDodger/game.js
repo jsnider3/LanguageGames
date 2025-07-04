@@ -11,22 +11,24 @@ class InputHandler {
     constructor() {
         this.keys = [];
         window.addEventListener('keydown', e => {
+            const key = e.key === 'Enter' ? 'Enter' : e.key.toLowerCase();
             if ((
-                e.key === 'ArrowDown' ||
-                e.key === 'ArrowUp' ||
-                e.key === 'ArrowLeft' ||
-                e.key === 'ArrowRight' ||
-                e.key.toLowerCase() === 'a' ||
-                e.key.toLowerCase() === 'd' ||
-                e.key.toLowerCase() === 'w' ||
-                e.key.toLowerCase() === 's'
-            ) && this.keys.indexOf(e.key) === -1) {
-                this.keys.push(e.key);
+                key === 'arrowdown' ||
+                key === 'arrowup' ||
+                key === 'arrowleft' ||
+                key === 'arrowright' ||
+                key === 'a' ||
+                key === 'd' ||
+                key === 'w' ||
+                key === 's' ||
+                key === 'enter'
+            ) && !this.keys.includes(key)) {
+                this.keys.push(key);
             }
         });
 
         window.addEventListener('keyup', e => {
-            const key = e.key.toLowerCase();
+            const key = e.key === 'Enter' ? 'Enter' : e.key.toLowerCase();
             const index = this.keys.findIndex(k => k.toLowerCase() === key);
             if (index > -1) {
                 this.keys.splice(index, 1);
@@ -48,16 +50,16 @@ class Player {
 
     update() {
         // Movement
-        if (this.game.input.keys.includes('ArrowUp') || this.game.input.keys.includes('w')) {
+        if (this.game.input.keys.includes('arrowup') || this.game.input.keys.includes('w')) {
             this.y -= this.speed;
         }
-        if (this.game.input.keys.includes('ArrowDown') || this.game.input.keys.includes('s')) {
+        if (this.game.input.keys.includes('arrowdown') || this.game.input.keys.includes('s')) {
             this.y += this.speed;
         }
-        if (this.game.input.keys.includes('ArrowLeft') || this.game.input.keys.includes('a')) {
+        if (this.game.input.keys.includes('arrowleft') || this.game.input.keys.includes('a')) {
             this.x -= this.speed;
         }
-        if (this.game.input.keys.includes('ArrowRight') || this.game.input.keys.includes('d')) {
+        if (this.game.input.keys.includes('arrowright') || this.game.input.keys.includes('d')) {
             this.x += this.speed;
         }
 
