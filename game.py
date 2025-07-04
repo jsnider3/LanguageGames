@@ -1,6 +1,14 @@
 import textwrap
+import copy
 
 # --- Game Data (Constants) ---
+
+VERB_ALIASES = {
+    "examine": ["look at", "inspect", "check", "read"],
+    "go": ["move", "walk", "travel"],
+    "talk": ["speak", "ask", "interrogate"],
+    "inventory": ["clues", "notes", "inv"],
+}
 
 CHARACTER_NAMES = {
     "lord alistair": "Lord Alistair Blackwood (deceased)",
@@ -91,6 +99,7 @@ ITEM_DETAILS = {
 
 class Game:
     def __init__(self):
+        self.world_state = copy.deepcopy(GAME_WORLD)
         self.current_location = "study"
         self.inventory = []
         self.game_over = False
@@ -101,7 +110,7 @@ class Game:
 
     def _show_location_details(self):
         """Prints the details of the current location."""
-        location = GAME_WORLD[self.current_location]
+        location = self.world_state[self.current_location]
         self._print_wrap(f"\n--- {self.current_location.title()} ---")
         self._print_wrap(location["description"])
         
@@ -121,6 +130,12 @@ class Game:
         verb = parts[0]
         noun = parts[1] if len(parts) > 1 else None
 
+        # Normalize verbs using aliases
+        for canonical_verb, aliases in VERB_ALIASES.items():
+            if verb == canonical_verb or verb in aliases:
+                verb = canonical_verb
+                break
+
         if verb in ["go", "talk", "examine", "accuse"] and noun and noun.startswith("to "):
             noun = noun[3:]
             
@@ -134,7 +149,7 @@ class Game:
 
     def _handle_go(self, noun):
         """Handles the 'go' command."""
-        if noun in GAME_WORLD[self.current_location]["exits"]:
+        if noun in self.world_state[self.current_location]["exits"]:
             self.current_location = noun
             self._show_location_details()
         else:
@@ -142,19 +157,26 @@ class Game:
 
     def _handle_examine(self, noun):
         """Handles the 'examine' command."""
-        location = GAME_WORLD[self.current_location]
+        location = self.world_state[self.current_location]
         
-        if noun not in location["items"] and noun not in location["characters"]:
-            print(f"You don't see a '{noun}' here.")
+        is_in_room = noun in location["items"] or noun in location["characters"]
+        is_in_inventory = noun in self.inventory
+
+        if not is_in_room and not is_in_inventory:
+            print(f"You don't see a '{noun}' here, nor do you have it.")
             return
 
         if noun in ITEM_DETAILS:
             detail = ITEM_DETAILS[noun]
             self._print_wrap(detail["description"])
             
-            if detail.get("is_clue") and noun not in self.inventory:
-                self._print_wrap(f"CLUE FOUND: You've added the {noun} to your notes.")
-                self.inventory.append(noun)
+            if detail.get("is_clue"):
+                if noun not in self.inventory:
+                    self._print_wrap(f"CLUE FOUND: You've added the {noun} to your notes.")
+                    self.inventory.append(noun)
+                    # Remove from room if it's there
+                    if noun in location["items"]:
+                        location["items"].remove(noun)
                 
             if "reveals" in detail:
                 revealed_item = detail["reveals"]
@@ -166,7 +188,7 @@ class Game:
 
     def _handle_talk(self, noun):
         """Handles the 'talk to' command."""
-        location = GAME_WORLD[self.current_location]
+        location = self.world_state[self.current_location]
         
         if noun == "lord alistair":
             self._print_wrap("'You can't talk to a dead man,' you mutter to yourself.")
@@ -261,3 +283,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.run()
+
