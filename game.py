@@ -131,10 +131,10 @@ def parse_command(command):
     if verb in ["go", "talk", "examine", "accuse"] and noun and noun.startswith("to "):
         noun = noun[3:]
         
-    # Allow for simplified character names
+    # Allow for simplified and full character names
     if noun:
-        for key in character_names:
-            if key in noun:
+        for key, full_name in character_names.items():
+            if noun in key or noun in full_name.lower():
                 noun = key
                 break
     
