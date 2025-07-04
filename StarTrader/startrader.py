@@ -293,30 +293,43 @@ class Game:
         print("\nUse 'buy <good> <quantity>' or 'sell <good> <quantity>'.")
 
     def _handle_buy(self, parts):
-        if len(parts) != 3:
+        """Handles the 'buy' command."""
+        if len(parts) < 3:
             print("Invalid format. Use: buy <good> <quantity>")
             return
-        good_name = parts[1].capitalize()
-        try: quantity = int(parts[2])
-        except ValueError: print("Quantity must be a number."); return
-        if quantity <= 0: print("Quantity must be positive."); return
+
+        try:
+            quantity = int(parts[-1])
+            good_name = " ".join(parts[1:-1]).capitalize()
+        except ValueError:
+            print("Invalid format. The last part of the command must be a number.")
+            return
+
+        if quantity <= 0:
+            print("Quantity must be positive.")
+            return
 
         system = self.player.location
         if good_name not in system.market:
-            print(f"'{good_name}' is not sold here."); return
+            print(f"'{good_name}' is not sold here.")
+            return
 
         market_data = system.market[good_name]
         if quantity > market_data["quantity"]:
-            print(f"Not enough {good_name} in stock."); return
+            print(f"Not enough {good_name} in stock. Only {market_data['quantity']} available.")
+            return
 
         total_cost = market_data["price"] * quantity
         if self.player.credits < total_cost:
-            print(f"Not enough credits."); return
+            print(f"Not enough credits. You need {total_cost}, but only have {self.player.credits}.")
+            return
 
         ship = self.player.ship
         if ship.get_cargo_used() + quantity > ship.cargo_capacity:
-            print(f"Not enough cargo space."); return
+            print(f"Not enough cargo space. You need {quantity} slots, but only have {ship.cargo_capacity - ship.get_cargo_used()} free.")
+            return
 
+        # All checks passed, execute transaction
         self.player.credits -= total_cost
         market_data["quantity"] -= quantity
         market_data["price"] = int(market_data["price"] * (1 + 0.05 * (quantity / 50))) + 1 # Price increases on buy
@@ -324,21 +337,32 @@ class Game:
         print(f"Successfully purchased {quantity} units of {good_name} for {total_cost} credits.")
 
     def _handle_sell(self, parts):
-        if len(parts) != 3:
-            print("Invalid format. Use: sell <good> <quantity>"); return
-        good_name = parts[1].capitalize()
-        try: quantity = int(parts[2])
-        except ValueError: print("Quantity must be a number."); return
-        if quantity <= 0: print("Quantity must be positive."); return
+        """Handles the 'sell' command."""
+        if len(parts) < 3:
+            print("Invalid format. Use: sell <good> <quantity>")
+            return
+
+        try:
+            quantity = int(parts[-1])
+            good_name = " ".join(parts[1:-1]).capitalize()
+        except ValueError:
+            print("Invalid format. The last part of the command must be a number.")
+            return
+
+        if quantity <= 0:
+            print("Quantity must be positive.")
+            return
 
         ship = self.player.ship
         if good_name not in ship.cargo_hold or ship.cargo_hold[good_name] < quantity:
-            print(f"You don't have {quantity} units of {good_name} to sell."); return
+            print(f"You don't have {quantity} units of {good_name} to sell.")
+            return
 
         system = self.player.location
         market_data = system.market[good_name]
         total_sale = market_data["price"] * quantity
 
+        # All checks passed, execute transaction
         self.player.credits += total_sale
         market_data["quantity"] += quantity
         market_data["price"] = max(1, int(market_data["price"] * (1 - 0.05 * (quantity / 50))) - 1) # Price decreases on sell, min 1

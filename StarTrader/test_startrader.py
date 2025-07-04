@@ -217,5 +217,14 @@ class TestStarTrader(unittest.TestCase):
         self.assertGreater(sirius_market["Food"]["price"], initial_price)
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_buy_multi_word_item(self):
+        """Test buying an item with a space in its name."""
+        initial_credits = self.game.player.credits
+        sol_market = self.game.galaxy.systems["Sol"].market
+        item_price = sol_market["Luxury Goods"]["price"]
+        
+        with patch('sys.stdout', new=io.StringIO()):
+            self.game._handle_buy(["buy", "luxury", "goods", "5"])
+
+        self.assertEqual(self.game.player.credits, initial_credits - (item_price * 5))
+        self.assertEqual(self.game.player.ship.cargo_hold["Luxury Goods"], 5)
