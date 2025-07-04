@@ -99,11 +99,42 @@ class Game:
         print(f"Assigned {number} colonists to {job}.")
         print(self.colony.get_status())
 
+    def _handle_unassign(self, parts):
+        """Handles the 'unassign' command."""
+        if len(parts) != 3:
+            print("Invalid format. Use: unassign <number> <job>")
+            return
+
+        try:
+            number = int(parts[1])
+        except ValueError:
+            print("Invalid number. Please enter a whole number.")
+            return
+
+        job = parts[2]
+        if job not in self.colony.jobs or job == "unassigned":
+            print(f"Invalid job. Choose from: farming, mining, research.")
+            return
+
+        if number < 0:
+            print("Cannot unassign a negative number of colonists.")
+            return
+
+        if number > self.colony.jobs[job]:
+            print(f"Not enough colonists in {job} to unassign. You only have {self.colony.jobs[job]}.")
+            return
+            
+        # Re-assign colonists
+        self.colony.jobs[job] -= number
+        self.colony.jobs["unassigned"] += number
+        print(f"Unassigned {number} colonists from {job}.")
+        print(self.colony.get_status())
+
     def run(self):
         """The main game loop."""
         print("Welcome to Echo Base.")
         print("Your mission is to build a thriving colony.")
-        print("Commands: 'status', 'assign <num> <job>', 'next', 'quit'")
+        print("Commands: 'status', 'assign <num> <job>', 'unassign <num> <job>', 'next', 'quit'")
         print(self.colony.get_status())
 
         while not self.game_over:
@@ -124,6 +155,8 @@ class Game:
                     print(self.colony.get_status())
             elif verb == "assign":
                 self._handle_assign(parts)
+            elif verb == "unassign":
+                self._handle_unassign(parts)
             else:
                 print(f"Unknown command: '{command}'")
 

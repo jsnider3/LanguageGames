@@ -106,6 +106,40 @@ class TestGame(unittest.TestCase):
             
         self.assertEqual(self.game.colony.jobs["unassigned"], initial_unassigned)
 
+    def test_valid_unassignment(self):
+        """Test unassigning colonists from a job."""
+        # First, assign some colonists to a job
+        self.game.colony.jobs["unassigned"] = 5
+        self.game.colony.jobs["farming"] = 5
+        
+        initial_unassigned = self.game.colony.jobs["unassigned"]
+        initial_farming = self.game.colony.jobs["farming"]
+
+        # Command: unassign 3 farming
+        command_parts = ["unassign", "3", "farming"]
+        
+        with patch('sys.stdout', new=io.StringIO()) as fake_out:
+            self.game._handle_unassign(command_parts)
+        
+        self.assertEqual(self.game.colony.jobs["unassigned"], initial_unassigned + 3)
+        self.assertEqual(self.game.colony.jobs["farming"], initial_farming - 3)
+
+    def test_unassign_more_colonists_than_assigned(self):
+        """Test unassigning more colonists than are in a job."""
+        self.game.colony.jobs["farming"] = 5
+        initial_farming = self.game.colony.jobs["farming"]
+        
+        # Command: unassign 8 farming
+        command_parts = ["unassign", "8", "farming"]
+        
+        with patch('sys.stdout', new=io.StringIO()) as fake_out:
+            self.game._handle_unassign(command_parts)
+            output = fake_out.getvalue().strip()
+            self.assertIn("Not enough colonists in farming to unassign", output)
+
+        # Ensure the state has not changed
+        self.assertEqual(self.game.colony.jobs["farming"], initial_farming)
+
 
 if __name__ == '__main__':
     unittest.main()
