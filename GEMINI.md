@@ -1,37 +1,27 @@
-# Project: The Crimson Case
+# Project: The Shadowed Keep
 
-## Project Goal
-To create an interactive text-based detective game where the player solves a murder mystery. The game should be engaging, intellectually stimulating, and driven by player choices.
+## 1. Project Goal
+To create a simple, replayable, text-based roguelike game. The player will explore a randomly generated dungeon, fight monsters, collect treasure, and try to survive as long as possible.
 
-## Core Concepts
-*   **Narrative-Driven:** The game is a story that unfolds based on player commands.
-*   **Choice Matters:** Player decisions will affect the outcome of the investigation.
-*   **Evidence Collection:** Players will need to find clues, interrogate suspects, and piece together the story.
-*   **Simple Command Interface:** Players interact using simple commands like `look`, `talk to [character]`, `examine [object]`, `go to [location]`.
+## 2. Core Concepts
+*   **Random Generation:** The dungeon layout, monster encounters, and treasure will be different each time you play.
+*   **Turn-Based Gameplay:** The game progresses one command at a time.
+*   **Permadeath:** If you die, you start over. The challenge is to get a new high score (deepest floor reached).
+*   **Risk vs. Reward:** Do you open that suspicious-looking chest? Do you fight that powerful monster or try to flee?
 
-## Development Plan
-1.  **Setup:**
-    *   Create a main Python file (e.g., `game.py`).
-    *   Establish the basic game loop (read player input, process command, print output).
-2.  **Story Outline:**
-    *   Develop the core plot: the victim, the suspects, the motive, and the key clues.
-    *   Map out the locations the player can visit.
-3.  **Game World Implementation:**
-    *   Create data structures (e.g., dictionaries or classes) to represent locations, characters, and items.
-    *   Each location should have a description and a list of items or characters present.
-4.  **Command Parsing:**
-    *   Implement a function to parse player input into commands and arguments (e.g., "talk to" and "butler").
-5.  **Game Logic:**
-    *   Implement the logic for each command (`look`, `talk`, `examine`, etc.).
-    *   Create a system to track game state (e.g., clues found, conversations had).
-6.  **Winning/Losing:**
-    *   Define the conditions for solving the mystery (e.g., accusing the correct suspect with the right evidence).
-    *   Create an ending sequence.
+## 3. Gameplay Loop
+1.  The player enters a new, unseen room.
+2.  The game describes the room and its contents (e.g., a monster, a treasure chest, or an exit).
+3.  The player chooses an action (`move`, `attack`, `open chest`, `run`).
+4.  The game resolves the action and the consequences.
+5.  This loop repeats until the player dies or decides to quit.
 
-## Tone and Style
-*   The writing should be evocative and mysterious, in the style of classic detective fiction.
-*   Descriptions should be detailed enough to paint a picture but leave room for imagination.
-
-## Technical Stack
+## 4. Technical Plan
 *   **Language:** Python 3
-*   **Dependencies:** No external libraries are necessary for the initial version. The standard library is sufficient.
+*   **Main File:** `shadowkeep.py`
+*   **Core Classes:**
+    *   `Player`: To manage health, attack power, and other stats.
+    *   `Monster`: A base class for enemies, with subclasses for different types (e.g., `Goblin`, `Orc`).
+    *   `Dungeon`: To manage the generation of floors and rooms.
+    *   `Game`: The main class to run the game loop and handle player commands.
+*   **Randomness:** Python's `random` module will be used extensively for procedural generation.
