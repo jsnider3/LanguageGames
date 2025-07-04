@@ -33,6 +33,14 @@ SHIPYARD_SPECS = {
 
 REPAIR_COST_PER_HP = 15
 
+GOODS = {
+    "Food": {"base_price": 20},
+    "Medicine": {"base_price": 50},
+    "Machinery": {"base_price": 100},
+    "Minerals": {"base_price": 80},
+    "Luxury Goods": {"base_price": 200}
+}
+
 class StarSystem:
     """Represents a single star system in the galaxy."""
     def __init__(self, name, description, economy_type, has_shipyard=False):
@@ -48,15 +56,16 @@ class Galaxy:
         self.systems = {}
         self.connections = {}
         self.fuel_costs = {}
+        self.active_events = {} # e.g., {"Sirius": {"type": "famine", "duration": 5}}
         self._create_galaxy()
         self._generate_markets()
 
     def _create_galaxy(self):
         """Creates the star systems and their connections in the galaxy."""
-        self.systems["Sol"] = StarSystem("Sol", "The bustling core of humanity, with a balanced and robust economy.", "Core", has_shipyard=True)
-        self.systems["Alpha Centauri"] = StarSystem("Alpha Centauri", "A verdant agricultural world, known for its vast hydroponic farms.", "Agricultural")
-        self.systems["Sirius"] = StarSystem("Sirius", "A heavily industrialized system, its skies thick with the smog of a thousand factories.", "Industrial", has_shipyard=True)
-        self.systems["Vega"] = StarSystem("Vega", "A remote mining outpost, rich in rare minerals and heavy metals.", "Mining")
+        self.systems["Sol"] = StarSystem("Sol", "The bustling core of humanity.", "Core", has_shipyard=True)
+        self.systems["Alpha Centauri"] = StarSystem("Alpha Centauri", "A verdant agricultural world.", "Agricultural")
+        self.systems["Sirius"] = StarSystem("Sirius", "A heavily industrialized system.", "Industrial", has_shipyard=True)
+        self.systems["Vega"] = StarSystem("Vega", "A remote mining outpost.", "Mining")
 
         self.connections = {
             "Sol": ["Alpha Centauri", "Sirius"],
@@ -66,36 +75,58 @@ class Galaxy:
         }
         
         self.fuel_costs = {
-            ("Sol", "Alpha Centauri"): 10,
-            ("Sol", "Sirius"): 12,
-            ("Alpha Centauri", "Vega"): 15,
-            ("Sirius", "Vega"): 15,
+            ("Sol", "Alpha Centauri"): 10, ("Sol", "Sirius"): 12,
+            ("Alpha Centauri", "Vega"): 15, ("Sirius", "Vega"): 15,
         }
         for (sys1, sys2), cost in list(self.fuel_costs.items()):
             self.fuel_costs[(sys2, sys1)] = cost
 
+    def _get_base_price_multiplier(self, system_economy, good):
+        """Calculates the base price multiplier for a good in a system."""
+        if system_economy == "Agricultural" and good == "Food": return 0.6
+        if system_economy != "Agricultural" and good == "Food": return 1.4
+        if system_economy == "Industrial" and good == "Machinery": return 0.7
+        if system_economy != "Industrial" and good == "Machinery": return 1.3
+        if system_economy == "Mining" and good == "Minerals": return 0.5
+        if system_economy != "Mining" and good == "Minerals": return 1.5
+        return 1.0
+
     def _generate_markets(self):
-        """Generates the initial market data for each system based on its economy."""
-        goods = {
-            "Food": 20, "Medicine": 50, "Machinery": 100, 
-            "Minerals": 80, "Luxury Goods": 200
-        }
-
+        """Generates the initial market data for each system."""
         for system in self.systems.values():
-            for good, base_price in goods.items():
-                price_multiplier = 1.0
-                if system.economy_type == "Agricultural" and good == "Food": price_multiplier = 0.6
-                elif system.economy_type != "Agricultural" and good == "Food": price_multiplier = 1.4
-                
-                if system.economy_type == "Industrial" and good == "Machinery": price_multiplier = 0.7
-                elif system.economy_type != "Industrial" and good == "Machinery": price_multiplier = 1.3
-
-                if system.economy_type == "Mining" and good == "Minerals": price_multiplier = 0.5
-                elif system.economy_type != "Mining" and good == "Minerals": price_multiplier = 1.5
-
-                price = int(base_price * price_multiplier * random.uniform(0.9, 1.1))
+            for good, data in GOODS.items():
+                base_price = data["base_price"]
+                multiplier = self._get_base_price_multiplier(system.economy_type, good)
+                price = int(base_price * multiplier * random.uniform(0.9, 1.1))
                 quantity = random.randint(50, 200)
                 system.market[good] = {"price": price, "quantity": quantity}
+
+    def update_markets(self):
+        """Updates all markets due to natural economic drift and events."""
+        # Decay active events
+        for system_name, event in list(self.active_events.items()):
+            event["duration"] -= 1
+            if event["duration"] <= 0:
+                print(f"The {event['type']} in {system_name} has ended.")
+                del self.active_events[system_name]
+
+        # Update prices
+        for system in self.systems.values():
+            for good, data in system.market.items():
+                base_price = GOODS[good]["base_price"]
+                multiplier = self._get_base_price_multiplier(system.economy_type, good)
+                
+                # Check for events
+                if system.name in self.active_events:
+                    event = self.active_events[system.name]
+                    if event["type"] == "famine" and good == "Food":
+                        multiplier *= 3.0 # Famine triples food prices
+                    if event["type"] == "mining_strike" and good == "Minerals":
+                        multiplier *= 4.0 # Strike quadruples mineral prices
+
+                target_price = int(base_price * multiplier)
+                # Drift price towards the target price
+                data["price"] += (target_price - data["price"]) // 4
 
 class Ship:
     """
@@ -103,41 +134,27 @@ class Ship:
     """
     def __init__(self):
         self.name = "Stardust Drifter"
-        self.component_levels = {
-            "cargo_hold": 0,
-            "engine": 0,
-            "hull": 0,
-        }
-        self.hull = self.max_hull # Start with full health
+        self.component_levels = {"cargo_hold": 0, "engine": 0, "hull": 0}
+        self.hull = self.max_hull
         self.fuel = 50
         self.max_fuel = 50
         self.cargo_hold = {}
 
     @property
     def max_hull(self):
-        level = self.component_levels["hull"]
-        return SHIPYARD_SPECS["hull"]["levels"][level]["max_hull"]
-
+        return SHIPYARD_SPECS["hull"]["levels"][self.component_levels["hull"]]["max_hull"]
     @property
     def cargo_capacity(self):
-        level = self.component_levels["cargo_hold"]
-        return SHIPYARD_SPECS["cargo_hold"]["levels"][level]["capacity"]
-
+        return SHIPYARD_SPECS["cargo_hold"]["levels"][self.component_levels["cargo_hold"]]["capacity"]
     @property
     def fuel_efficiency(self):
-        level = self.component_levels["engine"]
-        return SHIPYARD_SPECS["engine"]["levels"][level]["fuel_efficiency"]
+        return SHIPYARD_SPECS["engine"]["levels"][self.component_levels["engine"]]["fuel_efficiency"]
 
     def get_cargo_used(self):
-        """Returns the total number of items in the cargo hold."""
         return sum(self.cargo_hold.values())
-
     def add_cargo(self, good, quantity):
-        """Adds a specified quantity of a good to the cargo hold."""
         self.cargo_hold[good] = self.cargo_hold.get(good, 0) + quantity
-
     def remove_cargo(self, good, quantity):
-        """Removes a specified quantity of a good from the cargo hold."""
         if good in self.cargo_hold:
             self.cargo_hold[good] -= quantity
             if self.cargo_hold[good] <= 0:
@@ -160,24 +177,36 @@ class EventManager:
 
     def trigger_event(self):
         """Randomly determines if an event occurs and handles it."""
-        # 25% chance of an event during travel
-        if random.random() > 0.25:
-            return
+        if random.random() > 0.25: return
 
-        event_type = random.choice(["pirate", "derelict", "asteroid"])
+        # Prioritize economic events for now, will add more later
+        event_type = random.choice(["famine", "mining_strike", "pirate", "derelict", "asteroid"])
         print("\n--- EVENT ---")
 
-        if event_type == "pirate":
-            self._handle_pirate_encounter()
-        elif event_type == "derelict":
-            self._handle_derelict_ship()
-        elif event_type == "asteroid":
-            self._handle_asteroid_field()
+        if event_type == "famine": self._handle_famine()
+        elif event_type == "mining_strike": self._handle_mining_strike()
+        elif event_type == "pirate": self._handle_pirate_encounter()
+        elif event_type == "derelict": self._handle_derelict_ship()
+        elif event_type == "asteroid": self._handle_asteroid_field()
+
+    def _handle_famine(self):
+        system = random.choice(list(self.game.galaxy.systems.values()))
+        if system.economy_type == "Agricultural": # Famines don't happen on farm worlds
+            print("A distress call from a nearby system speaks of a bountiful harvest. Prices for food there may be low.")
+            return
+        print(f"A severe famine has struck {system.name}! Demand for food is critical.")
+        self.game.galaxy.active_events[system.name] = {"type": "famine", "duration": 10}
+
+    def _handle_mining_strike(self):
+        system = random.choice(list(self.game.galaxy.systems.values()))
+        if system.economy_type == "Mining":
+            print(f"A new mineral vein was discovered in {system.name}. Mineral prices there may be low.")
+            return
+        print(f"A widespread labor strike has halted all mining operations in {system.name}!")
+        self.game.galaxy.active_events[system.name] = {"type": "mining_strike", "duration": 8}
 
     def _handle_pirate_encounter(self):
-        """Handles a pirate encounter."""
         print("You've been ambushed by pirates!")
-        # For now, the encounter is simple. This can be expanded later.
         demands = random.randint(100, 500)
         print(f"They demand {demands} credits or they'll open fire!")
         
@@ -190,9 +219,7 @@ class EventManager:
                     return
                 else:
                     print("You don't have enough credits to pay! They open fire!")
-                    # Fall through to fighting
             
-            # Fight logic
             print("You stand your ground and fight!")
             damage = random.randint(10, 30)
             self.game.player.ship.hull -= damage
@@ -203,14 +230,12 @@ class EventManager:
             return
 
     def _handle_derelict_ship(self):
-        """Handles finding a derelict ship."""
         print("You come across a derelict, drifting ship.")
         salvage = random.randint(50, 200)
         self.game.player.credits += salvage
         print(f"You salvage parts worth {salvage} credits.")
 
     def _handle_asteroid_field(self):
-        """Handles navigating an asteroid field."""
         print("You navigate a dense asteroid field.")
         damage = random.randint(5, 15)
         self.game.player.ship.hull -= damage
@@ -231,12 +256,10 @@ class Game:
         self.player.location = self.galaxy.systems["Sol"]
 
     def get_status(self):
-        """Returns a formatted string of the player's current status."""
         ship = self.player.ship
         system = self.player.location
         connections = self.galaxy.connections.get(system.name, [])
         travel_options = ", ".join(connections) or "None"
-        
         cargo_list = ", ".join(f"{item} ({qty})" for item, qty in ship.cargo_hold.items()) or "Empty"
 
         status = (
@@ -245,6 +268,12 @@ class Game:
             f"\nCurrent Location: {system.name} ({system.economy_type})\n"
             f"Description: {system.description}\n"
             f"Reachable Systems: {travel_options}\n"
+        )
+        if system.name in self.galaxy.active_events:
+            event = self.galaxy.active_events[system.name]
+            status += f"EVENT: This system is experiencing a {event['type']}!\n"
+        
+        status += (
             f"\n--- Ship: {ship.name} ---\n"
             f"Hull: {ship.hull}/{ship.max_hull}\n"
             f"Fuel: {ship.fuel}/{ship.max_fuel}\n"
@@ -253,7 +282,6 @@ class Game:
         return status
 
     def _handle_trade(self):
-        """Displays the market of the current system."""
         system = self.player.location
         print(f"\n--- Market at {system.name} ---")
         print(f"{'Good':<15} {'Price':>10} {'Quantity':>10}")
@@ -265,68 +293,47 @@ class Game:
         print("\nUse 'buy <good> <quantity>' or 'sell <good> <quantity>'.")
 
     def _handle_buy(self, parts):
-        """Handles the 'buy' command."""
         if len(parts) != 3:
             print("Invalid format. Use: buy <good> <quantity>")
             return
-
         good_name = parts[1].capitalize()
-        try:
-            quantity = int(parts[2])
-        except ValueError:
-            print("Quantity must be a number.")
-            return
-
-        if quantity <= 0:
-            print("Quantity must be positive.")
-            return
+        try: quantity = int(parts[2])
+        except ValueError: print("Quantity must be a number."); return
+        if quantity <= 0: print("Quantity must be positive."); return
 
         system = self.player.location
         if good_name not in system.market:
-            print(f"'{good_name}' is not sold here.")
-            return
+            print(f"'{good_name}' is not sold here."); return
 
         market_data = system.market[good_name]
         if quantity > market_data["quantity"]:
-            print(f"Not enough {good_name} in stock. Only {market_data['quantity']} available.")
-            return
+            print(f"Not enough {good_name} in stock."); return
 
         total_cost = market_data["price"] * quantity
         if self.player.credits < total_cost:
-            print(f"Not enough credits. You need {total_cost}, but only have {self.player.credits}.")
-            return
+            print(f"Not enough credits."); return
 
         ship = self.player.ship
         if ship.get_cargo_used() + quantity > ship.cargo_capacity:
-            print(f"Not enough cargo space. You need {quantity} slots, but only have {ship.cargo_capacity - ship.get_cargo_used()} free.")
-            return
+            print(f"Not enough cargo space."); return
 
         self.player.credits -= total_cost
         market_data["quantity"] -= quantity
+        market_data["price"] = int(market_data["price"] * (1 + 0.05 * (quantity / 50))) + 1 # Price increases on buy
         ship.add_cargo(good_name, quantity)
         print(f"Successfully purchased {quantity} units of {good_name} for {total_cost} credits.")
 
     def _handle_sell(self, parts):
-        """Handles the 'sell' command."""
         if len(parts) != 3:
-            print("Invalid format. Use: sell <good> <quantity>")
-            return
-
+            print("Invalid format. Use: sell <good> <quantity>"); return
         good_name = parts[1].capitalize()
-        try:
-            quantity = int(parts[2])
-        except ValueError:
-            print("Quantity must be a number.")
-            return
-
-        if quantity <= 0:
-            print("Quantity must be positive.")
-            return
+        try: quantity = int(parts[2])
+        except ValueError: print("Quantity must be a number."); return
+        if quantity <= 0: print("Quantity must be positive."); return
 
         ship = self.player.ship
         if good_name not in ship.cargo_hold or ship.cargo_hold[good_name] < quantity:
-            print(f"You don't have {quantity} units of {good_name} to sell.")
-            return
+            print(f"You don't have {quantity} units of {good_name} to sell."); return
 
         system = self.player.location
         market_data = system.market[good_name]
@@ -334,55 +341,46 @@ class Game:
 
         self.player.credits += total_sale
         market_data["quantity"] += quantity
+        market_data["price"] = max(1, int(market_data["price"] * (1 - 0.05 * (quantity / 50))) - 1) # Price decreases on sell, min 1
         ship.remove_cargo(good_name, quantity)
         print(f"Successfully sold {quantity} units of {good_name} for {total_sale} credits.")
 
     def _handle_travel(self, parts):
-        """Handles the 'travel' command."""
         if len(parts) < 2:
-            print("Invalid format. Use: travel <system name>")
-            return
-
+            print("Invalid format. Use: travel <system name>"); return
         destination_input = " ".join(parts[1:]).title()
         
         if destination_input not in self.galaxy.systems:
-            print(f"Unknown system: '{destination_input}'")
-            return
+            print(f"Unknown system: '{destination_input}'"); return
 
         current_system = self.player.location
         if current_system.name == destination_input:
-            print("You are already in that system.")
-            return
+            print("You are already in that system."); return
 
         if destination_input not in self.galaxy.connections[current_system.name]:
-             print(f"Cannot travel directly from {current_system.name} to {destination_input}.")
-             return
+             print(f"Cannot travel directly from {current_system.name} to {destination_input}."); return
         
         fuel_needed = self.galaxy.fuel_costs.get((current_system.name, destination_input))
         fuel_needed = int(fuel_needed * self.player.ship.fuel_efficiency)
         if self.player.ship.fuel < fuel_needed:
-            print(f"Not enough fuel. You need {fuel_needed}, but only have {self.player.ship.fuel}.")
-            return
+            print(f"Not enough fuel. You need {fuel_needed}, but only have {self.player.ship.fuel}."); return
 
         self.player.ship.fuel -= fuel_needed
+        self.galaxy.update_markets() # Markets change over time
         
         print(f"\nTraveling from {current_system.name} to {destination_input}...")
         time.sleep(1)
         
-        # Trigger event before arrival
         self.event_manager.trigger_event()
-        if self.game_over:
-            return # The event destroyed the ship
+        if self.game_over: return
 
         self.player.location = self.galaxy.systems[destination_input]
         print(f"Arrived at {destination_input}. The journey consumed {fuel_needed} fuel.")
         print(self.get_status())
 
     def _handle_shipyard(self):
-        """Displays the shipyard and upgrade options."""
         if not self.player.location.has_shipyard:
-            print("No shipyard available in this system.")
-            return
+            print("No shipyard available in this system."); return
         
         print("\n--- Shipyard ---")
         print("Available commands: 'repair', 'upgrade <component>'")
@@ -397,51 +395,40 @@ class Game:
                 print(f"- {specs['name']} is fully upgraded.")
 
     def _handle_repair(self):
-        """Handles the 'repair' command."""
         ship = self.player.ship
         damage = ship.max_hull - ship.hull
-        if damage == 0:
-            print("Ship hull is already at maximum.")
-            return
+        if damage == 0: print("Ship hull is already at maximum."); return
         
         cost = damage * REPAIR_COST_PER_HP
         if self.player.credits < cost:
-            print(f"Not enough credits to fully repair. You need {cost}, but have {self.player.credits}.")
-            return
+            print(f"Not enough credits to fully repair."); return
         
         self.player.credits -= cost
         ship.hull = ship.max_hull
         print(f"Ship hull repaired for {cost} credits.")
 
     def _handle_upgrade(self, parts):
-        """Handles the 'upgrade' command."""
         if len(parts) != 2:
-            print("Invalid format. Use: upgrade <component>")
-            return
+            print("Invalid format. Use: upgrade <component>"); return
         
         component_name = parts[1]
         if component_name not in SHIPYARD_SPECS:
-            print(f"Unknown component: '{component_name}'.")
-            return
+            print(f"Unknown component: '{component_name}'."); return
             
         ship = self.player.ship
         current_level = ship.component_levels[component_name]
         specs = SHIPYARD_SPECS[component_name]
 
         if current_level + 1 >= len(specs["levels"]):
-            print(f"{specs['name']} is already fully upgraded.")
-            return
+            print(f"{specs['name']} is already fully upgraded."); return
             
         cost = specs["levels"][current_level + 1]["cost"]
         if self.player.credits < cost:
-            print(f"Not enough credits. You need {cost} to upgrade.")
-            return
+            print(f"Not enough credits. You need {cost} to upgrade."); return
             
         self.player.credits -= cost
         ship.component_levels[component_name] += 1
-        # For hull upgrades, also top off the health
-        if component_name == "hull":
-            ship.hull = ship.max_hull
+        if component_name == "hull": ship.hull = ship.max_hull
             
         print(f"Successfully upgraded {specs['name']} to Level {ship.component_levels[component_name] + 1} for {cost} credits.")
 
@@ -457,32 +444,24 @@ class Game:
             parts = command.split()
             verb = parts[0] if parts else ""
             
-            if verb == "quit":
-                print("You have retired from your life as a trader. Farewell.")
-                self.game_over = True
-            elif verb == "status":
-                print(self.get_status())
-            elif verb == "trade":
-                self._handle_trade()
-            elif verb == "buy":
-                self._handle_buy(parts)
-            elif verb == "sell":
-                self._handle_sell(parts)
-            elif verb == "travel":
-                self._handle_travel(parts)
-            elif verb == "shipyard":
-                self._handle_shipyard()
-            elif verb == "repair":
-                self._handle_repair()
-            elif verb == "upgrade":
-                self._handle_upgrade(parts)
-            else:
-                print(f"Unknown command: '{command}'")
+            if verb == "quit": self.game_over = True
+            elif verb == "status": print(self.get_status())
+            elif verb == "trade": self._handle_trade()
+            elif verb == "buy": self._handle_buy(parts)
+            elif verb == "sell": self._handle_sell(parts)
+            elif verb == "travel": self._handle_travel(parts)
+            elif verb == "shipyard": self._handle_shipyard()
+            elif verb == "repair": self._handle_repair()
+            elif verb == "upgrade": self._handle_upgrade(parts)
+            else: print(f"Unknown command: '{command}'")
+        
+        print("You have retired from your life as a trader. Farewell.")
 
 
 if __name__ == "__main__":
     game = Game()
     game.run()
+
 
 
 if __name__ == "__main__":

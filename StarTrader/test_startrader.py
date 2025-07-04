@@ -95,12 +95,14 @@ class TestStarTrader(unittest.TestCase):
         self.assertEqual(self.game.player.ship.cargo_hold["Food"], 5)
 
     def test_travel_valid(self):
-        """Test a valid trip between systems."""
+        """Test a valid trip between systems without events."""
         initial_fuel = self.game.player.ship.fuel
         fuel_cost = self.game.galaxy.fuel_costs[("Sol", "Sirius")]
 
-        with patch('sys.stdout', new=io.StringIO()):
-            self.game._handle_travel(["travel", "sirius"])
+        # Patch random.random to ensure no event fires during this test
+        with patch('random.random', return_value=1.0):
+            with patch('sys.stdout', new=io.StringIO()):
+                self.game._handle_travel(["travel", "sirius"])
 
         self.assertEqual(self.game.player.location.name, "Sirius")
         self.assertEqual(self.game.player.ship.fuel, initial_fuel - fuel_cost)
@@ -178,6 +180,41 @@ class TestStarTrader(unittest.TestCase):
                         event_manager.trigger_event()
 
         self.assertEqual(self.game.player.ship.hull, initial_hull - 10)
+
+    def test_price_fluctuation_on_buy(self):
+        """Test that buying a good increases its price."""
+        sol_market = self.game.galaxy.systems["Sol"].market
+        initial_price = sol_market["Food"]["price"]
+
+        with patch('sys.stdout', new=io.StringIO()):
+            self.game._handle_buy(["buy", "food", "20"])
+
+        self.assertGreater(sol_market["Food"]["price"], initial_price)
+
+    def test_price_fluctuation_on_sell(self):
+        """Test that selling a good decreases its price."""
+        # First, give the player something to sell
+        self.game.player.ship.add_cargo("Minerals", 20)
+        sol_market = self.game.galaxy.systems["Sol"].market
+        initial_price = sol_market["Minerals"]["price"]
+
+        with patch('sys.stdout', new=io.StringIO()):
+            self.game._handle_sell(["sell", "minerals", "20"])
+
+        self.assertLess(sol_market["Minerals"]["price"], initial_price)
+
+    def test_economic_event_famine(self):
+        """Test the effect of a famine event on market prices."""
+        # Trigger a famine in Sirius
+        self.game.galaxy.active_events["Sirius"] = {"type": "famine", "duration": 5}
+        sirius_market = self.game.galaxy.systems["Sirius"].market
+        initial_price = sirius_market["Food"]["price"]
+        
+        # Update markets to apply event effects
+        self.game.galaxy.update_markets()
+
+        # Price of food in the famine system should be dramatically higher
+        self.assertGreater(sirius_market["Food"]["price"], initial_price)
 
 
 if __name__ == '__main__':
