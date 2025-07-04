@@ -126,6 +126,59 @@ class TestStarTrader(unittest.TestCase):
 
         self.assertEqual(self.game.player.location.name, initial_location.name)
 
+    def test_shipyard_upgrade(self):
+        """Test a valid ship upgrade."""
+        self.game.player.credits = 2000 # Ensure enough credits
+        initial_credits = self.game.player.credits
+        
+        with patch('sys.stdout', new=io.StringIO()):
+            self.game._handle_upgrade(["upgrade", "engine"])
+
+        self.assertEqual(self.game.player.ship.component_levels["engine"], 1)
+        self.assertEqual(self.game.player.credits, initial_credits - 1500)
+        self.assertLess(self.game.player.ship.fuel_efficiency, 1.0)
+
+    def test_shipyard_repair(self):
+        """Test repairing the ship."""
+        self.game.player.ship.hull = 50
+        self.game.player.credits = 1000
+        
+        with patch('sys.stdout', new=io.StringIO()):
+            self.game._handle_repair()
+        
+        self.assertEqual(self.game.player.ship.hull, self.game.player.ship.max_hull)
+        # 50 damage * 15 credits/hp = 750. 1000 - 750 = 250
+        self.assertEqual(self.game.player.credits, 250)
+
+    def test_event_pirates(self):
+        """Test the pirate event, choosing to pay."""
+        initial_credits = self.game.player.credits
+        event_manager = self.game.event_manager
+        
+        with patch('random.random', return_value=0.1): # Force event
+            with patch('random.choice', return_value='pirate'):
+                # Mock the pirate's demand and the player's choice
+                with patch('random.randint', return_value=200):
+                    with patch('builtins.input', return_value='pay'):
+                        with patch('sys.stdout', new=io.StringIO()) as fake_out:
+                            event_manager.trigger_event()
+                            self.assertIn("You pay the pirates", fake_out.getvalue())
+        
+        self.assertEqual(self.game.player.credits, initial_credits - 200)
+
+    def test_event_asteroid_field(self):
+        """Test the asteroid field event."""
+        initial_hull = self.game.player.ship.hull
+        event_manager = self.game.event_manager
+        
+        with patch('random.random', return_value=0.1):
+            with patch('random.choice', return_value='asteroid'):
+                with patch('random.randint', return_value=10): # Force 10 damage
+                     with patch('sys.stdout', new=io.StringIO()):
+                        event_manager.trigger_event()
+
+        self.assertEqual(self.game.player.ship.hull, initial_hull - 10)
+
 
 if __name__ == '__main__':
     unittest.main()
