@@ -1,5 +1,6 @@
 import random
 import time
+import argparse
 
 class Player:
     """
@@ -181,5 +182,12 @@ class Game:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="The Shadowed Keep - A Text-Based Roguelike.")
+    parser.add_argument("--seed", type=int, help="A seed for the random number generator for reproducible runs.")
+    args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
+
     game = Game()
     game.run()
