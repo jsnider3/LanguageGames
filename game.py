@@ -1,5 +1,7 @@
 import textwrap
 import copy
+import pickle
+import os
 
 # --- Game Data (Constants) ---
 
@@ -96,6 +98,7 @@ ITEM_DETAILS = {
     }
 }
 
+SAVE_FILE = "savegame.dat"
 
 class Game:
     def __init__(self):
@@ -237,10 +240,40 @@ class Game:
             for item in self.inventory:
                 print(f"- {item}")
 
+    def _handle_save(self):
+        """Saves the current game state to a file."""
+        try:
+            with open(SAVE_FILE, "wb") as f:
+                pickle.dump(self, f)
+            print("Game saved successfully.")
+        except Exception as e:
+            print(f"Error saving game: {e}")
+
+    def _handle_load(self):
+        """Loads a game state from a file."""
+        if not os.path.exists(SAVE_FILE):
+            print("No save file found.")
+            return
+
+        try:
+            with open(SAVE_FILE, "rb") as f:
+                loaded_game = pickle.load(f)
+            
+            # Restore the state from the loaded game object
+            self.world_state = loaded_game.world_state
+            self.current_location = loaded_game.current_location
+            self.inventory = loaded_game.inventory
+            self.game_over = loaded_game.game_over
+            
+            print("\nGame loaded successfully.")
+            self._show_location_details()
+        except Exception as e:
+            print(f"Error loading game: {e}")
+
     def run(self):
         """The main game loop."""
         print("Welcome to The Crimson Case.")
-        self._print_wrap("Commands: 'quit', 'look', 'inventory', 'go [location]', 'examine [item]', 'talk to [person]', 'accuse [person]'")
+        self._print_wrap("Commands: 'quit', 'look', 'inventory', 'save', 'load', 'go [location]', 'examine [item]', 'talk to [person]', 'accuse [person]'")
         self._show_location_details()
 
         while not self.game_over:
@@ -257,6 +290,10 @@ class Game:
                 self._show_location_details()
             elif verb == "inventory":
                 self._handle_inventory()
+            elif verb == "save":
+                self._handle_save()
+            elif verb == "load":
+                self._handle_load()
             elif verb == "go":
                 if noun:
                     self._handle_go(noun)
