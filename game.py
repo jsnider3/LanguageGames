@@ -1,5 +1,4 @@
-# The Crimson Case
-# A text-based detective game
+import textwrap
 
 # --- Character Details ---
 
@@ -88,6 +87,9 @@ item_details = {
     "locket": {
         "description": "A silver locket. Inside, there's a picture of Isabella Vance, the young maid.",
         "is_clue": True
+    },
+    "lord alistair": {
+        "description": "You examine the body of Lord Alistair. He is slumped over the desk, his face pale. A small trickle of dried blood runs from the corner of his mouth. It seems he was poisoned."
     }
 }
 
@@ -98,11 +100,15 @@ inventory = [] # Will store clues
 
 # --- Helper Functions ---
 
+def print_wrap(text):
+    """Prints text wrapped to the terminal width."""
+    print(textwrap.fill(text, width=80))
+
 def show_location_details():
     """Prints the details of the current location."""
     location = game_world[current_location]
     print(f"\n--- {current_location.title()} ---")
-    print(location["description"])
+    print_wrap(location["description"])
     
     if location["items"]:
         print("You see the following items:", ", ".join(location["items"]))
@@ -116,10 +122,22 @@ def show_location_details():
         print("Exits:", ", ".join(location["exits"].keys()))
 
 def parse_command(command):
-    """Parses the player's command."""
+    """Parses the player's command, handling flexible verbs."""
     parts = command.split(" ", 1)
     verb = parts[0]
     noun = parts[1] if len(parts) > 1 else None
+
+    # Handle "go to", "talk to", etc.
+    if verb in ["go", "talk", "examine", "accuse"] and noun and noun.startswith("to "):
+        noun = noun[3:]
+        
+    # Allow for simplified character names
+    if noun:
+        for key in character_names:
+            if key in noun:
+                noun = key
+                break
+    
     return verb, noun
 
 # --- Command Handlers ---
@@ -137,23 +155,24 @@ def handle_examine(noun):
     """Handles the 'examine' command."""
     location = game_world[current_location]
     
-    if noun not in location["items"] and noun not in item_details:
+    # Check if the noun is a character or an item in the room
+    if noun not in location["items"] and noun not in location["characters"]:
         print(f"You don't see a '{noun}' here.")
         return
 
     if noun in item_details:
         detail = item_details[noun]
-        print(detail["description"])
+        print_wrap(detail["description"])
         
         if detail.get("is_clue") and noun not in inventory:
-            print(f"CLUE FOUND: You've added the {noun} to your notes.")
+            print_wrap(f"CLUE FOUND: You've added the {noun} to your notes.")
             inventory.append(noun)
             
         if "reveals" in detail:
             revealed_item = detail["reveals"]
             if revealed_item not in location["items"]:
                 location["items"].append(revealed_item)
-                print(f"You have discovered a new item: {revealed_item}.")
+                print_wrap(f"You have discovered a new item: {revealed_item}.")
     else:
         print(f"You can't examine the '{noun}'.")
 
@@ -161,6 +180,10 @@ def handle_talk(noun):
     """Handles the 'talk to' command."""
     location = game_world[current_location]
     
+    if noun == "lord alistair":
+        print_wrap("'You can't talk to a dead man,' you mutter to yourself.")
+        return
+
     if noun not in location["characters"]:
         print(f"You don't see '{noun}' here.")
         return
@@ -169,40 +192,39 @@ def handle_talk(noun):
     
     # Check for specific clue-based dialogue
     if noun == "lady eleanor" and "note" in inventory:
-        print(dialogue["with_note"])
+        print_wrap(dialogue["with_note"])
     elif (noun == "butler" or noun == "isabella") and "locket" in inventory:
-        print(dialogue["with_locket"])
+        print_wrap(dialogue["with_locket"])
     elif "default" in dialogue:
-        print(dialogue["default"])
+        print_wrap(dialogue["default"])
     else:
         print(f"You can't talk to '{noun}'.")
-
 
 def handle_accuse(noun):
     """Handles the 'accuse' command."""
     if noun not in character_names:
         print(f"You can't accuse '{noun}'. That person is not here.")
-        return
+        return False
 
-    print(f"You point a finger at {character_names[noun]}.")
+    print_wrap(f"You point a finger at {character_names[noun]}.")
 
     # Winning condition
     if noun == "lady eleanor" and "note" in inventory and "locket" in inventory:
-        print("\n'It was you!' you declare. 'You found out about your husband's affair with Isabella from the locket, and you confronted him. The note proves it.'")
-        print("\nLady Eleanor's cold facade crumbles. 'He was going to leave me for a servant girl! He deserved it.'")
-        print("\nCongratulations, you have solved The Crimson Case!")
+        print_wrap("\n'It was you!' you declare. 'You found out about your husband's affair with Isabella from the locket, and you confronted him. The note proves it.'")
+        print_wrap("\nLady Eleanor's cold facade crumbles. 'He was going to leave me for a servant girl! He deserved it.'")
+        print_wrap("\nCongratulations, you have solved The Crimson Case!")
         return True  # End the game
     # Losing condition
     else:
-        print(f"\n'{character_names[noun]} looks at you, bewildered. 'What are you talking about?'")
-        print("\nYou don't have enough evidence to support your claim. The case goes cold, and a murderer walks free.")
-        print("\nGAME OVER")
+        print_wrap(f"\n'{character_names[noun]} looks at you, bewildered. 'What are you talking about?'")
+        print_wrap("\nYou don't have enough evidence to support your claim. The case goes cold, and a murderer walks free.")
+        print_wrap("\nGAME OVER")
         return True  # End the game
 
 def main():
     """The main game loop."""
     print("Welcome to The Crimson Case.")
-    print("Commands: 'quit', 'look', 'go [location]', 'examine [item]', 'talk to [person]', 'accuse [person]'")
+    print_wrap("Commands: 'quit', 'look', 'go [location]', 'examine [item]', 'talk to [person]', 'accuse [person]'")
     show_location_details()
 
     while True:
@@ -228,9 +250,6 @@ def main():
             else:
                 print("Examine what?")
         elif verb == "talk":
-            if noun and noun.startswith("to "):
-                noun = noun[3:]
-            
             if noun:
                 handle_talk(noun)
             else:
@@ -243,10 +262,6 @@ def main():
                 print("Accuse whom?")
         else:
             print(f"Unknown command: '{verb}'")
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()
