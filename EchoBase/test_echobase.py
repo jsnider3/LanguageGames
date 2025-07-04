@@ -140,6 +140,55 @@ class TestGame(unittest.TestCase):
         # Ensure the state has not changed
         self.assertEqual(self.game.colony.jobs["farming"], initial_farming)
 
+    def test_build_valid_building(self):
+        """Test successfully building a new structure."""
+        self.game.colony.materials = 30 # Ensure enough materials
+        initial_materials = self.game.colony.materials
+        
+        command_parts = ["build", "greenhouse"]
+        
+        with patch('sys.stdout', new=io.StringIO()) as fake_out:
+            self.game._handle_build(command_parts)
+
+        self.assertEqual(len(self.game.colony.buildings), 1)
+        self.assertEqual(self.game.colony.buildings[0].name, "greenhouse")
+        self.assertEqual(self.game.colony.materials, initial_materials - 25)
+
+    def test_build_not_enough_materials(self):
+        """Test trying to build without enough materials."""
+        self.game.colony.materials = 10 # Not enough for a greenhouse
+        initial_materials = self.game.colony.materials
+        
+        command_parts = ["build", "greenhouse"]
+        
+        with patch('sys.stdout', new=io.StringIO()) as fake_out:
+            self.game._handle_build(command_parts)
+            output = fake_out.getvalue().strip()
+            self.assertIn("Not enough materials", output)
+
+        self.assertEqual(len(self.game.colony.buildings), 0)
+        self.assertEqual(self.game.colony.materials, initial_materials)
+
+    def test_building_effects_on_next_day(self):
+        """Test that buildings correctly affect resource production."""
+        # Build a greenhouse and a solar array
+        self.game.colony.materials = 50
+        with patch('sys.stdout', new=io.StringIO()): # Suppress output from build
+            self.game._handle_build(["build", "greenhouse"])
+            self.game._handle_build(["build", "solar_array"])
+
+        # Check initial state
+        self.assertEqual(self.game.colony.food, 50)
+        self.assertEqual(self.game.colony.power, 100)
+
+        # Run the day
+        self.game.colony.next_day()
+
+        # Expected Food: 50 (start) + 15 (greenhouse) - 10 (colonists) = 55
+        self.assertEqual(self.game.colony.food, 55)
+        # Expected Power: 100 (start) + 20 (solar) - 5 (greenhouse) = 115
+        self.assertEqual(self.game.colony.power, 115)
+
 
 if __name__ == '__main__':
     unittest.main()
