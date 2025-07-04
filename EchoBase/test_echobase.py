@@ -189,6 +189,35 @@ class TestGame(unittest.TestCase):
         # Expected Power: 100 (start) + 20 (solar) - 5 (greenhouse) = 115
         self.assertEqual(self.game.colony.power, 115)
 
+    def test_event_bountiful_harvest(self):
+        """Test the 'bountiful_harvest' event."""
+        initial_food = self.game.colony.food
+        event_manager = self.game.colony.event_manager
+        
+        # Use mock to force the event to trigger
+        with patch('random.random', return_value=0.1): # Ensures event happens
+            with patch('random.choice', return_value='bountiful_harvest'):
+                with patch('sys.stdout', new=io.StringIO()) as fake_out:
+                    event_manager.trigger_event(self.game.colony)
+                    output = fake_out.getvalue().strip()
+
+        self.assertIn("bountiful harvest", output)
+        self.assertEqual(self.game.colony.food, initial_food + 20)
+
+    def test_event_micrometeoroid_shower(self):
+        """Test the 'micrometeoroid_shower' event."""
+        initial_materials = self.game.colony.materials
+        event_manager = self.game.colony.event_manager
+        
+        with patch('random.random', return_value=0.1):
+            with patch('random.choice', return_value='micrometeoroid_shower'):
+                with patch('sys.stdout', new=io.StringIO()) as fake_out:
+                    event_manager.trigger_event(self.game.colony)
+                    output = fake_out.getvalue().strip()
+
+        self.assertIn("micrometeoroid shower", output)
+        self.assertEqual(self.game.colony.materials, initial_materials - 15)
+
 
 if __name__ == '__main__':
     unittest.main()

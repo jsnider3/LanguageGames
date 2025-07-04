@@ -1,3 +1,5 @@
+import random
+
 # --- Building Data ---
 BUILDING_SPECS = {
     "greenhouse": {
@@ -18,6 +20,48 @@ class Building:
         self.name = name
         self.spec = BUILDING_SPECS[name]
 
+class EventManager:
+    """Handles the triggering and effects of random events."""
+    def __init__(self):
+        self.events = {
+            "bountiful_harvest": {
+                "description": "Favorable weather conditions have led to a bountiful harvest!",
+                "effect": {"food": 20}
+            },
+            "power_surge": {
+                "description": "A solar flare caused a temporary surge in the power grid.",
+                "effect": {"power": 30}
+            },
+            "micrometeoroid_shower": {
+                "description": "A micrometeoroid shower passed by, causing minor damage to the exterior.",
+                "effect": {"materials": -15}
+            }
+        }
+
+    def trigger_event(self, colony):
+        """Randomly triggers an event and applies its effects."""
+        # 25% chance of an event happening each day
+        if random.random() < 0.25:
+            event_name = random.choice(list(self.events.keys()))
+            event = self.events[event_name]
+            
+            print(f"\nEVENT: {event['description']}")
+            
+            # Apply effects
+            if "food" in event["effect"]:
+                colony.food += event["effect"]["food"]
+            if "power" in event["effect"]:
+                colony.power += event["effect"]["power"]
+            if "materials" in event["effect"]:
+                colony.materials += event["effect"]["materials"]
+                if colony.materials < 0:
+                    print("The colony couldn't fully repair the damage!")
+                    # Could add more severe consequences here later
+                    colony.materials = 0
+            
+            return True
+        return False
+
 class Colony:
     """
     Manages the state of the colony, including resources, colonists, and buildings.
@@ -30,6 +74,7 @@ class Colony:
         self.power = 100
         self.materials = 20
         self.buildings = []
+        self.event_manager = EventManager()
 
         # Job assignments
         self.jobs = {
@@ -65,7 +110,10 @@ class Colony:
 
     def next_day(self):
         """Processes a single day's resource production and consumption."""
-        # --- Production ---
+        # --- Event Phase ---
+        self.event_manager.trigger_event(self)
+
+        # --- Production Phase ---
         food_produced = self.jobs['farming'] * 2
         materials_produced = self.jobs['mining'] * 1
         power_produced = 0
@@ -74,7 +122,7 @@ class Colony:
             food_produced += building.spec["produces"].get("food", 0)
             power_produced += building.spec["produces"].get("power", 0)
 
-        # --- Consumption ---
+        # --- Consumption Phase ---
         food_consumed = self.colonists
         water_consumed = self.colonists
         power_consumed = 0
