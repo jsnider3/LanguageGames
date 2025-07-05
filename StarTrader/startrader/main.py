@@ -1,618 +1,21 @@
-import random
 import time
-import uuid
 import json
 import os
+from .classes import Player, Ship, Mission
+from .galaxy import Galaxy
+from .events import EventManager
+from .game_data import (FACTIONS, ILLEGAL_GOODS, MODULE_SPECS)
 
 # --- Game Balance Constants ---
-REPAIR_COST_PER_HP = 15
-FUEL_COST_PER_UNIT = 10
-EVENT_CHANCE = 0.25
-MARKET_DRIFT_FACTOR = 4
-REPUTATION_DISCOUNT_THRESHOLD = 50
-PRICE_IMPACT_FACTOR = 0.05
-QUANTITY_IMPACT_DIVISOR = 50
-MAX_MISSIONS_PER_SYSTEM = 5
-SAVE_FILE_NAME = "savegame.json"
-GALAXY_WIDTH = 10
-GALAXY_HEIGHT = 10
-
-# --- Procedural Generation Data ---
-SYSTEM_NAME_PARTS = {
-    "part1": ["Sol", "Alpha", "Beta", "Sirius", "Vega", "Orion", "Cygnus", "Proxima", "Kepler"],
-    "part2": ["Centauri", "Majoris", "Minoris", "Prime", "Secundus", "Tertius", "IV", "IX", "X"],
-    "part3": ["Nebula", "Cluster", "Expanse", "Reach", "Void", "Core", "Rim", "Drift"]
+CONSTANTS = {
+    "REPAIR_COST_PER_HP": 15,
+    "FUEL_COST_PER_UNIT": 10,
+    "EVENT_CHANCE": 0.25,
+    "REPUTATION_DISCOUNT_THRESHOLD": 50,
+    "PRICE_IMPACT_FACTOR": 0.05,
+    "QUANTITY_IMPACT_DIVISOR": 50,
+    "SAVE_FILE_NAME": "savegame.json"
 }
-
-PIRATE_NAMES = ["Blackheart", "Red-Eye", "Iron-Fist", "One-Leg", "Mad-Dog"]
-
-CREW_RECRUITS = [
-    {"name": "Jax", "role": "Weapons Officer", "skill_bonus": 5, "salary": 100, "description": "A former navy gunner. Increases weapon damage."},
-    {"name": "Sparks", "role": "Engineer", "skill_bonus": 0.05, "salary": 120, "description": "A grease-stained genius. Improves fuel efficiency."},
-    {"name": "Slick", "role": "Negotiator", "skill_bonus": 0.1, "salary": 80, "description": "A smooth talker. Gets better prices at the market."},
-]
-
-# --- Data ---
-
-SHIP_CLASSES = {
-    "starter_ship": {
-        "name": "Stardust Drifter",
-        "base_hull": 100,
-        "base_fuel": 50,
-        "crew_quarters": 2,
-        "slots": {
-            "weapon": 1,
-            "shield": 1,
-            "engine": 1,
-            "cargo_hold": 2,
-        }
-    }
-}
-
-MODULE_SPECS = {
-    "cargo_hold": {
-        "CH-1": {"name": "Standard Cargo Hold", "cost": 0, "capacity": 20},
-        "CH-2": {"name": "Expanded Cargo Hold", "cost": 2500, "capacity": 50},
-        "CH-3": {"name": "Large Cargo Bay", "cost": 6000, "capacity": 100},
-    },
-    "engine": {
-        "E-1": {"name": "Basic Engine", "cost": 0, "fuel_efficiency": 1.0},
-        "E-2": {"name": "Ion Drive", "cost": 4000, "fuel_efficiency": 0.8},
-    },
-    "weapon": {
-        "W-1": {"name": "Pulse Laser", "cost": 1000, "damage": 10},
-        "W-2": {"name": "Heavy Laser", "cost": 3500, "damage": 25},
-    },
-    "shield": {
-        "S-1": {"name": "Basic Shield", "cost": 1500, "strength": 50},
-        "S-2": {"name": "Deflector Shield", "cost": 4000, "strength": 100},
-    }
-}
-
-GOODS = {
-    "Food": {"base_price": 20},
-    "Medicine": {"base_price": 50},
-    "Machinery": {"base_price": 100},
-    "Minerals": {"base_price": 80},
-    "Luxury Goods": {"base_price": 200}
-}
-
-ILLEGAL_GOODS = {
-    "Cybernetics": {"base_price": 500},
-    "Illegal Arms": {"base_price": 800},
-    "Xeno-Artifacts": {"base_price": 1200}
-}
-
-FACTIONS = {
-    "Federation": {"name": "Terran Federation", "home_system": "Sol"},
-    "Syndicate": {"name": "Orion Syndicate", "home_system": "Sirius"},
-    "Independent": {"name": "Independent Systems", "home_system": None}
-}
-
-class Mission:
-    """Represents a single mission."""
-    def __init__(self, origin_system, destination_system, faction, good, quantity, mission_type="DELIVER", target_name=None):
-        self.id = str(uuid.uuid4())[:4] # Short, readable ID
-        self.type = mission_type
-        self.origin_system = origin_system
-        self.destination_system = destination_system
-        self.faction = faction
-        self.good = good
-        self.quantity = quantity
-        self.target_name = target_name
-        
-        # Calculate rewards & time limit
-        if self.type == "BOUNTY":
-            self.reward_credits = 5000
-            self.reward_reputation = 25
-        else:
-            base_good_price = GOODS.get(good, ILLEGAL_GOODS.get(good, {"base_price": 0}))["base_price"]
-            distance = 1 # Simplified for now
-            self.reward_credits = int((base_good_price * quantity * 0.5) + (distance * 100))
-            self.reward_reputation = 10
-            
-        self.time_limit = 15 # Days
-        self.expiration_day = None
-
-    def get_description(self):
-        if self.type == "DELIVER":
-            return (f"Deliver {self.quantity} {self.good} from {self.origin_system.name} to "
-                    f"{self.destination_system.name} for the {self.faction}.")
-        elif self.type == "PROCURE":
-            return (f"Procure {self.quantity} {self.good} and deliver them to "
-                    f"{self.destination_system.name} for the {self.faction}.")
-        elif self.type == "BOUNTY":
-            return (f"Hunt down the notorious pirate {self.target_name} last seen in the "
-                    f"{self.destination_system.name} system for the {self.faction}.")
-
-    def to_dict(self):
-        """Converts the mission to a serializable dictionary."""
-        return {
-            "id": self.id,
-            "type": self.type,
-            "origin_system_name": self.origin_system.name,
-            "destination_system_name": self.destination_system.name,
-            "faction": self.faction,
-            "good": self.good,
-            "quantity": self.quantity,
-            "target_name": self.target_name,
-            "reward_credits": self.reward_credits,
-            "reward_reputation": self.reward_reputation,
-            "time_limit": self.time_limit,
-            "expiration_day": self.expiration_day,
-        }
-
-    @classmethod
-    def from_dict(cls, data, galaxy):
-        """Creates a Mission object from a dictionary."""
-        origin = galaxy.systems[data["origin_system_name"]]
-        destination = galaxy.systems[data["destination_system_name"]]
-        mission = cls(origin, destination, data["faction"], data["good"], data["quantity"], data["type"], data.get("target_name"))
-        mission.id = data["id"]
-        mission.reward_credits = data["reward_credits"]
-        mission.reward_reputation = data["reward_reputation"]
-        mission.time_limit = data["time_limit"]
-        mission.expiration_day = data["expiration_day"]
-        return mission
-
-class CrewMember:
-    """Represents a single crew member."""
-    def __init__(self, name, role, skill_bonus, salary, description):
-        self.name = name
-        self.role = role
-        self.skill_bonus = skill_bonus
-        self.salary = salary
-        self.description = description
-
-    def to_dict(self):
-        """Converts the crew member to a serializable dictionary."""
-        return {
-            "name": self.name,
-            "role": self.role,
-            "skill_bonus": self.skill_bonus,
-            "salary": self.salary,
-            "description": self.description,
-        }
-
-    @classmethod
-    def from_dict(cls, data):
-        """Creates a CrewMember object from a dictionary."""
-        return cls(data["name"], data["role"], data["skill_bonus"], data["salary"], data["description"])
-
-class StarSystem:
-    """Represents a single star system in the galaxy."""
-    def __init__(self, name, description, economy_type, faction, x, y, has_shipyard=False):
-        self.name = name
-        self.description = description
-        self.economy_type = economy_type
-        self.faction = faction
-        self.x = x
-        self.y = y
-        self.has_shipyard = has_shipyard
-        self.market = {}
-        self.available_missions = []
-        self.has_black_market = False
-        self.recruitment_office = []
-
-class Galaxy:
-    """Holds the map of all star systems and generates their markets."""
-    def __init__(self):
-        self.systems = {}
-        self.connections = {}
-        self.fuel_costs = {}
-        self.active_events = {} # e.g., {"Sirius": {"type": "famine", "duration": 5}}
-        self._create_galaxy()
-        self._generate_markets()
-        self._generate_missions()
-        self._populate_recruitment_offices()
-
-    def _populate_recruitment_offices(self):
-        """Populates the recruitment offices with potential crew members."""
-        # For now, all recruits are available in Sol
-        for recruit_data in CREW_RECRUITS:
-            self.systems["Sol"].recruitment_office.append(CrewMember(**recruit_data))
-
-    def _generate_missions(self):
-        """Generates new missions for each system."""
-        for system in self.systems.values():
-            if system.faction == "Independent": continue # No missions from independents for now
-            
-            # Remove completed or expired missions before generating new ones
-            system.available_missions = [m for m in system.available_missions if not getattr(m, 'is_complete', False)]
-
-            # A system must have connections to generate missions
-            if not self.connections.get(system.name):
-                continue
-
-            while len(system.available_missions) < MAX_MISSIONS_PER_SYSTEM:
-                
-                # Determine possible mission types to avoid infinite loops
-                possible_types = ["DELIVER", "PROCURE"]
-                
-                # Check if a BOUNTY mission is possible
-                possible_bounty_destinations = [
-                    self.systems[s_name] for s_name in self.connections[system.name]
-                    if self.systems[s_name].faction != "Federation"
-                ]
-                if possible_bounty_destinations:
-                    possible_types.append("BOUNTY")
-
-                mission_type = random.choice(possible_types)
-                
-                if mission_type == "BOUNTY":
-                    destination = random.choice(possible_bounty_destinations)
-                    target_name = random.choice(PIRATE_NAMES)
-                    mission = Mission(system, destination, system.faction, None, None, "BOUNTY", target_name)
-                else:
-                    destination_name = random.choice(self.connections[system.name])
-                    destination = self.systems[destination_name]
-                    good = random.choice(list(GOODS.keys()))
-                    quantity = random.randint(5, 20)
-                    mission = Mission(system, destination, system.faction, good, quantity, mission_type)
-
-                system.available_missions.append(mission)
-
-    def _create_galaxy(self):
-        """Creates the star systems and their connections in the galaxy."""
-        # Create a grid of systems
-        grid = [[None for _ in range(GALAXY_WIDTH)] for _ in range(GALAXY_HEIGHT)]
-        
-        # Place core systems
-        grid[5][5] = StarSystem("Sol", "The bustling core of humanity.", "Core", "Federation", 5, 5, has_shipyard=True)
-        grid[4][5] = StarSystem("Alpha Centauri", "A verdant agricultural world.", "Agricultural", "Federation", 4, 5)
-        grid[5][4] = StarSystem("Sirius", "A heavily industrialized system.", "Industrial", "Syndicate", 5, 4, has_shipyard=True)
-        grid[6][4] = StarSystem("Vega", "A remote mining outpost.", "Mining", "Independent", 6, 4)
-
-        # Procedurally generate the rest of the systems
-        for y in range(GALAXY_HEIGHT):
-            for x in range(GALAXY_WIDTH):
-                if grid[y][x] is None and random.random() < 0.3: # 30% chance of a system
-                    name = f"{random.choice(SYSTEM_NAME_PARTS['part1'])}-{random.randint(1, 100)}"
-                    description = "An unremarkable system."
-                    economy_type = random.choice(["Agricultural", "Industrial", "Mining", "Core"])
-                    faction = random.choice(["Federation", "Syndicate", "Independent"])
-                    has_shipyard = random.random() < 0.2 # 20% chance of a shipyard
-                    grid[y][x] = StarSystem(name, description, economy_type, faction, x, y, has_shipyard)
-
-        # Add systems to the main dictionary and create connections
-        for y in range(GALAXY_HEIGHT):
-            for x in range(GALAXY_WIDTH):
-                if grid[y][x]:
-                    self.systems[grid[y][x].name] = grid[y][x]
-                    
-                    # Connect to nearby systems
-                    for dx in range(-1, 2):
-                        for dy in range(-1, 2):
-                            if dx == 0 and dy == 0: continue
-                            nx, ny = x + dx, y + dy
-                            if 0 <= nx < GALAXY_WIDTH and 0 <= ny < GALAXY_HEIGHT and grid[ny][nx]:
-                                if grid[y][x].name not in self.connections:
-                                    self.connections[grid[y][x].name] = []
-                                self.connections[grid[y][x].name].append(grid[ny][nx].name)
-                                
-                                # Calculate fuel cost
-                                distance = self._calculate_distance(grid[y][x], grid[ny][nx])
-                                self.fuel_costs[(grid[y][x].name, grid[ny][nx].name)] = int(distance * 5)
-
-    def _calculate_distance(self, system1, system2):
-        """Calculates the distance between two systems."""
-        return ((system1.x - system2.x)**2 + (system1.y - system2.y)**2)**0.5
-
-    def _get_base_price_multiplier(self, system_economy, good):
-        """Calculates the base price multiplier for a good in a system."""
-        if system_economy == "Agricultural" and good == "Food": return 0.6
-        if system_economy != "Agricultural" and good == "Food": return 1.4
-        if system_economy == "Industrial" and good == "Machinery": return 0.7
-        if system_economy != "Industrial" and good == "Machinery": return 1.3
-        if system_economy == "Mining" and good == "Minerals": return 0.5
-        if system_economy != "Mining" and good == "Minerals": return 1.5
-        return 1.0
-
-    def _generate_markets(self):
-        """Generates the initial market data for each system."""
-        for system in self.systems.values():
-            # Legal Market
-            for good, data in GOODS.items():
-                base_price = data["base_price"]
-                multiplier = self._get_base_price_multiplier(system.economy_type, good)
-                price = int(base_price * multiplier * random.uniform(0.9, 1.1))
-                quantity = random.randint(50, 200)
-                system.market[good] = {"price": price, "quantity": quantity}
-            
-            # Black Market
-            if system.has_black_market:
-                for good, data in ILLEGAL_GOODS.items():
-                    # Illegal goods are always expensive and rare
-                    price = int(data["base_price"] * random.uniform(1.2, 1.8))
-                    quantity = random.randint(5, 25)
-                    system.market[good] = {"price": price, "quantity": quantity}
-
-    def update_markets(self):
-        """Updates all markets due to natural economic drift and events."""
-        # Decay active events
-        for system_name, event in list(self.active_events.items()):
-            event["duration"] -= 1
-            if event["duration"] <= 0:
-                print(f"The {event['type']} in {system_name} has ended.")
-                del self.active_events[system_name]
-
-        # Update prices
-        for system in self.systems.values():
-            for good, data in system.market.items():
-                base_price = GOODS.get(good, ILLEGAL_GOODS.get(good, {"base_price": 0}))["base_price"]
-                multiplier = self._get_base_price_multiplier(system.economy_type, good)
-                
-                # Check for events
-                if system.name in self.active_events:
-                    event = self.active_events[system.name]
-                    if event["type"] == "famine" and good == "Food":
-                        multiplier *= 3.0 # Famine triples food prices
-                    if event["type"] == "mining_strike" and good == "Minerals":
-                        multiplier *= 4.0 # Strike quadruples mineral prices
-                    if event["type"] == "bountiful_harvest" and good == "Food":
-                        multiplier *= 0.5 # Bountiful harvest halves food prices
-                    if event["type"] == "mining_boom" and good == "Minerals":
-                        multiplier *= 0.4 # Mining boom cuts mineral prices by 60%
-
-                target_price = int(base_price * multiplier)
-                # Drift price towards the target price
-                data["price"] += (target_price - data["price"]) // MARKET_DRIFT_FACTOR
-        
-        self._generate_missions()
-
-class Ship:
-    """
-    Represents the player's starship, composed of a hull and various modules.
-    """
-    def __init__(self, ship_class="starter_ship"):
-        self.ship_class_data = SHIP_CLASSES[ship_class]
-        self.name = self.ship_class_data["name"]
-        self.hull = self.ship_class_data["base_hull"]
-        self.fuel = self.ship_class_data["base_fuel"]
-        self.max_fuel = self.ship_class_data["base_fuel"]
-        self.cargo_hold = {}
-        
-        # Equip default modules
-        self.modules = {
-            "weapon": ["W-1"],
-            "shield": ["S-1"],
-            "engine": ["E-1"],
-            "cargo_hold": ["CH-1"],
-        }
-
-    @property
-    def max_hull(self):
-        return self.ship_class_data["base_hull"]
-
-    @property
-    def cargo_capacity(self):
-        total_capacity = 0
-        for module_id in self.modules.get("cargo_hold", []):
-            total_capacity += MODULE_SPECS["cargo_hold"][module_id]["capacity"]
-        return total_capacity
-
-    def get_fuel_efficiency(self, player):
-        """Calculates fuel efficiency based on engine modules and crew."""
-        base_efficiency = 1.0
-        for module_id in self.modules.get("engine", []):
-            efficiency = MODULE_SPECS["engine"][module_id]["fuel_efficiency"]
-            if efficiency < base_efficiency:
-                base_efficiency = efficiency
-        
-        # Apply engineer bonus
-        engineer_bonus = player.get_crew_bonus("Engineer")
-        return base_efficiency - engineer_bonus
-
-    def get_shield_strength(self):
-        total_strength = 0
-        for module_id in self.modules.get("shield", []):
-            total_strength += MODULE_SPECS["shield"][module_id]["strength"]
-        return total_strength
-
-    def get_weapon_damage(self, player):
-        total_damage = 0
-        for module_id in self.modules.get("weapon", []):
-            total_damage += MODULE_SPECS["weapon"][module_id]["damage"]
-            
-        # Apply weapons officer bonus
-        officer_bonus = player.get_crew_bonus("Weapons Officer")
-        return total_damage + officer_bonus
-
-    def get_cargo_used(self):
-        return sum(self.cargo_hold.values())
-    def add_cargo(self, good, quantity):
-        self.cargo_hold[good] = self.cargo_hold.get(good, 0) + quantity
-    def remove_cargo(self, good, quantity):
-        if good in self.cargo_hold:
-            self.cargo_hold[good] -= quantity
-            if self.cargo_hold[good] <= 0:
-                del self.cargo_hold[good]
-
-class Player:
-    """
-    Represents the player.
-    """
-    def __init__(self, name="Captain"):
-        self.name = name
-        self.credits = 1000
-        self.ship = Ship()
-        self.location = None
-        self.reputation = {faction: 0 for faction in FACTIONS}
-        self.active_missions = []
-        self.crew = []
-
-    def add_reputation(self, faction, amount):
-        if faction != "Independent":
-            self.reputation[faction] += amount
-            if amount > 0:
-                print(f"Your reputation with {faction} has increased to {self.reputation[faction]}.")
-            elif amount < 0:
-                print(f"Your reputation with {faction} has decreased to {self.reputation[faction]}.")
-
-    def get_crew_bonus(self, role):
-        """Calculates the total skill bonus for a given role from all crew members."""
-        bonus = 0
-        for member in self.crew:
-            if member.role == role:
-                bonus += member.skill_bonus
-        return bonus
-
-
-class EventManager:
-    """Handles random events during travel."""
-    def __init__(self, game):
-        self.game = game
-
-    def trigger_event(self):
-        """Randomly determines if an event occurs and handles it."""
-        if random.random() > EVENT_CHANCE: return
-
-        # Prioritize economic events for now, will add more later
-        event_type = random.choice(["famine", "mining_strike", "pirate", "derelict", "asteroid", "customs_scan"])
-        print("\n--- EVENT ---")
-
-        if event_type == "famine": self._handle_famine()
-        elif event_type == "mining_strike": self._handle_mining_strike()
-        elif event_type == "pirate": self._handle_pirate_encounter()
-        elif event_type == "derelict": self._handle_derelict_ship()
-        elif event_type == "asteroid": self._handle_asteroid_field()
-        elif event_type == "customs_scan": self._handle_customs_scan()
-
-    def _handle_customs_scan(self):
-        """Handles a random customs scan event."""
-        faction = self.game.player.location.faction
-        if faction == "Independent" or faction == "Syndicate": # Less likely to be scanned in these systems
-            if random.random() > 0.1:
-                return
-        
-        print(f"You are hailed by a {faction} patrol for a routine customs scan.")
-        
-        illegal_cargo = []
-        for good, quantity in self.game.player.ship.cargo_hold.items():
-            if good in ILLEGAL_GOODS:
-                illegal_cargo.append((good, quantity))
-        
-        if not illegal_cargo:
-            print("The scan reveals nothing illegal. They let you pass.")
-            return
-            
-        print("\n--- CONTRABAND DETECTED! ---")
-        total_fine = 0
-        for good, quantity in illegal_cargo:
-            base_price = ILLEGAL_GOODS[good]["base_price"]
-            fine = base_price * quantity * 2 # 200% fine
-            total_fine += fine
-            print(f"Your {quantity} units of {good} have been confiscated!")
-            self.game.player.ship.remove_cargo(good, quantity)
-            
-        reputation_loss = 25 * len(illegal_cargo)
-        print(f"You have been fined {total_fine} credits and your reputation with {faction} has been damaged.")
-        self.game.player.credits -= total_fine
-        self.game.player.add_reputation(faction, -reputation_loss)
-        
-        if self.game.player.credits < 0:
-            print("You couldn't afford the fine and have been thrown in jail. Your journey ends here.")
-            self.game.game_over = True
-
-    def _handle_famine(self):
-        system = random.choice(list(self.game.galaxy.systems.values()))
-        if system.economy_type == "Agricultural": # Famines don't happen on farm worlds
-            print(f"A distress call from a nearby system speaks of a bountiful harvest in {system.name}. Prices for food there may be low.")
-            self.game.galaxy.active_events[system.name] = {"type": "bountiful_harvest", "duration": 5}
-            return
-        print(f"A severe famine has struck {system.name}! Demand for food is critical.")
-        self.game.galaxy.active_events[system.name] = {"type": "famine", "duration": 10}
-
-    def _handle_mining_strike(self):
-        system = random.choice(list(self.game.galaxy.systems.values()))
-        if system.economy_type == "Mining":
-            print(f"A new mineral vein was discovered in {system.name}. Mineral prices there may be low.")
-            self.game.galaxy.active_events[system.name] = {"type": "mining_boom", "duration": 5}
-            return
-        print(f"A widespread labor strike has halted all mining operations in {system.name}!")
-        self.game.galaxy.active_events[system.name] = {"type": "mining_strike", "duration": 8}
-
-    def _handle_pirate_encounter(self):
-        # Check for active bounty missions in the current system
-        bounty_mission = None
-        for mission in self.game.player.active_missions:
-            if mission.type == "BOUNTY" and mission.destination_system == self.game.player.location:
-                bounty_mission = mission
-                break
-        
-        if bounty_mission:
-            pirate_name = bounty_mission.target_name
-            print(f"You've found him! The notorious pirate {pirate_name} is here!")
-            pirate_hull = 100 # Bounty targets are tougher
-            pirate_damage = 20
-        else:
-            pirate_name = "a pirate"
-            print(f"You've been ambushed by {pirate_name}!")
-            pirate_hull = 50
-            pirate_damage = 15
-        
-        while True:
-            choice = input("Do you 'fight' or 'flee'? > ").lower()
-            if choice == "flee":
-                print("You attempt to flee...")
-                if random.random() > 0.5:
-                    print("You got away safely!")
-                    return
-                else:
-                    print("You couldn't escape!")
-            
-            # Player's turn
-            player_damage = self.game.player.ship.get_weapon_damage(self.game.player)
-            pirate_hull -= player_damage
-            print(f"You fire your weapons, dealing {player_damage} damage. The pirate has {pirate_hull} hull remaining.")
-            if pirate_hull <= 0:
-                print(f"You destroyed the {pirate_name}'s ship!")
-                
-                if bounty_mission:
-                    self.game._handle_complete(["complete", bounty_mission.id, "bounty"])
-                else:
-                    salvage = random.randint(200, 800)
-                    self.game.player.credits += salvage
-                    print(f"You salvage {salvage} credits from the wreckage.")
-                return
-
-            # Pirate's turn
-            damage_taken = pirate_damage
-            # Apply shield damage first
-            shield_strength = self.game.player.ship.get_shield_strength()
-            if shield_strength > 0:
-                if damage_taken <= shield_strength:
-                    print(f"Your shields absorbed {damage_taken} damage.")
-                    damage_taken = 0
-                else:
-                    damage_taken -= shield_strength
-                    print(f"Your shields absorbed {shield_strength} damage and collapsed!")
-            
-            if damage_taken > 0:
-                self.game.player.ship.hull -= damage_taken
-                print(f"The pirate fires back, dealing {damage_taken} hull damage.")
-
-            if self.game.player.ship.hull <= 0:
-                self.game.game_over = True
-                print("Your ship was destroyed by pirates...")
-                return
-            
-            print(f"Your Hull: {self.game.player.ship.hull}/{self.game.player.ship.max_hull}, Pirate Hull: {pirate_hull}/50")
-
-    def _handle_derelict_ship(self):
-        print("You come across a derelict, drifting ship.")
-        salvage = random.randint(50, 200)
-        self.game.player.credits += salvage
-        print(f"You salvage parts worth {salvage} credits.")
-
-    def _handle_asteroid_field(self):
-        print("You navigate a dense asteroid field.")
-        damage = random.randint(5, 15)
-        self.game.player.ship.hull -= damage
-        print(f"You make it through, but your ship takes {damage} hull damage.")
-        if self.game.player.ship.hull <= 0:
-            self.game.game_over = True
-            print("Your ship was destroyed by asteroids...")
 
 class Game:
     """
@@ -625,6 +28,7 @@ class Game:
         self.game_over = False
         self.player.location = self.galaxy.systems["Sol"]
         self.current_day = 1
+        self.constants = CONSTANTS
 
     def get_status(self):
         ship = self.player.ship
@@ -636,7 +40,7 @@ class Game:
         status = (
             f"--- Captain {self.player.name} ---\n"
             f"Credits: {self.player.credits}\n"
-            f"\nCurrent Location: {system.name} ({system.economy_type})\n"
+            f"\n--- Current Location: {system.name} ({system.economy_type})\n"
             f"System Faction: {system.faction} ({FACTIONS[system.faction]['name']})\n"
             f"Description: {system.description}\n"
             f"Reachable Systems: {travel_options}\n"
@@ -740,7 +144,7 @@ class Game:
         # All checks passed, execute transaction
         self.player.credits -= total_cost
         market_data["quantity"] -= quantity
-        market_data["price"] = int(market_data["price"] * (1 + PRICE_IMPACT_FACTOR * (quantity / QUANTITY_IMPACT_DIVISOR))) + 1 # Price increases on buy
+        market_data["price"] = int(market_data["price"] * (1 + self.constants['PRICE_IMPACT_FACTOR'] * (quantity / self.constants['QUANTITY_IMPACT_DIVISOR']))) + 1 # Price increases on buy
         ship.add_cargo(good_name, quantity)
         print(f"Successfully purchased {quantity} units of {good_name} for {total_cost} credits.")
         
@@ -789,7 +193,7 @@ class Game:
         # All checks passed, execute transaction
         self.player.credits += total_sale
         market_data["quantity"] += quantity
-        market_data["price"] = max(1, int(market_data["price"] * (1 - PRICE_IMPACT_FACTOR * (quantity / QUANTITY_IMPACT_DIVISOR))) - 1) # Price decreases on sell, min 1
+        market_data["price"] = max(1, int(market_data["price"] * (1 - self.constants['PRICE_IMPACT_FACTOR'] * (quantity / self.constants['QUANTITY_IMPACT_DIVISOR']))) - 1) # Price decreases on sell, min 1
         ship.remove_cargo(good_name, quantity)
         print(f"Successfully sold {quantity} units of {good_name} for {total_sale} credits.")
         
@@ -823,7 +227,7 @@ class Game:
         
         # Apply faction discount
         faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= REPUTATION_DISCOUNT_THRESHOLD: # Reputation >= 50 gives discount
+        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']: # Reputation >= 50 gives discount
             fuel_needed *= 0.9 # 10% discount
             print("Your high reputation with this faction gives you a 10% discount on fuel!")
 
@@ -868,10 +272,10 @@ class Game:
         print("Available commands: 'repair', 'upgrade <module_id>', 'sellmodule <module_id>'")
         
         faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= REPUTATION_DISCOUNT_THRESHOLD:
+        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']:
              print("Your high reputation with this faction gives you a 10% discount on repairs!")
         
-        print(f"Hull: {self.player.ship.hull}/{self.player.ship.max_hull}. Repair cost: {REPAIR_COST_PER_HP} credits per point.")
+        print(f"Hull: {self.player.ship.hull}/{self.player.ship.max_hull}. Repair cost: {self.constants['REPAIR_COST_PER_HP']} credits per point.")
         
         print("\n--- Available Modules for Purchase ---")
         for module_type, modules in MODULE_SPECS.items():
@@ -884,11 +288,11 @@ class Game:
         damage = ship.max_hull - ship.hull
         if damage == 0: print("Ship hull is already at maximum."); return
         
-        cost = damage * REPAIR_COST_PER_HP
+        cost = damage * self.constants['REPAIR_COST_PER_HP']
         
         # Apply faction discount
         faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= REPUTATION_DISCOUNT_THRESHOLD: # Reputation >= 50 gives discount
+        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']: # Reputation >= 50 gives discount
             cost *= 0.9 # 10% discount
         
         cost = int(cost)
@@ -959,7 +363,7 @@ class Game:
 
         amount_to_buy = min(amount_to_buy, fuel_needed) # Don't overfill
         
-        cost = amount_to_buy * FUEL_COST_PER_UNIT
+        cost = amount_to_buy * self.constants['FUEL_COST_PER_UNIT']
         
         if self.player.credits < cost:
             print(f"Not enough credits. You need {cost} for {amount_to_buy} fuel, but only have {self.player.credits}.")
@@ -987,8 +391,6 @@ class Game:
             "missions": self._handle_missions,
             "accept": self._handle_accept,
             "complete": self._handle_complete,
-            "accept": self._handle_accept,
-            "complete": self._handle_complete,
             "save": self._handle_save,
             "load": self._handle_load,
             "new": self._handle_new,
@@ -1004,7 +406,7 @@ class Game:
         
         print(f"Commands: {', '.join(self.commands.keys())}")
         
-        if os.path.exists(SAVE_FILE_NAME):
+        if os.path.exists(self.constants['SAVE_FILE_NAME']):
             print("Save file found. Use 'load' to continue or 'new' to start a new game.")
         else:
             self._handle_status(None) # Initial status
@@ -1213,17 +615,17 @@ class Game:
             "current_day": self.current_day,
         }
         
-        with open(SAVE_FILE_NAME, 'w') as f:
+        with open(self.constants['SAVE_FILE_NAME'], 'w') as f:
             json.dump(game_state, f, indent=4)
-        print(f"Game saved to {SAVE_FILE_NAME}.")
+        print(f"Game saved to {self.constants['SAVE_FILE_NAME']}.")
 
     def _handle_load(self, parts):
         """Loads the game state from a file."""
-        if not os.path.exists(SAVE_FILE_NAME):
+        if not os.path.exists(self.constants['SAVE_FILE_NAME']):
             print("No save file found.")
             return
 
-        with open(SAVE_FILE_NAME, 'r') as f:
+        with open(self.constants['SAVE_FILE_NAME'], 'r') as f:
             game_state = json.load(f)
 
         # Restore Player state
@@ -1373,8 +775,3 @@ class Game:
     def quit_game(self, parts):
         """Sets the game_over flag to True."""
         self.game_over = True
-
-
-if __name__ == "__main__":
-    game = Game()
-    game.run()

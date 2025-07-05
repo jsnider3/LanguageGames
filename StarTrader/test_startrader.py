@@ -8,7 +8,9 @@ import random
 # Add the parent directory to the Python path to allow for local imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from StarTrader.startrader import Galaxy, Game, Ship, Player, Mission
+from startrader.main import Game
+from startrader.galaxy import Galaxy
+from startrader.classes import Ship, Player, Mission
 
 class TestStarTrader(unittest.TestCase):
     """Tests for the Star Trader game."""
