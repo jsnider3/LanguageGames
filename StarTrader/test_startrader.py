@@ -4,6 +4,7 @@ import io
 import sys
 import os
 import random
+import signal
 
 # Add the parent directory to the Python path to allow for local imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -12,14 +13,27 @@ from startrader.main import Game
 from startrader.galaxy import Galaxy
 from startrader.classes import Ship, Player, Mission
 
+class TimeoutError(Exception):
+    pass
+
 class TestStarTrader(unittest.TestCase):
     """Tests for the Star Trader game."""
+
+    def timeout_handler(self, signum, frame):
+        """Handles the timeout signal."""
+        raise TimeoutError("Test timed out after 10 seconds")
 
     def setUp(self):
         """Set up a new Game instance for each test."""
         # Seeding random ensures that market prices are predictable for tests
         random.seed(42)
         self.game = Game()
+        signal.signal(signal.SIGALRM, self.timeout_handler)
+        signal.alarm(10) # 10 second timeout
+
+    def tearDown(self):
+        """Cancel the alarm after each test."""
+        signal.alarm(0)
 
     def test_galaxy_creation(self):
         """Test that the galaxy and its systems are created correctly."""
