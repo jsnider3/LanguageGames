@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Black Hole Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #00000a;
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 350px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            cursor: move; /* Add move cursor to indicate it's draggable */
+        }
+        .info-panel h1, .info-panel p {
+            pointer-events: none; /* Prevent text selection on drag */
+            user-select: none;
+        }
+        .slider-container {
+            margin-top: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            pointer-events: none;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="container"></div>
+
+    <div class="info-panel" id="info-panel">
+        <h1 class="text-xl font-bold mb-2">Black Hole Simulation</h1>
+        <p class="text-sm text-gray-300 mb-4">
+            An interactive model of a black hole with a glowing accretion disk, featuring Doppler beaming and gravitational lensing.
+        </p>
+        
+        <div class="slider-container">
+            <label for="lensing-slider">Gravitational Lensing Strength</label>
+            <input id="lensing-slider" type="range" min="0" max="0.1" value="0.03" step="0.001">
+        </div>
+
+        <div class="slider-container">
+            <label for="disk-speed-slider">Accretion Disk Speed</label>
+            <input id="disk-speed-slider" type="range" min="0.1" max="2.0" value="1.0" step="0.05">
+        </div>
+
+        <div class="slider-container">
+            <label for="particle-count-slider">Particle Count</label>
+            <input id="particle-count-slider" type="range" min="10000" max="100000" value="50000" step="1000">
+            <button id="restart-btn" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                Apply & Restart
+            </button>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+        // --- Configuration Constants ---
+        const CONSTANTS = {
+            STAR_COUNT: 15000,
+            STARFIELD_RADIUS: 1000,
+            EVENT_HORIZON_RADIUS: 6.0,
+            DISK_OUTER_RADIUS: 35.0,
+            DISK_HEIGHT: 3.0,
+            PHOTON_SPHERE_THICKNESS: 0.2,
+            INWARD_DRIFT_SPEED: 0.04,
+            ORBITAL_VELOCITY_FACTOR: 150,
+            DOPPLER_BRIGHTNESS_FACTOR: 0.8,
+            DOPPLER_HUE_SHIFT_FACTOR: -0.1,
+            PARTICLE_BASE_SIZE: 0.1,
+            MAX_DELTA_TIME: 1 / 30 // Cap delta time to prevent physics jumps
+        };
+
+        let simulationParams = {
+            particleCount: 50000,
+            lensingStrength: 0.03,
+            diskSpeed: 1.0
+        };
+        // --------------------------------
+
+        let scene, camera, renderer, controls, composer, clock;
+        let accretionDisk;
+        let particleData = []; 
+
+        const LensingShader = {
+            uniforms: { "tDiffuse": { value: null }, "strength": { value: 0.03 }, "center": { value: new THREE.Vector2(0.5, 0.5) }, "aspectRatio": { value: window.innerWidth / window.innerHeight } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+                uniform sampler2D tDiffuse; uniform float strength; uniform vec2 center; uniform float aspectRatio; varying vec2 vUv;
+                void main() {
+                    vec2 uv = vUv; vec2 texCoord = uv;
+                    texCoord -= center; texCoord.x *= aspectRatio;
+                    float dist = length(texCoord);
+                    if (dist > 0.0) { vec2 deflection = texCoord / dist * strength / dist; texCoord += deflection; }
+                    texCoord.x /= aspectRatio; texCoord += center;
+                    gl_FragColor = texture2D(tDiffuse, texCoord);
+                }`
+        };
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 20, 45);
+            
+            clock = new THREE.Clock();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 300;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.1;
+
+            createStarfield();
+
+            const blackHoleGeometry = new THREE.SphereGeometry(CONSTANTS.EVENT_HORIZON_RADIUS - 0.1, 64, 64);
+            const blackHoleMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            scene.add(new THREE.Mesh(blackHoleGeometry, blackHoleMaterial));
+
+            // Add Photon Sphere for visual flair
+            const photonSphereGeom = new THREE.RingGeometry(CONSTANTS.EVENT_HORIZON_RADIUS, CONSTANTS.EVENT_HORIZON_RADIUS + CONSTANTS.PHOTON_SPHERE_THICKNESS, 128);
+            const photonSphereMat = new THREE.MeshBasicMaterial({ color: 0xffeeb8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7, depthWrite: false });
+            const photonSphere = new THREE.Mesh(photonSphereGeom, photonSphereMat);
+            photonSphere.rotation.x = Math.PI / 2;
+            scene.add(photonSphere);
+
+            createAccretionDisk();
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            const lensingPass = new ShaderPass(LensingShader);
+            lensingPass.uniforms.strength.value = simulationParams.lensingStrength;
+            lensingPass.uniforms.aspectRatio.value = window.innerWidth / window.innerHeight;
+            composer.addPass(lensingPass);
+
+            setupEventListeners();
+        }
+
+        function createStarfield() {
+            const starGeometry = new THREE.BufferGeometry();
+            const starVertices = [];
+            for (let i = 0; i < CONSTANTS.STAR_COUNT; i++) {
+                const theta = 2 * Math.PI * Math.random();
+                const phi = Math.acos(2 * Math.random() - 1);
+                const x = CONSTANTS.STARFIELD_RADIUS * Math.sin(phi) * Math.cos(theta);
+                const y = CONSTANTS.STARFIELD_RADIUS * Math.sin(phi) * Math.sin(theta);
+                const z = CONSTANTS.STARFIELD_RADIUS * Math.cos(phi);
+                starVertices.push(x, y, z);
+            }
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const starMaterial = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.6, transparent: true, opacity: 0.8 });
+            scene.add(new THREE.Points(starGeometry, starMaterial));
+        }
+
+        function createAccretionDisk() {
+            if (accretionDisk) {
+                scene.remove(accretionDisk);
+                accretionDisk.geometry.dispose();
+                accretionDisk.material.dispose();
+            }
+            particleData = [];
+
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(simulationParams.particleCount * 3);
+            
+            for (let i = 0; i < simulationParams.particleCount; i++) {
+                const data = {};
+                resetParticle(data);
+                particleData.push(data);
+                positions[i * 3] = Math.cos(data.angle) * data.radius;
+                positions[i * 3 + 1] = data.y;
+                positions[i * 3 + 2] = Math.sin(data.angle) * data.radius;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(simulationParams.particleCount * 3), 3));
+
+            const material = new THREE.PointsMaterial({ size: CONSTANTS.PARTICLE_BASE_SIZE, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8, depthWrite: false });
+            accretionDisk = new THREE.Points(geometry, material);
+            scene.add(accretionDisk);
+            document.getElementById('restart-btn').innerText = `Apply & Restart`;
+        }
+        
+        function resetParticle(data) {
+            data.radius = Math.sqrt(Math.random()) * (CONSTANTS.DISK_OUTER_RADIUS - CONSTANTS.EVENT_HORIZON_RADIUS) + CONSTANTS.EVENT_HORIZON_RADIUS;
+            data.angle = Math.random() * Math.PI * 2;
+            data.y = (Math.random() - 0.5) * CONSTANTS.DISK_HEIGHT * (1 - (data.radius / CONSTANTS.DISK_OUTER_RADIUS) ** 2);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            const lensingPass = composer.passes[1];
+            if (lensingPass) lensingPass.uniforms.aspectRatio.value = window.innerWidth / window.innerHeight;
+        }
+
+        const cameraDirection = new THREE.Vector3();
+        const particleVelocity = new THREE.Vector3();
+        const baseColor = new THREE.Color();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            // *** FIX: Cap the delta time to prevent physics jumps on tab resume ***
+            const delta = Math.min(clock.getDelta(), CONSTANTS.MAX_DELTA_TIME);
+
+            camera.getWorldDirection(cameraDirection);
+            const positions = accretionDisk.geometry.attributes.position.array;
+            const colors = accretionDisk.geometry.attributes.color.array;
+
+            for (let i = 0; i < simulationParams.particleCount; i++) {
+                const data = particleData[i];
+                
+                data.radius -= CONSTANTS.INWARD_DRIFT_SPEED * simulationParams.diskSpeed * delta * 60; // Use delta for frame-rate independence
+                if (data.radius < CONSTANTS.EVENT_HORIZON_RADIUS) {
+                    resetParticle(data);
+                }
+                
+                const orbital_speed = CONSTANTS.ORBITAL_VELOCITY_FACTOR / Math.sqrt(data.radius);
+                const angular_velocity = orbital_speed / data.radius;
+                data.angle += angular_velocity * simulationParams.diskSpeed * delta;
+                
+                const i3 = i * 3;
+                positions[i3] = Math.cos(data.angle) * data.radius;
+                positions[i3 + 1] = data.y;
+                positions[i3 + 2] = Math.sin(data.angle) * data.radius;
+
+                const temp = 1 - ((data.radius - CONSTANTS.EVENT_HORIZON_RADIUS) / (CONSTANTS.DISK_OUTER_RADIUS - CONSTANTS.EVENT_HORIZON_RADIUS));
+                baseColor.setHSL(0.1 * (1 - temp), 0.9, 0.3 + temp * 0.7);
+
+                particleVelocity.set(-Math.sin(data.angle) * orbital_speed, 0, Math.cos(data.angle) * orbital_speed).normalize();
+                const dopplerFactor = particleVelocity.dot(cameraDirection);
+                
+                const dopplerColor = baseColor.clone();
+                const brightnessFactor = 1.0 + dopplerFactor * CONSTANTS.DOPPLER_BRIGHTNESS_FACTOR;
+                const colorShift = dopplerFactor * CONSTANTS.DOPPLER_HUE_SHIFT_FACTOR;
+                dopplerColor.offsetHSL(colorShift, 0.0, 0.0);
+                dopplerColor.multiplyScalar(brightnessFactor);
+                
+                colors[i3] = dopplerColor.r; colors[i3 + 1] = dopplerColor.g; colors[i3 + 2] = dopplerColor.b;
+            }
+            accretionDisk.geometry.attributes.position.needsUpdate = true;
+            accretionDisk.geometry.attributes.color.needsUpdate = true;
+
+            controls.update();
+            composer.render();
+        }
+        
+        function setupEventListeners() {
+            window.addEventListener('resize', onWindowResize, false);
+            document.getElementById('lensing-slider').addEventListener('input', (e) => {
+                composer.passes[1].uniforms.strength.value = parseFloat(e.target.value);
+            });
+            document.getElementById('disk-speed-slider').addEventListener('input', (e) => {
+                simulationParams.diskSpeed = parseFloat(e.target.value);
+            });
+            document.getElementById('particle-count-slider').addEventListener('input', (e) => {
+                const newCount = parseInt(e.target.value);
+                document.getElementById('restart-btn').innerText = `Apply ${newCount.toLocaleString()} Particles`;
+            });
+            document.getElementById('restart-btn').addEventListener('click', () => {
+                simulationParams.particleCount = parseInt(document.getElementById('particle-count-slider').value);
+                createAccretionDisk();
+            });
+
+            const panel = document.getElementById('info-panel');
+            let isDragging = false;
+            let offset = { x: 0, y: 0 };
+
+            panel.addEventListener('mousedown', (e) => {
+                if (e.target.closest('input, button')) return;
+                isDragging = true;
+                offset.x = e.clientX - panel.offsetLeft;
+                offset.y = e.clientY - panel.offsetTop;
+                panel.style.transition = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                panel.style.left = `${e.clientX - offset.x}px`;
+                panel.style.top = `${e.clientY - offset.y}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                panel.style.transition = '';
+            });
+        }
+
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
