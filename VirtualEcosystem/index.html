@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Ecosystem Simulation (Evolved)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            cursor: default;
+        }
+        .control-panel {
+            background-color: #2d3748;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            align-items: baseline;
+        }
+         @media (min-width: 1024px) {
+            .stat-grid {
+                grid-template-columns: auto 1fr auto 1fr;
+                gap: 0.5rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-7xl">
+        <h1 class="text-3xl font-bold text-center mb-2">Virtual Ecosystem Simulation</h1>
+        <p class="text-center text-gray-400 mb-4">With Re-balanced Carnivore Energy</p>
+        
+        <div class="control-panel p-4 rounded-lg shadow-lg mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-start">
+            <!-- Column 1: Core Controls -->
+            <div class="space-y-4">
+                <div class="flex space-x-2">
+                    <button id="start-pause-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Start</button>
+                    <button id="reset-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Reset</button>
+                </div>
+                 <div class="space-y-2">
+                    <button id="autotune-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Auto-Tune</button>
+                </div>
+                 <div class="space-y-2">
+                    <label for="herbivore-slider" class="block text-sm font-medium">Herbivores: <span id="herbivore-count-label">50</span></label>
+                    <input id="herbivore-slider" type="range" min="1" max="150" value="50" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="space-y-2">
+                    <label for="carnivore-slider" class="block text-sm font-medium">Carnivores: <span id="carnivore-count-label">5</span></label>
+                    <input id="carnivore-slider" type="range" min="0" max="50" value="5" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="space-y-2">
+                    <label for="food-slider" class="block text-sm font-medium">Food Density: <span id="food-count-label">200</span></label>
+                    <input id="food-slider" type="range" min="50" max="500" value="200" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Column 2: Advanced Parameters -->
+            <div class="bg-gray-800 p-3 rounded-lg space-y-4">
+                 <h3 class="font-semibold text-lg text-center mb-2">Advanced Params</h3>
+                 <div class="space-y-2">
+                    <label for="mutation-slider" class="block text-sm font-medium">Mutation Rate: <span id="mutation-label">10%</span></label>
+                    <input id="mutation-slider" type="range" min="0" max="50" value="10" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="space-y-2">
+                    <label for="cooldown-slider" class="block text-sm font-medium">Repro Cooldown: <span id="cooldown-label">2 Days</span></label>
+                    <input id="cooldown-slider" type="range" min="0" max="10" value="2" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+                 <button id="mute-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                    <svg id="speaker-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    <svg id="speaker-muted-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+                    <span>Mute</span>
+                </button>
+            </div>
+
+            <!-- Column 3, 4, 5: Stats -->
+            <div id="stats-container" class="bg-gray-800 p-3 rounded-lg lg:col-span-3">
+                <h3 class="font-semibold text-lg text-center mb-2">Live Statistics</h3>
+                <div id="normal-stats" class="stat-grid text-sm">
+                    <span class="font-bold text-blue-400">Day:</span><span id="day-stat">0</span>
+                    <span class="font-bold text-green-400">Herbivores:</span><span id="herbivore-stat">0</span>
+                    <span class="font-bold text-red-400">Carnivores:</span><span id="carnivore-stat">0</span>
+                    <span class="font-bold text-yellow-500">Carcasses:</span><span id="carcass-stat">0</span>
+                    <span class="font-bold text-green-400">H. Births:</span><span id="herb-births">0</span>
+                    <span class="font-bold text-red-400">C. Births:</span><span id="carn-births">0</span>
+                    <span class="font-bold text-green-400">H. Starved:</span><span id="herb-starved">0</span>
+                    <span class="font-bold text-green-400">H. Eaten:</span><span id="herb-eaten">0</span>
+                    <span class="font-bold text-red-400">C. Deaths:</span><span id="carn-deaths">0</span>
+                    <span class="font-bold text-green-400">Avg H. Speed:</span><span id="herb-avg-speed">0</span>
+                    <span class="font-bold text-red-400">Avg C. Speed:</span><span id="carn-avg-speed">0</span>
+                    <span class="font-bold text-green-400">Avg H. Vision:</span><span id="herb-avg-vision">0</span>
+                    <span class="font-bold text-red-400">Avg C. Vision:</span><span id="carn-avg-vision">0</span>
+                </div>
+                <div id="autotune-stats" class="hidden text-sm space-y-2">
+                    <h4 class="font-bold text-lg text-purple-400 text-center">Auto-Tuning in Progress...</h4>
+                    <div><span class="font-semibold">Generation:</span> <span id="generation-stat">0</span></div>
+                    <div><span class="font-semibold">Last Run:</span> <span id="last-run-stat">N/A</span> days</div>
+                    <div><span class="font-semibold">Best Run:</span> <span id="best-run-stat">0</span> days</div>
+                    <div class="pt-2 border-t border-gray-700"><span class="font-semibold">Best Params:</span>
+                        <div class="text-xs pl-2">
+                            H: <span id="best-h-stat">0</span> | C: <span id="best-c-stat">0</span> | F: <span id="best-f-stat">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="ecosystem-canvas" class="w-full rounded-lg shadow-2xl"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('ecosystem-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- DOM Elements ---
+        const startPauseBtn = document.getElementById('start-pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const autotuneBtn = document.getElementById('autotune-btn');
+        const herbivoreSlider = document.getElementById('herbivore-slider');
+        const carnivoreSlider = document.getElementById('carnivore-slider');
+        const foodSlider = document.getElementById('food-slider');
+        const mutationSlider = document.getElementById('mutation-slider');
+        const cooldownSlider = document.getElementById('cooldown-slider');
+        const muteBtn = document.getElementById('mute-btn');
+        const speakerIcon = document.getElementById('speaker-icon');
+        const speakerMutedIcon = document.getElementById('speaker-muted-icon');
+        const herbivoreLabel = document.getElementById('herbivore-count-label');
+        const carnivoreLabel = document.getElementById('carnivore-count-label');
+        const foodLabel = document.getElementById('food-count-label');
+        const mutationLabel = document.getElementById('mutation-label');
+        const cooldownLabel = document.getElementById('cooldown-label');
+        // Normal stats
+        const normalStatsEl = document.getElementById('normal-stats');
+        const herbivoreStat = document.getElementById('herbivore-stat');
+        const carnivoreStat = document.getElementById('carnivore-stat');
+        const carcassStat = document.getElementById('carcass-stat');
+        const dayStat = document.getElementById('day-stat');
+        const herbAvgSpeed = document.getElementById('herb-avg-speed');
+        const herbAvgVision = document.getElementById('herb-avg-vision');
+        const carnAvgSpeed = document.getElementById('carn-avg-speed');
+        const carnAvgVision = document.getElementById('carn-avg-vision');
+        const herbBirthsStat = document.getElementById('herb-births');
+        const carnBirthsStat = document.getElementById('carn-births');
+        const herbStarvedStat = document.getElementById('herb-starved');
+        const herbEatenStat = document.getElementById('herb-eaten');
+        const carnDeathsStat = document.getElementById('carn-deaths');
+        // Autotune stats
+        const autotuneStatsEl = document.getElementById('autotune-stats');
+        const generationStat = document.getElementById('generation-stat');
+        const lastRunStat = document.getElementById('last-run-stat');
+        const bestRunStat = document.getElementById('best-run-stat');
+        const bestHStat = document.getElementById('best-h-stat');
+        const bestCStat = document.getElementById('best-c-stat');
+        const bestFStat = document.getElementById('best-f-stat');
+
+        let simulationRunning = false;
+        let isAutoTuning = false;
+        let animationFrameId;
+        let herbivores = [], carnivores = [], food = [], carcasses = [];
+        let day = 0, frameCount = 0;
+        let stats = {};
+        let backgroundPattern;
+        let audioReady = false;
+        let autotuneData = { generation: 0, bestRun: 0, bestParams: {}, initialH: 0 };
+
+        // --- Simulation Parameters ---
+        let params = {};
+
+        function updateParams() {
+            params = {
+                herbivore: { baseRadius: 6, maxSpeed: 1.2, maxForce: 0.04, baseVision: 110, color: '#48BB78', energy: 100, reproduceEnergy: 200, energyLossRate: 0.1, movementEnergyCost: 0.01, cohesionVision: 50, maxStamina: 100, dangerThreshold: 0.4, herdBonusThreshold: 3, herdVisionBonus: 20 },
+                carnivore: { baseRadius: 8, maxSpeed: 1.6, maxForce: 0.05, baseVision: 150, color: '#F56565', energy: 300, reproduceEnergy: 450, energyLossRate: 0.15, movementEnergyCost: 0.015, hungerThreshold: 0.8, satiationTime: 100, sicknessChance: 0.40, sicknessDuration: 500, killEnergyGain: 140 },
+                food: { radius: 4, color: '#63B3ED', energy: 40 },
+                carcass: { radius: 5, color: '#A0AEC0', energy: 150 },
+                dayDurationFrames: 500,
+                mutationRate: parseInt(mutationSlider.value) / 100,
+                reproduceCooldown: parseInt(cooldownSlider.value) * 500
+            };
+        }
+        
+        const distance = (a, b) => Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2);
+        const random = (min, max) => Math.random() * (max - min) + min;
+        const mutate = (value) => value * (1 + random(-params.mutationRate, params.mutationRate));
+
+        class Vector {
+            constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+            add(v) { this.x += v.x; this.y += v.y; return this; }
+            sub(v) { this.x -= v.x; this.y -= v.y; return this; }
+            mult(s) { this.x *= s; this.y *= s; return this; }
+            div(s) { this.x /= s; this.y /= s; return this; }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() { const m = this.mag(); if (m > 0) { this.div(m); } return this; }
+            limit(max) { if (this.mag() > max) { this.normalize().mult(max); } return this; }
+            heading() { return Math.atan2(this.y, this.x); }
+            static sub(v1, v2) { return new Vector(v1.x - v2.x, v1.y - v2.y); }
+            static random2D() { return new Vector(random(-1, 1), random(-1, 1)).normalize(); }
+        }
+
+        class Creature {
+            constructor(x, y, options, baseParams) {
+                this.position = new Vector(x, y); this.velocity = Vector.random2D(); this.acceleration = new Vector();
+                this.maxSpeed = options.maxSpeed || baseParams.maxSpeed; this.maxForce = options.maxForce || baseParams.maxForce;
+                this.energy = options.energy || baseParams.energy; this.energyLossRate = baseParams.energyLossRate;
+                this.movementEnergyCost = baseParams.movementEnergyCost;
+                this.radius = options.radius || baseParams.baseRadius; this.vision = options.vision || baseParams.baseVision;
+                this.reproduceCooldown = 0;
+                this.isSick = false; this.sicknessTimer = 0;
+            }
+            get currentMaxSpeed() {
+                const energyRatio = Math.max(0.2, this.energy / (this.constructor === Herbivore ? params.herbivore.reproduceEnergy : params.carnivore.reproduceEnergy));
+                const sicknessMultiplier = this.isSick ? 0.5 : 1.0;
+                return this.maxSpeed * energyRatio * sicknessMultiplier;
+            }
+            applyForce(force) { this.acceleration.add(force); }
+            seek(target) { let desired = Vector.sub(target, this.position); desired.normalize().mult(this.currentMaxSpeed); let steer = Vector.sub(desired, this.velocity); steer.limit(this.maxForce); return steer; }
+            flee(target) { return this.seek(target).mult(-1); }
+            wander() { return Vector.random2D().mult(this.maxForce * 0.5); }
+            draw() {
+                const angle = this.velocity.heading(); const r = this.radius; ctx.save(); ctx.translate(this.position.x, this.position.y); ctx.rotate(angle);
+                const speedRatio = Math.min(1, this.maxSpeed / (params.herbivore.maxSpeed * 2)); const intensity = Math.floor(120 + 135 * speedRatio);
+                let bodyColor; if (this.constructor === Herbivore) { bodyColor = `rgb(72, ${intensity}, 120)`; } else { bodyColor = `rgb(${intensity}, 101, 101)`; }
+                ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r, r / 1.5); ctx.lineTo(-r, -r / 1.5); ctx.closePath(); ctx.fillStyle = bodyColor; ctx.fill();
+                ctx.restore();
+                if (this.constructor === Herbivore && this.stamina < params.herbivore.maxStamina / 2) { ctx.beginPath(); ctx.arc(this.position.x, this.position.y - this.radius - 4, 2, 0, Math.PI * 2); ctx.fillStyle = '#FFA500'; ctx.fill(); }
+                if (this.constructor === Carnivore && this.satiation > 0) { ctx.beginPath(); ctx.arc(this.position.x, this.position.y - this.radius - 4, 2, 0, Math.PI * 2); ctx.fillStyle = '#90EE90'; ctx.fill(); }
+                if (this.isSick) { ctx.beginPath(); ctx.arc(this.position.x, this.position.y + this.radius + 4, 2, 0, Math.PI * 2); ctx.fillStyle = '#A040A0'; ctx.fill(); }
+            }
+            keepInBounds() { 
+                const d = 25; let desired = null;
+                if (this.position.x < d) desired = new Vector(this.currentMaxSpeed, this.velocity.y); else if (this.position.x > canvas.width - d) desired = new Vector(-this.currentMaxSpeed, this.velocity.y);
+                if (this.position.y < d) desired = new Vector(this.velocity.x, this.currentMaxSpeed); else if (this.position.y > canvas.height - d) desired = new Vector(this.velocity.x, -this.currentMaxSpeed);
+                if (desired !== null) { desired.normalize().mult(this.currentMaxSpeed); let steer = Vector.sub(desired, this.velocity); steer.limit(this.maxForce * 1.5); this.applyForce(steer); }
+            }
+            findNearby(items, range) {
+                const nearby = [];
+                for (const item of items) { if (item !== this && distance(this.position, item.position) < range) { nearby.push(item); } }
+                return nearby;
+            }
+            findClosest(items, vision) { 
+                let closest = null, closestDist = Infinity;
+                for (const item of items) { if (item === this) continue; const d = distance(this.position, item.position || item); if (d < closestDist && d < vision) { closestDist = d; closest = item; } }
+                return { target: closest, dist: closestDist };
+            }
+            update() {
+                const sicknessDrain = this.isSick ? this.energyLossRate : 0;
+                this.energy -= (this.energyLossRate + (this.velocity.mag() * this.movementEnergyCost) + sicknessDrain);
+                if (this.reproduceCooldown > 0) this.reproduceCooldown--;
+                if (this.sicknessTimer > 0) { this.sicknessTimer--; } else { this.isSick = false; }
+                this.velocity.add(this.acceleration); this.velocity.limit(this.currentMaxSpeed); this.position.add(this.velocity); this.acceleration.mult(0);
+                this.keepInBounds(); this.draw();
+            }
+        }
+
+        class Herbivore extends Creature {
+            constructor(x, y, options = {}) { super(x, y, options, params.herbivore); this.cohesionVision = params.herbivore.cohesionVision; this.stamina = params.herbivore.maxStamina; }
+            update(foodArray, carnivoreArray, herbivoreArray, index) {
+                const herdMates = this.findNearby(herbivoreArray, this.cohesionVision);
+                const isInHerd = herdMates.length >= params.herbivore.herdBonusThreshold;
+                const effectiveVision = this.vision + (isInHerd ? params.herbivore.herdVisionBonus : 0);
+                
+                const { target: predator, dist: predatorDist } = this.findClosest(carnivoreArray, effectiveVision);
+                
+                if (predator) {
+                    const dangerThreshold = effectiveVision * params.herbivore.dangerThreshold;
+                    if (predatorDist < dangerThreshold) {
+                        const fleeForce = this.flee(predator.position); const multiplier = this.stamina > 0 ? 1.5 : 1.0; this.applyForce(fleeForce.mult(multiplier));
+                        if (this.stamina > 0) this.stamina--;
+                    } else {
+                        if (this.stamina < params.herbivore.maxStamina) this.stamina += isInHerd ? 2 : 1;
+                        const fleeForce = this.flee(predator.position); this.applyForce(fleeForce.mult(0.7));
+                        const { target: foodItem } = this.findClosest(foodArray, this.vision);
+                        if (foodItem) { const seekForce = this.seek(foodItem.position); this.applyForce(seekForce.mult(0.3)); }
+                    }
+                } else {
+                    if (this.stamina < params.herbivore.maxStamina) this.stamina += isInHerd ? 2 : 1;
+                    const { target: foodItem, dist: foodDist } = this.findClosest(foodArray, this.vision);
+                    if (foodItem) {
+                        this.applyForce(this.seek(foodItem.position));
+                        if (foodDist < this.radius + foodItem.radius) { this.energy += params.food.energy; foodArray.splice(foodArray.indexOf(foodItem), 1); }
+                    } else {
+                        const { target: friend } = this.findClosest(herbivoreArray, this.cohesionVision);
+                        if(friend) { this.applyForce(this.seek(friend.position)); } else { this.applyForce(this.wander()); }
+                    }
+                }
+                if (this.energy >= params.herbivore.reproduceEnergy && this.reproduceCooldown === 0) {
+                    this.energy /= 2; this.reproduceCooldown = params.reproduceCooldown; stats.births.h++;
+                    const offspringStats = { energy: this.energy, radius: Math.max(2, mutate(this.radius)), maxSpeed: Math.max(0.5, mutate(this.maxSpeed)), vision: Math.max(20, mutate(this.vision)) };
+                    herbivores.push(new Herbivore(this.position.x, this.position.y, offspringStats));
+                }
+                if (this.energy <= 0) { 
+                    stats.deaths.h_starvation++;
+                    carcasses.push(new Carcass(this.position.x, this.position.y));
+                    herbivores.splice(index, 1); 
+                    return; 
+                }
+                super.update();
+            }
+        }
+
+        class Carnivore extends Creature {
+            constructor(x, y, options = {}) { super(x, y, options, params.carnivore); this.satiation = 0; }
+            update(herbivoreArray, carcassArray, index) {
+                if (this.satiation > 0) this.satiation--;
+                const isHungry = this.energy < params.carnivore.reproduceEnergy * params.carnivore.hungerThreshold && this.satiation === 0;
+                if (isHungry) {
+                    const { target: prey } = this.findClosest(herbivoreArray, this.vision);
+                    const { target: carcass } = this.findClosest(carcassArray, this.vision);
+                    let target = null;
+                    if(prey && carcass) { target = distance(this.position, prey.position) < distance(this.position, carcass.position) ? prey : carcass; }
+                    else if (prey) { target = prey; }
+                    else if (carcass) { target = carcass; }
+                    if (target) {
+                        this.applyForce(this.seek(target.position));
+                        if (distance(this.position, target.position) < this.radius + target.radius) { 
+                            if (target instanceof Herbivore) {
+                                this.energy += params.carnivore.killEnergyGain; 
+                                stats.deaths.h_predation++;
+                                herbivoreArray.splice(herbivoreArray.indexOf(target), 1);
+                            } else {
+                                this.energy += target.energy;
+                                if (Math.random() < params.carnivore.sicknessChance) { this.isSick = true; this.sicknessTimer = params.carnivore.sicknessDuration; }
+                                carcassArray.splice(carcassArray.indexOf(target), 1);
+                            }
+                            this.satiation = params.carnivore.satiationTime;
+                        }
+                    } else { this.applyForce(this.wander()); }
+                } else { this.applyForce(this.wander()); }
+                if (this.energy >= params.carnivore.reproduceEnergy && this.reproduceCooldown === 0) {
+                    this.energy /= 2; this.reproduceCooldown = params.reproduceCooldown; stats.births.c++;
+                    const offspringStats = { energy: this.energy, radius: Math.max(4, mutate(this.radius)), maxSpeed: Math.max(0.8, mutate(this.maxSpeed)), vision: Math.max(50, mutate(this.vision)) };
+                    carnivores.push(new Carnivore(this.position.x, this.position.y, offspringStats));
+                }
+                if (this.energy <= 0) { stats.deaths.c++; carnivores.splice(index, 1); return; }
+                super.update();
+            }
+        }
+        
+        class Carcass {
+            constructor(x, y) { this.position = new Vector(x, y); this.radius = params.carcass.radius; this.color = params.carcass.color; this.energy = params.carcass.energy; this.decayTimer = params.dayDurationFrames; }
+            draw() { ctx.save(); ctx.translate(this.position.x, this.position.y); ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-this.radius, -this.radius); ctx.lineTo(this.radius, this.radius); ctx.moveTo(this.radius, -this.radius); ctx.lineTo(-this.radius, this.radius); ctx.stroke(); ctx.restore(); }
+        }
+        
+        class Food { 
+            constructor(x,y) { this.position = new Vector(x,y); this.radius=params.food.radius; this.color=params.food.color; }
+            draw() { ctx.beginPath(); ctx.moveTo(this.position.x, this.position.y - this.radius); ctx.quadraticCurveTo(this.position.x + this.radius, this.position.y, this.position.x, this.position.y + this.radius); ctx.quadraticCurveTo(this.position.x - this.radius, this.position.y, this.position.x, this.position.y - this.radius); ctx.fillStyle = this.color; ctx.fill(); }
+        }
+        
+        function spawnFoodCluster(centerX, centerY, count = 10, clusterRadius = 40) { for (let i = 0; i < count; i++) { const angle = random(0, 2 * Math.PI); const dist = random(0, clusterRadius); const x = centerX + Math.cos(angle) * dist; const y = centerY + Math.sin(angle) * dist; if (x > 0 && x < canvas.width && y > 0 && y < canvas.height) { food.push(new Food(x, y)); } } }
+        function createBackgroundPattern() { const patternCanvas = document.createElement('canvas'); const patternCtx = patternCanvas.getContext('2d'); const size = 20; patternCanvas.width = size; patternCanvas.height = size; patternCtx.fillStyle = '#1a2e2a'; patternCtx.fillRect(0, 0, size, size); patternCtx.fillStyle = 'rgba(10, 50, 40, 0.5)'; patternCtx.fillRect(0, 0, size / 2, size / 2); patternCtx.fillRect(size / 2, size / 2, size / 2, size / 2); backgroundPattern = ctx.createPattern(patternCanvas, 'repeat'); }
+
+        function init() {
+            updateParams(); const containerWidth = canvas.parentElement.clientWidth; canvas.width = containerWidth; canvas.height = (window.innerHeight > 800) ? 500 : 350;
+            herbivores = []; carnivores = []; food = []; carcasses = []; day = 0; frameCount = 0;
+            stats = { births: { h: 0, c: 0 }, deaths: { c: 0, h_starvation: 0, h_predation: 0 } };
+            autotuneData.initialH = parseInt(herbivoreSlider.value);
+            createBackgroundPattern();
+            for (let i = 0; i < parseInt(herbivoreSlider.value); i++) herbivores.push(new Herbivore(random(0, canvas.width), random(0, canvas.height), {}));
+            for (let i = 0; i < parseInt(carnivoreSlider.value); i++) carnivores.push(new Carnivore(random(0, canvas.width), random(0, canvas.height), {}));
+            for (let i = 0; i < parseInt(foodSlider.value); i++) food.push(new Food(random(0, canvas.width), random(0, canvas.height)));
+            updateStats(); drawInitialState();
+        }
+
+        function drawInitialState() {
+            ctx.fillStyle = backgroundPattern; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            food.forEach(f => f.draw()); carcasses.forEach(c => c.draw());
+            herbivores.forEach(h => h.draw()); carnivores.forEach(c => c.draw());
+        }
+
+        function animate() {
+            if (!simulationRunning && !isAutoTuning) return;
+            ctx.fillStyle = backgroundPattern; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (frameCount % 60 === 0) {
+                 if (Math.random() < 0.2) { spawnFoodCluster(random(50, canvas.width - 50), random(50, canvas.height - 50)); } 
+                 else if (food.length < parseInt(foodSlider.value) * 1.5) { food.push(new Food(random(0, canvas.width), random(0, canvas.height))); }
+            }
+            food.forEach(f => f.draw());
+            for (let i = carcasses.length - 1; i >= 0; i--) { carcasses[i].decayTimer--; if (carcasses[i].decayTimer <= 0) { carcasses.splice(i, 1); } else { carcasses[i].draw(); } }
+            for (let i = herbivores.length - 1; i >= 0; i--) { if(herbivores[i]) herbivores[i].update(food, carnivores, herbivores, i); }
+            for (let i = carnivores.length - 1; i >= 0; i--) { if(carnivores[i]) carnivores[i].update(herbivores, carcasses, i); }
+            frameCount++;
+            if (frameCount >= params.dayDurationFrames) { day++; frameCount = 0; }
+            updateStats();
+            if (herbivores.length === 0 || carnivores.length === 0) {
+                if (isAutoTuning) { runNextGeneration(); } 
+                else if (simulationRunning) { toggleSimulation(); }
+            } else { animationFrameId = requestAnimationFrame(animate); }
+        }
+        
+        function updateStats() {
+            if (isAutoTuning) {
+                generationStat.textContent = autotuneData.generation; lastRunStat.textContent = day; bestRunStat.textContent = autotuneData.bestRun;
+                bestHStat.textContent = autotuneData.bestParams.h || 'N/A'; bestCStat.textContent = autotuneData.bestParams.c || 'N/A'; bestFStat.textContent = autotuneData.bestParams.f || 'N/A';
+            } else {
+                dayStat.textContent = day; herbivoreStat.textContent = herbivores.length; carnivoreStat.textContent = carnivores.length; carcassStat.textContent = carcasses.length;
+                herbBirthsStat.textContent = stats.births.h; carnBirthsStat.textContent = stats.births.c; 
+                herbStarvedStat.textContent = stats.deaths.h_starvation;
+                herbEatenStat.textContent = stats.deaths.h_predation;
+                carnDeathsStat.textContent = stats.deaths.c;
+                const updateAvg = (pop, speedEl, visionEl) => {
+                    if (pop.length > 0) { const avgSpeed = pop.reduce((sum, c) => sum + c.maxSpeed, 0) / pop.length; const avgVision = pop.reduce((sum, c) => sum + c.vision, 0) / pop.length; speedEl.textContent = avgSpeed.toFixed(2); visionEl.textContent = avgVision.toFixed(2); } 
+                    else { speedEl.textContent = 'N/A'; visionEl.textContent = 'N/A'; }
+                };
+                updateAvg(herbivores, herbAvgSpeed, herbAvgVision);
+                updateAvg(carnivores, carnAvgSpeed, carnAvgVision);
+            }
+        }
+
+        function toggleSimulation() {
+            if (!audioReady) { initAudio(); }
+            simulationRunning = !simulationRunning;
+            if (simulationRunning) {
+                startPauseBtn.textContent = 'Pause'; startPauseBtn.classList.remove('bg-green-500', 'hover:bg-green-600'); startPauseBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                [herbivoreSlider, carnivoreSlider, foodSlider, mutationSlider, cooldownSlider, autotuneBtn].forEach(s => s.disabled = true);
+                Tone.Transport.start(); animationFrameId = requestAnimationFrame(animate);
+            } else {
+                startPauseBtn.textContent = 'Start'; startPauseBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600'); startPauseBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                [herbivoreSlider, carnivoreSlider, foodSlider, mutationSlider, cooldownSlider, autotuneBtn].forEach(s => s.disabled = false);
+                Tone.Transport.pause(); cancelAnimationFrame(animationFrameId);
+            }
+        }
+        
+        function toggleAutoTune() {
+            isAutoTuning = !isAutoTuning;
+            if (isAutoTuning) {
+                if (simulationRunning) toggleSimulation();
+                autotuneBtn.textContent = 'Stop Tuning'; autotuneBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600'); autotuneBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                [startPauseBtn, resetBtn, herbivoreSlider, carnivoreSlider, foodSlider, mutationSlider, cooldownSlider].forEach(el => el.disabled = true);
+                normalStatsEl.classList.add('hidden'); autotuneStatsEl.classList.remove('hidden');
+                autotuneData = { generation: 1, bestRun: 0, bestParams: {}, initialH: 0 };
+                init(); animationFrameId = requestAnimationFrame(animate);
+            } else {
+                autotuneBtn.textContent = 'Auto-Tune'; autotuneBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600'); autotuneBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+                [startPauseBtn, resetBtn, herbivoreSlider, carnivoreSlider, foodSlider, mutationSlider, cooldownSlider].forEach(el => el.disabled = false);
+                normalStatsEl.classList.remove('hidden');
+                autotuneStatsEl.classList.add('hidden');
+                cancelAnimationFrame(animationFrameId); init();
+            }
+        }
+
+        function runNextGeneration() {
+            if (day > autotuneData.bestRun) { autotuneData.bestRun = day; autotuneData.bestParams = { h: herbivoreSlider.value, c: carnivoreSlider.value, f: foodSlider.value }; }
+            updateStats();
+            if (carnivores.length === 0) {
+                if (herbivores.length < autotuneData.initialH * 0.5) { foodSlider.value = Math.min(parseInt(foodSlider.value) + 20, foodSlider.max); } 
+                else { carnivoreSlider.value = Math.min(parseInt(carnivoreSlider.value) + 1, carnivoreSlider.max); }
+            } else { herbivoreSlider.value = Math.min(parseInt(herbivoreSlider.value) + 5, herbivoreSlider.max); }
+            autotuneData.generation++;
+            herbivoreLabel.textContent = herbivoreSlider.value; carnivoreLabel.textContent = carnivoreSlider.value; foodLabel.textContent = foodSlider.value;
+            init(); animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function initAudio() {
+            if (audioReady) return;
+            Tone.start();
+            const wind = new Tone.Noise("pink").toDestination();
+            const windFilter = new Tone.AutoFilter({ frequency: "8m", baseFrequency: 100, octaves: 4 }).toDestination();
+            wind.connect(windFilter);
+            wind.volume.value = -25;
+            wind.start();
+            const reverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination();
+            const pluckSynth = new Tone.PluckSynth({ attackNoise: 0.5, dampening: 4000, resonance: 0.9 }).connect(reverb);
+            pluckSynth.volume.value = -10;
+            const notes = ["C4", "E4", "G4", "A4", "C5", "E5", "G5"];
+            const chirpLoop = new Tone.Loop(time => {
+                const note = notes[Math.floor(Math.random() * notes.length)];
+                pluckSynth.triggerAttack(note, time);
+            }, "2n");
+            chirpLoop.humanize = true;
+            chirpLoop.start(0);
+            Tone.Transport.bpm.value = 80;
+            audioReady = true;
+        }
+        function toggleMute() {
+            if (!audioReady) { initAudio(); }
+            Tone.Master.mute = !Tone.Master.mute;
+            speakerIcon.classList.toggle('hidden');
+            speakerMutedIcon.classList.toggle('hidden');
+            muteBtn.querySelector('span').textContent = Tone.Master.mute ? 'Unmute' : 'Mute';
+            if (!simulationRunning && !Tone.Master.mute) { Tone.Transport.start(); }
+        }
+
+        // --- Event Listeners ---
+        startPauseBtn.addEventListener('click', toggleSimulation);
+        resetBtn.addEventListener('click', () => { if (simulationRunning || isAutoTuning) { if(isAutoTuning) toggleAutoTune(); else toggleSimulation(); } init(); });
+        muteBtn.addEventListener('click', toggleMute);
+        autotuneBtn.addEventListener('click', toggleAutoTune);
+        
+        const setupSlider = (slider, label, isPercent=false) => {
+            slider.addEventListener('input', (e) => {
+                let valueText = e.target.value;
+                if (isPercent) valueText += '%';
+                else if (slider.id === 'cooldown-slider') valueText += ' Days';
+                label.textContent = valueText;
+                if (!simulationRunning) updateParams();
+            });
+            slider.addEventListener('change', () => { if(!simulationRunning) init(); });
+        };
+        setupSlider(herbivoreSlider, herbivoreLabel);
+        setupSlider(carnivoreSlider, carnivoreLabel);
+        setupSlider(foodSlider, foodLabel);
+        setupSlider(mutationSlider, mutationLabel, true);
+        setupSlider(cooldownSlider, cooldownLabel);
+        
+        window.addEventListener('resize', () => { if (!simulationRunning && !isAutoTuning) init(); });
+        window.onload = init;
+    </script>
+</body>
+</html>
+
