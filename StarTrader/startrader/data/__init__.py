@@ -1,0 +1,1 @@
+"""Game data modules for Star Trader."""

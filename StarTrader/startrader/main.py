@@ -1,412 +1,259 @@
+"""
+Main game controller for Star Trader.
+
+This module contains the core Game class that manages the entire game state,
+command processing, and coordination between all game systems. It provides
+a modular architecture where different aspects of gameplay are handled by
+specialized manager classes.
+
+The game features:
+- Space trading and economic simulation
+- Mission system with various objectives
+- Crew management and skills
+- Ship customization and upgrades
+- Tactical combat system
+- Factory construction and management
+- Multiple victory conditions
+- Rich galaxy with events and factions
+"""
+
 import time
-import json
-import os
-from .classes import Player, Ship, Mission
+import random
+from .classes import Player, Ship, Mission, CrewMember, AICaptain, Factory
 from .galaxy import Galaxy
-from .events import EventManager
-from .game_data import (FACTIONS, ILLEGAL_GOODS, MODULE_SPECS)
+from .event_system import EventManager as NewEventManager
+from .game_data import (FACTIONS, ILLEGAL_GOODS, MODULE_SPECS, SHIP_CLASSES, GOODS)
+from .constants import (TRADING_SHIP_BONUS_PER_LEVEL, REPUTATION_DISCOUNT_THRESHOLD,
+                       REPAIR_COST_PER_HP, FUEL_COST_PER_UNIT, EVENT_CHANCE,
+                       PRICE_IMPACT_FACTOR, QUANTITY_IMPACT_DIVISOR)
+from .commands.trading import TradingCommands
+from .commands.navigation import NavigationCommands
+from .commands.ship import ShipCommands
+from .commands.missions import MissionCommands
+from .commands.crew import CrewCommands
+from .commands.factory import FactoryCommands
+from .commands.captains import CaptainCommands
+from .analysis import TradeAnalyzer
+from .persistence import SaveLoadManager
+from .victory import VictoryManager
+from .help_system import HelpSystem
+from .exploration_events import ExplorationEventHandler
+from .encyclopedia import Encyclopedia
+from .production import ProductionManager
+from .ui import UIManager
+from .game_mechanics import GameMechanicsManager
 
 # --- Game Balance Constants ---
+# Most constants moved to constants.py
 CONSTANTS = {
-    "REPAIR_COST_PER_HP": 15,
-    "FUEL_COST_PER_UNIT": 10,
-    "EVENT_CHANCE": 0.25,
-    "REPUTATION_DISCOUNT_THRESHOLD": 50,
-    "PRICE_IMPACT_FACTOR": 0.05,
-    "QUANTITY_IMPACT_DIVISOR": 50,
+    "REPAIR_COST_PER_HP": REPAIR_COST_PER_HP,
+    "FUEL_COST_PER_UNIT": FUEL_COST_PER_UNIT,
+    "EVENT_CHANCE": EVENT_CHANCE,
+    "REPUTATION_DISCOUNT_THRESHOLD": REPUTATION_DISCOUNT_THRESHOLD,
+    "PRICE_IMPACT_FACTOR": PRICE_IMPACT_FACTOR,
+    "QUANTITY_IMPACT_DIVISOR": QUANTITY_IMPACT_DIVISOR,
     "SAVE_FILE_NAME": "savegame.json"
 }
 
 class Game:
     """
-    Manages the main game loop and player commands.
+    Main game controller for Star Trader.
+    
+    Manages the game state, player actions, command processing, and game systems.
+    Coordinates between various managers like trading, navigation, missions, etc.
+    
+    Attributes:
+        player: The player character and their ship
+        galaxy: The game world with systems, markets, and connections
+        event_manager: Handles travel and exploration events
+        current_day: Current in-game day counter
+        game_over: Flag indicating if the game has ended
+        
+    The Game class uses a modular architecture with specialized managers:
+    - TradingCommands: Buy/sell goods, market interactions
+    - NavigationCommands: Travel between systems
+    - ShipCommands: Ship upgrades, repairs, refueling
+    - MissionCommands: Mission acceptance and completion
+    - CrewCommands: Crew hiring and management
+    - FactoryCommands: Factory construction and management
+    - CaptainCommands: AI captain management
+    - TradeAnalyzer: Market analysis and route planning
+    - VictoryManager: Victory condition checking
+    - HelpSystem: In-game help and documentation
     """
     def __init__(self):
+        """Initialize a new game instance.
+        
+        Creates the player, galaxy, and all game systems. Sets up the player
+        in the Sol system and initializes all command handlers and managers.
+        """
         self.player = Player()
         self.galaxy = Galaxy()
-        self.event_manager = EventManager(self)
+        self.event_manager = NewEventManager(self)
         self.game_over = False
         self.player.location = self.galaxy.systems["Sol"]
         self.current_day = 1
         self.constants = CONSTANTS
+        
+        # Initialize command handlers
+        self.trading_commands = TradingCommands(self)
+        self.navigation_commands = NavigationCommands(self)
+        self.ship_commands = ShipCommands(self)
+        self.mission_commands = MissionCommands(self)
+        self.crew_commands = CrewCommands(self)
+        self.factory_commands = FactoryCommands(self)
+        self.captain_commands = CaptainCommands(self)
+        
+        # Initialize trade analyzer
+        self.trade_analyzer = TradeAnalyzer(self.galaxy, self.player)
+        
+        # Initialize save/load manager
+        self.save_load_manager = SaveLoadManager(self.constants['SAVE_FILE_NAME'])
+        
+        # Initialize victory manager
+        self.victory_manager = VictoryManager()
+        
+        # Initialize help system
+        self.help_system = HelpSystem()
+        
+        # Initialize exploration event handler
+        self.exploration_handler = ExplorationEventHandler(self)
+        
+        # Initialize encyclopedia
+        self.encyclopedia = Encyclopedia()
+        
+        # Initialize production manager
+        self.production_manager = ProductionManager(self)
+        
+        # Initialize UI manager
+        self.ui_manager = UIManager(self)
+        
+        # Initialize game mechanics manager
+        self.mechanics_manager = GameMechanicsManager(self)
+        
+        # Initialize commands dictionary
+        self._setup_commands()
+
+    def validate_command(self, parts, min_args, usage_msg):
+        """Validate command has minimum arguments. Returns True if valid."""
+        if len(parts) < min_args:
+            print(f"Invalid format. Use: {usage_msg}")
+            return False
+        return True
+
+    def calculate_trade_bonus(self):
+        """Calculate total trading bonus from crew, skills, and ship."""
+        negotiator_bonus = self.player.get_crew_bonus("Negotiator")
+        skill_bonus = self.player.get_skill_bonus("negotiation")
+        
+        # Ship trading specialization
+        ship = self.player.ship
+        ship_bonus = 0
+        if ship.specialization == "trading":
+            ship_bonus = (ship.level - 1) * TRADING_SHIP_BONUS_PER_LEVEL
+            
+        return negotiator_bonus + skill_bonus + ship_bonus
 
     def get_status(self):
-        ship = self.player.ship
-        system = self.player.location
-        connections = self.galaxy.connections.get(system.name, [])
-        travel_options = ", ".join(connections) or "None"
-        cargo_list = ", ".join(f"{item} ({qty})" for item, qty in ship.cargo_hold.items()) or "Empty"
-
-        status = (
-            f"--- Captain {self.player.name} ---\n"
-            f"Credits: {self.player.credits}\n"
-            f"\n--- Current Location: {system.name} ({system.economy_type})\n"
-            f"System Faction: {system.faction} ({FACTIONS[system.faction]['name']})\n"
-            f"Description: {system.description}\n"
-            f"Reachable Systems: {travel_options}\n"
-        )
-        if system.name in self.galaxy.active_events:
-            event = self.galaxy.active_events[system.name]
-            status += f"EVENT: This system is experiencing a {event['type']}!\n"
-        
-        status += (
-            f"\n--- Ship: {ship.name} ({ship.ship_class_data['name']}) ---\n"
-            f"Hull: {ship.hull}/{ship.max_hull}\n"
-            f"Fuel: {ship.fuel}/{ship.max_fuel}\n"
-            f"Cargo ({ship.get_cargo_used()}/{ship.cargo_capacity}): {cargo_list}\n"
-            f"Weapon Damage: {ship.get_weapon_damage(self.player)}\n"
-            f"Shield Strength: {ship.get_shield_strength()}\n"
-            f"Fuel Efficiency: {ship.get_fuel_efficiency(self.player)}\n"
-            f"\n--- Installed Modules ---\n"
-        )
-        for module_type, installed_modules in ship.modules.items():
-            status += f"- {module_type.upper()}:\n"
-            for module_id in installed_modules:
-                specs = MODULE_SPECS[module_type][module_id]
-                status += f"  - {specs['name']} ({module_id})\n"
-
-        if self.player.crew:
-            status += "\n--- Crew ---\n"
-            for member in self.player.crew:
-                status += f"- {member.name} ({member.role})\n"
-
-        if self.player.active_missions:
-            status += f"\n--- Active Missions (Day {self.current_day}) ---\n"
-            for mission in self.player.active_missions:
-                status += f"- ID: {mission.id} | {mission.get_description()} (Expires: Day {mission.expiration_day})\n"
-            
-        return status
+        """Get the player's status display."""
+        return self.ui_manager.get_status()
 
     def _handle_status(self, parts):
         """Prints the player's status."""
-        print(self.get_status())
-
-    def _handle_trade(self, parts):
-        system = self.player.location
-        print(f"\n--- Market at {system.name} ---")
-        print(f"{'Good':<15} {'Price':>10} {'Quantity':>10}")
-        print("-" * 37)
-        
-        for good, data in sorted(system.market.items()):
-            print(f"{good:<15} {data['price']:>10} {data['quantity']:>10}")
-        
-        print("\nUse 'buy <good> <quantity>' or 'sell <good> <quantity>'.")
-
-    def _handle_buy(self, parts):
-        """Handles the 'buy' command."""
-        if len(parts) < 3:
-            print("Invalid format. Use: buy <good> <quantity>")
-            return
-
-        try:
-            quantity = int(parts[-1])
-            good_name = " ".join(parts[1:-1]).title()
-        except ValueError:
-            print("Invalid format. The last part of the command must be a number.")
-            return
-
-        if quantity <= 0:
-            print("Quantity must be positive.")
-            return
-
-        system = self.player.location
-        if good_name not in system.market:
-            print(f"'{good_name}' is not sold here.")
-            return
-            
-        if good_name in ILLEGAL_GOODS and not system.has_black_market:
-            print("You can't trade that on the open market!")
-            return
-
-        market_data = system.market[good_name]
-        if quantity > market_data["quantity"]:
-            print(f"Not enough {good_name} in stock. Only {market_data['quantity']} available.")
-            return
-
-        total_cost = market_data["price"] * quantity
-        
-        # Apply negotiator bonus
-        negotiator_bonus = self.player.get_crew_bonus("Negotiator")
-        if negotiator_bonus > 0:
-            total_cost *= (1 - negotiator_bonus)
-            total_cost = int(total_cost)
-            print(f"Your negotiator secured a better price! You save {int(market_data['price'] * quantity * negotiator_bonus)} credits.")
-
-        if self.player.credits < total_cost:
-            print(f"Not enough credits. You need {total_cost}, but only have {self.player.credits}.")
-            return
-
-        ship = self.player.ship
-        if ship.get_cargo_used() + quantity > ship.cargo_capacity:
-            print(f"Not enough cargo space. You need {quantity} slots, but only have {ship.cargo_capacity - ship.get_cargo_used()} free.")
-            return
-
-        # All checks passed, execute transaction
-        self.player.credits -= total_cost
-        market_data["quantity"] -= quantity
-        market_data["price"] = int(market_data["price"] * (1 + self.constants['PRICE_IMPACT_FACTOR'] * (quantity / self.constants['QUANTITY_IMPACT_DIVISOR']))) + 1 # Price increases on buy
-        ship.add_cargo(good_name, quantity)
-        print(f"Successfully purchased {quantity} units of {good_name} for {total_cost} credits.")
-        
-        if good_name in ILLEGAL_GOODS:
-            self.player.add_reputation("Federation", -5) # Dealing in illegal goods hurts Fed rep
-        else:
-            self.player.add_reputation(system.faction, 1)
-
-    def _handle_sell(self, parts):
-        """Handles the 'sell' command."""
-        if len(parts) < 3:
-            print("Invalid format. Use: sell <good> <quantity>")
-            return
-
-        try:
-            quantity = int(parts[-1])
-            good_name = " ".join(parts[1:-1]).title()
-        except ValueError:
-            print("Invalid format. The last part of the command must be a number.")
-            return
-
-        if quantity <= 0:
-            print("Quantity must be positive.")
-            return
-
-        ship = self.player.ship
-        if good_name not in ship.cargo_hold or ship.cargo_hold[good_name] < quantity:
-            print(f"You don't have {quantity} units of {good_name} to sell.")
-            return
-
-        system = self.player.location
-        if good_name in ILLEGAL_GOODS and not system.has_black_market:
-            print("You can't trade that on the open market!")
-            return
-            
-        market_data = system.market[good_name]
-        total_sale = market_data["price"] * quantity
-        
-        # Apply negotiator bonus
-        negotiator_bonus = self.player.get_crew_bonus("Negotiator")
-        if negotiator_bonus > 0:
-            bonus_amount = int(total_sale * negotiator_bonus)
-            total_sale += bonus_amount
-            print(f"Your negotiator secured a better price! You earn an extra {bonus_amount} credits.")
-
-        # All checks passed, execute transaction
-        self.player.credits += total_sale
-        market_data["quantity"] += quantity
-        market_data["price"] = max(1, int(market_data["price"] * (1 - self.constants['PRICE_IMPACT_FACTOR'] * (quantity / self.constants['QUANTITY_IMPACT_DIVISOR']))) - 1) # Price decreases on sell, min 1
-        ship.remove_cargo(good_name, quantity)
-        print(f"Successfully sold {quantity} units of {good_name} for {total_sale} credits.")
-        
-        if good_name in ILLEGAL_GOODS:
-            self.player.add_reputation("Federation", -5) # Dealing in illegal goods hurts Fed rep
-        else:
-            self.player.add_reputation(system.faction, 1)
-
-    def _handle_travel(self, parts):
-        if len(parts) < 2:
-            print("Invalid format. Use: travel <system name>"); return
-        destination_name = " ".join(parts[1:]).title()
-        
-        if destination_name not in self.galaxy.systems:
-            # Allow for short names
-            for system_name_i in self.galaxy.systems:
-                if destination_name.lower() in system_name_i.lower():
-                    destination_name = system_name_i
-                    break
-            else:
-                print(f"Unknown system: '{destination_name}'"); return
-
-        current_system = self.player.location
-        if current_system.name == destination_name:
-            print("You are already in that system."); return
-
-        if destination_name not in self.galaxy.connections[current_system.name]:
-             print(f"Cannot travel directly from {current_system.name} to {destination_name}."); return
-        
-        fuel_needed = self.galaxy.fuel_costs.get((current_system.name, destination_name))
-        
-        # Apply faction discount
-        faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']: # Reputation >= 50 gives discount
-            fuel_needed *= 0.9 # 10% discount
-            print("Your high reputation with this faction gives you a 10% discount on fuel!")
-
-        fuel_needed = int(fuel_needed * self.player.ship.get_fuel_efficiency(self.player))
-        if self.player.ship.fuel < fuel_needed:
-            print(f"Not enough fuel. You need {fuel_needed}, but only have {self.player.ship.fuel}."); return
-
-        self.player.ship.fuel -= fuel_needed
-        self.current_day += 1
-        self._handle_daily_costs()
-        self.galaxy.update_markets() # Markets change over time
-        self._check_mission_failure()
-        
-        print(f"\nTraveling from {current_system.name} to {destination_name}...")
-        time.sleep(1)
-        
-        self.event_manager.trigger_event()
-        if self.game_over: return
-
-        self.player.location = self.galaxy.systems[destination_name]
-        print(f"Arrived at {destination_name}. The journey consumed {fuel_needed} fuel.")
-        print(f"It is now Day {self.current_day}.")
-        print(self.get_status())
+        self.ui_manager.display_status()
 
     def _handle_daily_costs(self):
         """Handles daily costs like crew salaries."""
-        total_salary = sum(member.salary for member in self.player.crew)
-        if total_salary > 0:
-            print(f"\n--- Daily Costs (Day {self.current_day}) ---")
-            print(f"Crew salaries: {total_salary} credits")
-            self.player.credits -= total_salary
-            if self.player.credits < 0:
-                print("You can't afford to pay your crew! They've all quit in disgust.")
-                self.player.crew = []
-                self.player.credits = max(0, self.player.credits) # Don't go into negative credits from this
+        self.mechanics_manager.handle_daily_costs()
 
-    def _handle_shipyard(self, parts):
-        if not self.player.location.has_shipyard:
-            print("No shipyard available in this system."); return
-        
-        print("\n--- Shipyard ---")
-        print("Available commands: 'repair', 'upgrade <module_id>', 'sellmodule <module_id>'")
-        
-        faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']:
-             print("Your high reputation with this faction gives you a 10% discount on repairs!")
-        
-        print(f"Hull: {self.player.ship.hull}/{self.player.ship.max_hull}. Repair cost: {self.constants['REPAIR_COST_PER_HP']} credits per point.")
-        
-        print("\n--- Available Modules for Purchase ---")
-        for module_type, modules in MODULE_SPECS.items():
-            print(f"\n-- {module_type.upper()} --")
-            for module_id, specs in modules.items():
-                print(f"  ID: {module_id} | {specs['name']:<20} | Cost: {specs['cost']:<5} | Stats: {specs}")
-
-    def _handle_repair(self, parts):
-        ship = self.player.ship
-        damage = ship.max_hull - ship.hull
-        if damage == 0: print("Ship hull is already at maximum."); return
-        
-        cost = damage * self.constants['REPAIR_COST_PER_HP']
-        
-        # Apply faction discount
-        faction = self.player.location.faction
-        if self.player.reputation.get(faction, 0) >= self.constants['REPUTATION_DISCOUNT_THRESHOLD']: # Reputation >= 50 gives discount
-            cost *= 0.9 # 10% discount
-        
-        cost = int(cost)
-        if self.player.credits < cost:
-            print(f"Not enough credits to fully repair."); return
-        
-        self.player.credits -= cost
-        ship.hull = ship.max_hull
-        print(f"Ship hull repaired for {cost} credits.")
-
-    def _handle_upgrade(self, parts):
-        if len(parts) != 2:
-            print("Invalid format. Use: upgrade <module_id>"); return
-        
-        module_id_to_install = parts[1].upper()
-        
-        # Find the module in the specs
-        module_type = None
-        module_specs = None
-        for m_type, modules in MODULE_SPECS.items():
-            if module_id_to_install in modules:
-                module_type = m_type
-                module_specs = modules[module_id_to_install]
-                break
-        
-        if not module_specs:
-            print(f"Unknown module ID: '{module_id_to_install}'."); return
+    def _setup_commands(self):
+        """Setup command handlers dictionary."""
+        self.commands = {
+            # Game system commands
+            "status": self._handle_status,
+            "save": self._handle_save,
+            "load": self._handle_load,
+            "new": self._handle_new,
+            "news": self._handle_news,
+            "help": self._handle_help,
+            "clearwanted": self._handle_clear_wanted,
+            "combat": self._handle_tactical_combat,  # For testing/demo
+            "encyclopedia": self._handle_encyclopedia,
+            "wiki": self._handle_encyclopedia,  # Alias
+            "victory": self._handle_victory,
+            "goals": self._handle_victory,  # Alias
+            "quit": self.quit_game,
             
-        ship = self.player.ship
-        
-        # Check if the ship has a slot for this module type
-        if module_type not in ship.ship_class_data["slots"]:
-            print(f"This ship does not have a slot for '{module_type}' modules."); return
+            # Trading commands (from module)
+            "trade": self.trading_commands.handle_trade,
+            "buy": self.trading_commands.handle_buy,
+            "sell": self.trading_commands.handle_sell,
+            "blackmarket": self.trading_commands.handle_blackmarket,
             
-        # Check if there are enough free slots
-        max_slots = ship.ship_class_data["slots"][module_type]
-        current_slots_used = len(ship.modules.get(module_type, []))
-        if current_slots_used >= max_slots:
-            print(f"All '{module_type}' slots are currently in use. You must sell a module to install a new one."); return
+            # Navigation commands (from module)
+            "travel": self.navigation_commands.handle_travel,
+            "map": self.navigation_commands.handle_map,
+            "explore": self.navigation_commands.handle_explore,
+            "scan": self.navigation_commands.handle_scan,
             
-        cost = module_specs["cost"]
-        if self.player.credits < cost:
-            print(f"Not enough credits. You need {cost} to install this module."); return
+            # Ship commands (from module)
+            "shipyard": self.ship_commands.handle_shipyard,
+            "repair": self.ship_commands.handle_repair,
+            "upgrade": self.ship_commands.handle_upgrade,
+            "refuel": self.ship_commands.handle_refuel,
+            "buyship": self.ship_commands.handle_buy_ship,
+            "sellmodule": self.ship_commands.handle_sell_module,
+            "fleet": self.ship_commands.handle_fleet,
+            "switchship": self.ship_commands.handle_switch_ship,
+            "renameship": self.ship_commands.handle_rename_ship,
             
-        self.player.credits -= cost
-        ship.modules.setdefault(module_type, []).append(module_id_to_install)
-        
-        print(f"Successfully installed {module_specs['name']} for {cost} credits.")
-
-    def _handle_refuel(self, parts):
-        """Handles the 'refuel' command."""
-        ship = self.player.ship
-        fuel_needed = ship.max_fuel - ship.fuel
-        if fuel_needed == 0:
-            print("Fuel tank is already full.")
-            return
-
-        try:
-            # Default to max refuel if no amount is given
-            amount_to_buy = fuel_needed if len(parts) < 2 else (fuel_needed if parts[1] == 'max' else int(parts[1]))
-        except ValueError:
-            print("Invalid format. Use: refuel <amount> or refuel max")
-            return
-        
-        if amount_to_buy <= 0:
-            print("Amount must be positive.")
-            return
-
-        amount_to_buy = min(amount_to_buy, fuel_needed) # Don't overfill
-        
-        cost = amount_to_buy * self.constants['FUEL_COST_PER_UNIT']
-        
-        if self.player.credits < cost:
-            print(f"Not enough credits. You need {cost} for {amount_to_buy} fuel, but only have {self.player.credits}.")
-            return
+            # Mission commands (from module)
+            "missions": self.mission_commands.handle_missions,
+            "accept": self.mission_commands.handle_accept,
+            "complete": self.mission_commands.handle_complete,
             
-        self.player.credits -= cost
-        ship.fuel += amount_to_buy
-        print(f"Refueled {amount_to_buy} units for {cost} credits. Fuel is now {ship.fuel}/{ship.max_fuel}.")
-
+            # Crew commands (from module)
+            "recruits": self.crew_commands.handle_recruits,
+            "hire": self.crew_commands.handle_hire,
+            "crew": self.crew_commands.handle_crew,
+            "fire": self.crew_commands.handle_fire,
+            
+            # Production commands (still in main)
+            "produce": self._handle_produce,
+            "recipes": self._handle_recipes,
+            
+            # AI Captain commands (from module)
+            "captains": self.captain_commands.handle_captains,
+            "hirecaptain": self.captain_commands.handle_hire_captain,
+            "assigncaptain": self.captain_commands.handle_assign_captain,
+            "setroute": self.captain_commands.handle_set_route,
+            "firecaptain": self.captain_commands.handle_fire_captain,
+            "captainstatus": self.captain_commands.handle_captain_status,
+            
+            # Factory commands (from module)
+            "buildfactory": self.factory_commands.handle_build_factory,
+            "factories": self.factory_commands.handle_factories,
+            "factorysupply": self.factory_commands.handle_factory_supply,
+            "factorycollect": self.factory_commands.handle_factory_collect,
+            "factoryupgrade": self.factory_commands.handle_factory_upgrade,
+            "hirefactorymanager": self.factory_commands.handle_hire_factory_manager,
+            "factorymanager": self.factory_commands.handle_factory_manager,
+            
+            # Analysis commands (still in main)
+            "cargo": self._handle_cargo,
+            "search": self._handle_search,
+            "analyze": self._handle_analyze,
+            "traderoute": self._handle_trade_route,
+        }
+    
     def run(self):
         """The main game loop."""
         print("Welcome to Star Trader!")
         print("Your goal is to make a fortune trading between the stars.")
         
-        self.commands = {
-            "status": self._handle_status,
-            "trade": self._handle_trade,
-            "buy": self._handle_buy,
-            "sell": self._handle_sell,
-            "travel": self._handle_travel,
-            "shipyard": self._handle_shipyard,
-            "repair": self._handle_repair,
-            "upgrade": self._handle_upgrade,
-            "refuel": self._handle_refuel,
-            "missions": self._handle_missions,
-            "accept": self._handle_accept,
-            "complete": self._handle_complete,
-            "save": self._handle_save,
-            "load": self._handle_load,
-            "new": self._handle_new,
-            "blackmarket": self._handle_black_market,
-            "sellmodule": self._handle_sell_module,
-            "recruits": self._handle_recruits,
-            "hire": self._handle_hire,
-            "crew": self._handle_crew,
-            "fire": self._handle_fire,
-            "news": self._handle_news,
-            "quit": self.quit_game
-        }
-        
         print(f"Commands: {', '.join(self.commands.keys())}")
         
-        if os.path.exists(self.constants['SAVE_FILE_NAME']):
+        if self.save_load_manager.save_exists():
             print("Save file found. Use 'load' to continue or 'new' to start a new game.")
         else:
             self._handle_status(None) # Initial status
@@ -429,6 +276,24 @@ class Game:
         print(f"\n--- Galactic News Network (GNN) - Day {self.current_day} ---")
         
         news_items = 0
+        
+        # Faction relations
+        factions = [f for f in FACTIONS.keys() if f != "Independent"]
+        print("\n-- Faction Relations --")
+        for faction1 in factions:
+            for faction2 in factions:
+                if faction1 < faction2:  # Avoid duplicates
+                    status = self.galaxy.get_faction_relation_status(faction1, faction2)
+                    value = self.galaxy.faction_relations[faction1][faction2]
+                    print(f"  {faction1} ↔ {faction2}: {status} ({value:+d})")
+        news_items += 1
+        
+        # Report on galactic events
+        if self.galaxy.galactic_events:
+            print("\n-- Major Galactic Events --")
+            for event in self.galaxy.galactic_events.values():
+                print(f"  - {event['description']} (Day {event['duration']} remaining)")
+                news_items += 1
         
         # Report on active economic events
         if self.galaxy.active_events:
@@ -460,129 +325,18 @@ class Game:
         if news_items == 0:
             print("\nNo major news to report across the galaxy.")
 
-    def _handle_recruits(self, parts):
-        """Displays available recruits at the current location."""
-        system = self.player.location
-        print(f"\n--- Recruitment Office at {system.name} ---")
-        if not system.recruitment_office:
-            print("No one is looking for work here at the moment.")
-            return
-            
-        for recruit in system.recruitment_office:
-            print(f"Name: {recruit.name} | Role: {recruit.role} | Salary: {recruit.salary} Cr/day")
-            print(f"  Description: {recruit.description}")
+    def _handle_recipes(self, parts):
+        """Shows available production recipes at the current location."""
+        self.production_manager.show_recipes()
 
-    def _handle_hire(self, parts):
-        """Hires a new crew member."""
-        if len(parts) != 2:
-            print("Invalid format. Use: hire <name>")
+    def _handle_produce(self, parts):
+        """Handles production of goods from recipes."""
+        if len(parts) < 2:
+            print("Invalid format. Use: produce <product>")
             return
             
-        name_to_hire = parts[1].capitalize()
-        system = self.player.location
-        
-        recruit_to_hire = None
-        for recruit in system.recruitment_office:
-            if recruit.name == name_to_hire:
-                recruit_to_hire = recruit
-                break
-        
-        if not recruit_to_hire:
-            print(f"No recruit named '{name_to_hire}' found here.")
-            return
-            
-        if len(self.player.crew) >= self.player.ship.ship_class_data["crew_quarters"]:
-            print("Your ship's crew quarters are full.")
-            return
-            
-        # For now, hiring is free. We can add a hiring fee later.
-        self.player.crew.append(recruit_to_hire)
-        system.recruitment_office.remove(recruit_to_hire)
-        print(f"{recruit_to_hire.name} has joined your crew as your new {recruit_to_hire.role}.")
-
-    def _handle_crew(self, parts):
-        """Displays the current crew."""
-        print("\n--- Your Crew ---")
-        if not self.player.crew:
-            print("You have no crew.")
-            return
-            
-        for member in self.player.crew:
-            print(f"Name: {member.name} | Role: {member.role} | Salary: {member.salary} Cr/day")
-
-    def _handle_fire(self, parts):
-        """Fires a crew member."""
-        if len(parts) != 2:
-            print("Invalid format. Use: fire <name>")
-            return
-            
-        name_to_fire = parts[1].capitalize()
-        
-        member_to_fire = None
-        for member in self.player.crew:
-            if member.name == name_to_fire:
-                member_to_fire = member
-                break
-        
-        if not member_to_fire:
-            print(f"No crew member named '{name_to_fire}' found.")
-            return
-            
-        self.player.crew.remove(member_to_fire)
-        # For now, fired crew just disappear. We could have them return to a recruitment office later.
-        print(f"You have fired {member_to_fire.name}.")
-
-    def _handle_sell_module(self, parts):
-        """Sells an installed module from the player's ship."""
-        if len(parts) != 2:
-            print("Invalid format. Use: sellmodule <module_id>")
-            return
-
-        module_id_to_sell = parts[1].upper()
-        ship = self.player.ship
-        
-        module_type = None
-        found_module = False
-        for m_type, installed_list in ship.modules.items():
-            if module_id_to_sell in installed_list:
-                module_type = m_type
-                found_module = True
-                break
-        
-        if not found_module:
-            print(f"Module '{module_id_to_sell}' not found on your ship.")
-            return
-            
-        # Prevent selling the last module of a critical type
-        if module_type in ["engine", "weapon"] and len(ship.modules[module_type]) == 1:
-            print(f"Cannot sell your last {module_type}. A ship needs it to function!")
-            return
-
-        module_specs = MODULE_SPECS[module_type][module_id_to_sell]
-        resale_price = int(module_specs["cost"] * 0.5) # Sell for 50% of original price
-        
-        ship.modules[module_type].remove(module_id_to_sell)
-        self.player.credits += resale_price
-        
-        print(f"Sold {module_specs['name']} for {resale_price} credits.")
-
-    def _handle_black_market(self, parts):
-        """Displays the black market at the current location."""
-        system = self.player.location
-        if not system.has_black_market:
-            print("No black market here. Keep your nose clean.")
-            return
-            
-        print(f"\n--- Black Market at {system.name} ---")
-        print("A shady figure in a dimly lit corner of the starport acknowledges you.")
-        print(f"{'Good':<15} {'Price':>10} {'Quantity':>10}")
-        print("-" * 37)
-        
-        for good, data in sorted(system.market.items()):
-            if good in ILLEGAL_GOODS:
-                print(f"{good:<15} {data['price']:>10} {data['quantity']:>10}")
-        
-        print("\nUse 'buy <good> <quantity>' or 'sell <good> <quantity>'.")
+        product_name = " ".join(parts[1:]).title()
+        self.production_manager.produce_good(product_name)
 
     def _handle_new(self, parts):
         """Starts a new game, overwriting any existing save."""
@@ -592,185 +346,233 @@ class Game:
 
     def _handle_save(self, parts):
         """Saves the current game state to a file."""
-        game_state = {
-            "player": {
-                "name": self.player.name,
-                "credits": self.player.credits,
-                "location_name": self.player.location.name,
-                "reputation": self.player.reputation,
-                "active_missions": [m.to_dict() for m in self.player.active_missions],
-                "ship": {
-                    "ship_class": "starter_ship", # For now, only one ship class
-                    "modules": self.player.ship.modules,
-                    "hull": self.player.ship.hull,
-                    "fuel": self.player.ship.fuel,
-                    "cargo_hold": self.player.ship.cargo_hold,
-                }
-            },
-            "galaxy": {
-                "active_events": self.galaxy.active_events,
-                "markets": {name: sys.market for name, sys in self.galaxy.systems.items()},
-                "available_missions": {name: [m.to_dict() for m in sys.available_missions] for name, sys in self.galaxy.systems.items()}
-            },
-            "current_day": self.current_day,
-        }
-        
-        with open(self.constants['SAVE_FILE_NAME'], 'w') as f:
-            json.dump(game_state, f, indent=4)
-        print(f"Game saved to {self.constants['SAVE_FILE_NAME']}.")
+        self.save_load_manager.save_game(self)
 
     def _handle_load(self, parts):
         """Loads the game state from a file."""
-        if not os.path.exists(self.constants['SAVE_FILE_NAME']):
-            print("No save file found.")
-            return
+        if self.save_load_manager.load_game(self):
+            self._handle_status(None)
 
-        with open(self.constants['SAVE_FILE_NAME'], 'r') as f:
-            game_state = json.load(f)
-
-        # Restore Player state
-        player_data = game_state["player"]
-        self.player.name = player_data["name"]
-        self.player.credits = player_data["credits"]
-        self.player.location = self.galaxy.systems[player_data["location_name"]]
-        self.player.reputation = player_data["reputation"]
-        
-        # Restore Ship state
-        ship_data = player_data["ship"]
-        self.player.ship = Ship(ship_data["ship_class"])
-        self.player.ship.modules = ship_data["modules"]
-        self.player.ship.hull = ship_data["hull"]
-        self.player.ship.fuel = ship_data["fuel"]
-        self.player.ship.cargo_hold = ship_data["cargo_hold"]
-
-        # Restore Galaxy state
-        galaxy_data = game_state["galaxy"]
-        self.galaxy.active_events = galaxy_data["active_events"]
-        for name, market_data in galaxy_data["markets"].items():
-            self.galaxy.systems[name].market = market_data
-            
-        # Restore Missions
-        self.player.active_missions = [Mission.from_dict(md, self.galaxy) for md in player_data["active_missions"]]
-        for name, missions_data in galaxy_data["available_missions"].items():
-            self.galaxy.systems[name].available_missions = [Mission.from_dict(md, self.galaxy) for md in missions_data]
-
-        self.current_day = game_state["current_day"]
-        
-        print("Game loaded successfully.")
-        self._handle_status(None)
-
-    def _handle_missions(self, parts):
-        """Displays available missions at the current location."""
-        system = self.player.location
-        print(f"\n--- Mission Board at {system.name} (Day {self.current_day}) ---")
-        if not system.available_missions:
-            print("No missions available at this time.")
-            return
-            
-        for mission in system.available_missions:
-            print(f"ID: {mission.id} | {mission.get_description()}")
-            print(f"  Reward: {mission.reward_credits} Cr, {mission.reward_reputation} Rep | Time Limit: {mission.time_limit} days")
-
-    def _handle_accept(self, parts):
-        """Accepts a mission."""
-        if len(parts) != 2:
-            print("Invalid format. Use: accept <mission_id>")
-            return
-        
-        mission_id = parts[1]
-        system = self.player.location
-        
-        mission_to_accept = None
-        for mission in system.available_missions:
-            if mission.id == mission_id:
-                mission_to_accept = mission
-                break
-        
-        if not mission_to_accept:
-            print(f"Mission ID '{mission_id}' not found here.")
-            return
-            
-        # For now, players can only have one mission at a time
-        if self.player.active_missions:
-            print("You already have an active mission. Complete it first.")
-            return
-            
-        # If it's a delivery mission, check for cargo space and give the cargo to the player.
-        if mission_to_accept.type == "DELIVER":
-            if self.player.ship.get_cargo_used() + mission_to_accept.quantity > self.player.ship.cargo_capacity:
-                print(f"Not enough cargo space to accept this mission. You need {mission_to_accept.quantity} free space.")
-                return
-            self.player.ship.add_cargo(mission_to_accept.good, mission_to_accept.quantity)
-            print(f"{mission_to_accept.quantity} units of {mission_to_accept.good} have been loaded into your cargo hold.")
-
-        mission_to_accept.expiration_day = self.current_day + mission_to_accept.time_limit
-        self.player.active_missions.append(mission_to_accept)
-        system.available_missions.remove(mission_to_accept)
-        print(f"Mission '{mission_to_accept.id}' accepted! It expires on Day {mission_to_accept.expiration_day}.")
-        print("Check your status to see your active mission.")
-
-    def _check_mission_failure(self):
+    def check_mission_failure(self):
         """Checks for and handles failed missions."""
-        failed_missions = []
-        for mission in self.player.active_missions:
-            if self.current_day > mission.expiration_day:
-                failed_missions.append(mission)
-        
-        for mission in failed_missions:
-            self.player.active_missions.remove(mission)
-            # Harsh penalty for failure
-            reputation_penalty = mission.reward_reputation * 2
-            self.player.add_reputation(mission.faction, -reputation_penalty)
-            print(f"\n--- MISSION FAILED ---")
-            print(f"Mission '{mission.id}' expired on Day {mission.expiration_day}.")
-            print(f"Your reputation with {mission.faction} has suffered greatly.")
+        self.mechanics_manager.check_mission_failures()
 
-    def _handle_complete(self, parts):
-        """Completes a mission."""
-        if len(parts) < 2:
-            print("Invalid format. Use: complete <mission_id>")
-            return
-            
-        mission_id = parts[1]
-        is_bounty_completion = len(parts) > 2 and parts[2] == "bounty"
-        
-        mission_to_complete = None
-        for mission in self.player.active_missions:
-            if mission.id == mission_id:
-                mission_to_complete = mission
-                break
-        
-        if not mission_to_complete:
-            print(f"You do not have an active mission with ID '{mission_id}'.")
-            return
-            
-        if mission_to_complete.type == "BOUNTY":
-            if not is_bounty_completion:
-                print("You must defeat the bounty target in combat to complete this mission.")
-                return
+    def _handle_cargo(self, parts):
+        """Shows just the cargo hold contents."""
+        ship = self.player.ship
+        print(f"\n--- Cargo Hold ({ship.get_cargo_used()}/{ship.cargo_capacity}) ---")
+        if ship.cargo_hold:
+            for good, quantity in sorted(ship.cargo_hold.items()):
+                print(f"  {good}: {quantity}")
         else:
-            # Check if player is at the correct destination
-            if self.player.location != mission_to_complete.destination_system:
-                print(f"You must be at {mission_to_complete.destination_system.name} to complete this mission.")
+            print("  Empty")
+    
+    def _handle_clear_wanted(self, parts):
+        """Pay to clear wanted status through underground contacts."""
+        if self.player.get_total_wanted_level() == 0:
+            print("You're not wanted by anyone.")
+            return
+            
+        # Only available in Syndicate or Independent systems
+        if self.player.location.faction == "Federation":
+            print("No underground contacts available in Federation space.")
+            print("Try a Syndicate or Independent system.")
+            return
+            
+        print("\n--- UNDERGROUND CONTACT ---")
+        print("A shady figure approaches you in a dark corner of the station...")
+        print("\"I can make your problems... disappear. For a price.\"")
+        print()
+        
+        # Show current wanted status
+        if self.player.wanted_level > 0:
+            print(f"Global Wanted Level: {'★' * self.player.wanted_level}")
+        
+        for faction, level in self.player.wanted_by.items():
+            print(f"{faction} Wanted Level: {'★' * level}")
+        
+        # Calculate costs
+        print("\nClearing Options:")
+        options = []
+        
+        if self.player.wanted_level > 0:
+            cost = self.player.wanted_level * 3000
+            # Syndicate rank gives discount
+            if self.player.location.faction == "Syndicate":
+                benefits = self.player.get_rank_benefits("Syndicate")
+                if "black_market_discount" in benefits:
+                    cost = int(cost * (1 - benefits["black_market_discount"]))
+            options.append(("global", cost, f"Clear global wanted status: {cost} credits"))
+            
+        for faction, level in self.player.wanted_by.items():
+            cost = level * 2500
+            # Syndicate rank gives discount
+            if self.player.location.faction == "Syndicate":
+                benefits = self.player.get_rank_benefits("Syndicate")
+                if "black_market_discount" in benefits:
+                    cost = int(cost * (1 - benefits["black_market_discount"]))
+            options.append((faction, cost, f"Clear {faction} wanted status: {cost} credits"))
+        
+        # Display options
+        for i, (target, cost, desc) in enumerate(options):
+            print(f"{i+1}. {desc}")
+        print(f"{len(options)+1}. Never mind")
+        
+        choice = input("\nYour choice: ").strip()
+        
+        try:
+            choice_idx = int(choice) - 1
+            if choice_idx == len(options):
+                print("You decide to keep your wanted status for now.")
                 return
                 
-            # Check if player has the required cargo
-            if self.player.ship.cargo_hold.get(mission_to_complete.good, 0) < mission_to_complete.quantity:
-                print(f"You don't have the required {mission_to_complete.quantity} units of {mission_to_complete.good}.")
-                return
+            if 0 <= choice_idx < len(options):
+                target, cost, _ = options[choice_idx]
                 
-            self.player.ship.remove_cargo(mission_to_complete.good, mission_to_complete.quantity)
+                if self.player.credits >= cost:
+                    self.player.credits -= cost
+                    
+                    if target == "global":
+                        self.player.wanted_level = 0
+                        print("\nThe contact makes a few calls...")
+                        print("\"It's done. Your record has been... cleaned.\"")
+                        print("Your global wanted status has been cleared!")
+                    else:
+                        level = self.player.wanted_by[target]
+                        self.player.decrease_wanted_level(target, level)
+                        print(f"\nThe contact taps into the {target} database...")
+                        print("\"Consider yourself a ghost in their system.\"")
+                        print(f"Your wanted status with {target} has been cleared!")
+                        
+                    # Gain some Syndicate reputation for using their services
+                    if self.player.location.faction == "Syndicate":
+                        self.player.add_reputation("Syndicate", 5)
+                else:
+                    print(f"\nYou need {cost} credits but only have {self.player.credits}.")
+                    print("\"Come back when you have the money.\"")
+            else:
+                print("Invalid choice.")
+        except ValueError:
+            print("Invalid choice.")
+    
+    
+    def _handle_search(self, parts):
+        """Search for special features in the current system."""
+        self.exploration_handler.handle_search(parts)
+    
+    def _handle_analyze(self, parts):
+        """Analyze market data across connected systems."""
+        if len(parts) < 2:
+            print("Analyze what? (markets, good <name>, routes)")
+            return
+            
+        analysis_type = parts[1].lower()
+        
+        if analysis_type == "markets":
+            self.trade_analyzer.analyze_markets()
+        elif analysis_type == "good" and len(parts) > 2:
+            good_name = " ".join(parts[2:]).title()
+            self.trade_analyzer.analyze_good(good_name)
+        elif analysis_type == "routes":
+            self.trade_analyzer.analyze_trade_routes()
+        else:
+            print("Unknown analysis type. Use: analyze markets, analyze good <name>, or analyze routes")
+    
+    def _handle_trade_route(self, parts):
+        """Plan or execute automated trade routes."""
+        if len(parts) < 2:
+            print("Usage: traderoute plan - Plan optimal routes")
+            print("       traderoute auto - Start automated trading (requires AI captain)")
+            return
+            
+        action = parts[1].lower()
+        
+        if action == "plan":
+            self.trade_analyzer.plan_trade_route()
+        elif action == "auto":
+            self.trade_analyzer.auto_trade()
+        else:
+            print("Unknown traderoute command.")
+    
+    def _handle_encyclopedia(self, parts):
+        """In-game encyclopedia with information about the game world."""
+        self.encyclopedia.handle_query(parts)
+    
+    def _handle_help(self, parts):
+        """Shows help for commands."""
+        self.help_system.show_help(parts)
+    
+    def _handle_victory(self, parts):
+        """Display victory conditions and current progress."""
+        self.victory_manager.display_victory_status(self.player, self.galaxy)
 
-        # All checks passed, complete the mission
-        self.player.credits += mission_to_complete.reward_credits
-        self.player.add_reputation(mission_to_complete.faction, mission_to_complete.reward_reputation)
+    def _handle_tactical_combat(self, parts):
+        """Initiate tactical combat (for testing/demonstration)."""
+        print("\n--- TACTICAL COMBAT SIMULATION ---")
+        print("This will start a tactical combat encounter for testing.")
         
-        print(f"\n--- MISSION COMPLETE ---")
-        print(f"Mission '{mission_to_complete.id}' complete!")
-        print(f"You received {mission_to_complete.reward_credits} credits and {mission_to_complete.reward_reputation} reputation with {mission_to_complete.faction}.")
+        from .combat import TacticalCombat, WeaponRange
         
-        self.player.active_missions.remove(mission_to_complete)
-        mission_to_complete.is_complete = True # Mark for cleanup
+        # Create enemy configuration
+        enemy_configs = []
+        
+        if len(parts) > 1 and parts[1] == "multi":
+            # Multiple enemies for more interesting combat
+            enemy_configs = [
+                {
+                    "name": "Pirate Leader",
+                    "type": "pirate",
+                    "hull": 60,
+                    "shield": 30,
+                    "damage": 20,
+                    "range": WeaponRange.LONG,
+                    "speed": 2,
+                    "evasion": 15
+                },
+                {
+                    "name": "Pirate Wingman",
+                    "type": "pirate", 
+                    "hull": 40,
+                    "shield": 10,
+                    "damage": 15,
+                    "range": WeaponRange.SHORT,
+                    "speed": 3,
+                    "evasion": 20
+                }
+            ]
+        else:
+            # Single enemy
+            enemy_configs = [{
+                "name": "Pirate Raider",
+                "type": "pirate",
+                "hull": 50,
+                "shield": 20,
+                "damage": 15,
+                "range": WeaponRange.MEDIUM,
+                "speed": 2,
+                "evasion": 10
+            }]
+        
+        # Run tactical combat
+        combat = TacticalCombat(self.player.ship, enemy_configs, self)
+        result = combat.run()
+        
+        if result == "victory":
+            print("\nVictory in tactical combat!")
+            # Apply damage taken
+            self.player.ship.hull = combat.player.hull
+            # Rewards
+            credits = random.randint(300, 600) * len(enemy_configs)
+            self.player.credits += credits
+            print(f"You earned {credits} credits from salvage.")
+            
+            # Experience
+            self.player.give_crew_experience("Weapons Officer", 3 * len(enemy_configs))
+            self.player.ship.gain_experience("combat", 10)
+            self.player.gain_skill("leadership", 2)
+        else:
+            print("\nDefeat in tactical combat...")
+            self.game_over = True
 
     def quit_game(self, parts):
         """Sets the game_over flag to True."""
