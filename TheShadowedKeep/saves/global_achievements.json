@@ -1,0 +1,24 @@
+{
+  "completed": [
+    "untouchable",
+    "first_blood",
+    "well_equipped"
+  ],
+  "progress": {
+    "explorer": {
+      "rooms": 99
+    },
+    "monster_slayer": {
+      "kills": 20
+    },
+    "untouchable": {
+      "no_damage_kills": 20
+    }
+  },
+  "unlocks": {
+    "character_class": [],
+    "starting_item": [],
+    "game_mode": [],
+    "cosmetic": []
+  }
+}

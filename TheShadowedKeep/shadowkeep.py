@@ -2,74 +2,36 @@ import random
 import time
 import argparse
 
-class Player:
-    """
-    The player character.
-    """
-    def __init__(self, name="Hero"):
-        self.name = name
-        self.hp = 20
-        self.max_hp = 20
-        self.attack_power = 5
-        self.gold = 0
-        self.dungeon_level = 1
+# Core game modules
+from player import Player
+from monsters import Monster, Goblin, Orc, Slime, SkeletonArcher, Bandit, Troll, Mimic
+from combat_manager import CombatManager, CombatAction, CombatState
+from equipment import (EquipmentManager, Equipment, EquipmentSlot, 
+                      RustyDagger, IronSword, SteelSword,
+                      LeatherArmor, ChainMail,
+                      LuckyCharm, HealthRing)
+from dungeon_map import DungeonMap, Direction, RoomState
+from save_manager import SaveManager, serialize_game_state, deserialize_game_state
+from room_content import (RoomContent, RoomContentFactory, RoomContentType,
+                         MonsterRoom, TreasureRoom, EquipmentRoom, StairsRoom,
+                         MerchantRoom, HealingFountainRoom, TrapRoom)
+from character_classes import CharacterClass, CharacterClassFactory, Warrior, Rogue, Mage
+from constants import *
+from room_handlers import RoomHandler
+from ui_manager import UIManager
+from achievements import AchievementTracker, AchievementManager
+from difficulty_manager import DifficultyManager, AdaptiveDifficulty
+from puzzles import PuzzleManager
+from tutorial_system import tutorial_manager
+from combat_log import combat_log
 
-    def is_alive(self):
-        return self.hp > 0
+# Player class has been moved to player.py
 
-    def take_damage(self, damage):
-        self.hp -= damage
-        if self.hp < 0:
-            self.hp = 0
-
-class Monster:
-    """
-    A base class for all monsters.
-    """
-    def __init__(self, name, hp, attack_power, gold_reward):
-        self.name = name
-        self.hp = hp
-        self.attack_power = attack_power
-        self.gold_reward = gold_reward
-
-    def is_alive(self):
-        return self.hp > 0
-
-    def take_damage(self, damage):
-        self.hp -= damage
-        if self.hp < 0:
-            self.hp = 0
-
-class Goblin(Monster):
-    """A weak but common monster."""
-    def __init__(self):
-        super().__init__(name="Goblin", hp=8, attack_power=3, gold_reward=random.randint(1, 5))
-
-class Orc(Monster):
-    """A tougher monster."""
-    def __init__(self):
-        super().__init__(name="Orc", hp=15, attack_power=6, gold_reward=random.randint(5, 12))
+# Monster classes have been moved to monsters.py
 
 
-class Dungeon:
-    """
-    Manages the generation of dungeon rooms.
-    """
-    def __init__(self, level=1):
-        self.level = level
 
-    def generate_room(self):
-        """Randomly generates a new room with an event."""
-        room_type = random.choices(["monster", "treasure", "empty"], [0.6, 0.2, 0.2])[0]
-
-        if room_type == "monster":
-            monster_type = random.choice([Goblin, Orc])
-            return {"type": "monster", "content": monster_type()}
-        elif room_type == "treasure":
-            gold_found = random.randint(5, 20) * self.level
-            return {"type": "treasure", "content": gold_found}
-        else:
-            return {"type": "empty", "content": None}
+# Dungeon class has been replaced by RoomContentFactory in room_content.py
 
 
 class Game:
@@ -78,107 +40,398 @@ class Game:
     """
     def __init__(self):
         self.player = Player()
-        self.dungeon = Dungeon()
         self.game_over = False
+        self.dungeon_map = DungeonMap()
+        self.floor_number = 1
+        self.save_manager = SaveManager()
+        self.dungeon_level = 1  # Track dungeon difficulty level
+        self.room_handler = RoomHandler(self)
+        self.ui = UIManager(self)
+        
+        # Initialize achievement system
+        self.achievement_tracker = AchievementTracker()
+        self.achievement_manager = AchievementManager(self.achievement_tracker)
+        
+        # Initialize difficulty systems
+        self.difficulty_manager = DifficultyManager()
+        self.adaptive_difficulty = AdaptiveDifficulty()
+        
+        # Initialize puzzle system
+        self.puzzle_manager = PuzzleManager()
+        
+        # Load global achievements
+        self.achievement_tracker.load_from_file("saves/global_achievements.json")
 
-    def _handle_monster_room(self, room):
-        """Handles the logic for a room containing a monster."""
-        monster = room["content"]
-        print(f"A wild {monster.name} with {monster.hp} HP appears!")
-
-        while monster.is_alive() and self.player.is_alive():
-            print("\nWhat do you do?")
-            command = input("> ").strip().lower()
-
-            if command == "attack":
-                # Player attacks monster
-                player_damage = self.player.attack_power
-                monster.take_damage(player_damage)
-                print(f"You attack the {monster.name} for {player_damage} damage.")
-                
-                # Monster attacks player (if still alive)
-                if monster.is_alive():
-                    monster_damage = monster.attack_power
-                    self.player.take_damage(monster_damage)
-                    print(f"The {monster.name} attacks you for {monster_damage} damage. You have {self.player.hp} HP left.")
-                else:
-                    print(f"You have defeated the {monster.name}!")
-                    self.player.gold += monster.gold_reward
-                    print(f"You find {monster.gold_reward} gold. Total gold: {self.player.gold}")
-
-            elif command == "run":
-                print("You flee from the battle.")
-                # 25% chance the monster gets a free hit
-                if random.random() < 0.25:
-                    monster_damage = monster.attack_power
-                    self.player.take_damage(monster_damage)
-                    print(f"The {monster.name} gets a parting shot in for {monster_damage} damage! You have {self.player.hp} HP left.")
-                return # Exit the combat loop
-            else:
-                print("Invalid command. Choose 'attack' or 'run'.")
-
-        if not self.player.is_alive():
+    def _handle_room_content(self, room_content):
+        """Delegate room handling to the room handler."""
+        if not self.room_handler.handle_room(room_content):
             self.game_over = True
-            print("\nYou have been defeated. Your adventure ends here.")
 
-    def _handle_treasure_room(self, room):
-        """Handles the logic for a room containing treasure."""
-        gold = room["content"]
-        print(f"You enter a quiet room. You find a chest containing {gold} gold!")
-        self.player.gold += gold
-        print(f"Your total gold is now {self.player.gold}.")
-
-    def _handle_empty_room(self, room):
-        """Handles the logic for an empty room."""
-        print("The room is empty. You take a moment to catch your breath.")
-        # Small chance to heal
-        if random.random() < 0.3:
-            heal_amount = random.randint(1, 5)
-            self.player.hp = min(self.player.max_hp, self.player.hp + heal_amount)
-            print(f"You find some discarded bandages and heal for {heal_amount} HP. Current HP: {self.player.hp}")
+    def save_game(self):
+        """Save the current game state."""
+        state = serialize_game_state(self)
+        self.save_manager.save_game(state)
+        
+        # Save global achievements
+        self.achievement_tracker.save_to_file("saves/global_achievements.json")
+        
+    def load_game(self):
+        """Load a saved game state."""
+        state = self.save_manager.load_game()
+        if state:
+            deserialize_game_state(self, state)
+            return True
+        return False
+        
+    def _character_creation(self):
+        """Handle character creation at game start."""
+        self.ui.show_character_creation()
+        name = self.ui.get_character_name()
+        
+        # Display class options
+        descriptions = CharacterClassFactory.get_class_descriptions()
+        
+        class_options = []
+        display_options = []
+        for i, (class_type, info) in enumerate(descriptions.items(), 1):
+            class_options.append(class_type)
+            display_options.append(
+                f"\n[{i}] {info['name']}\n"
+                f"    {info['description']}\n"
+                f"    HP: {info['hp']} | Attack: {info['attack']} | Defense: {info['defense']}\n"
+                f"    Special: {info['special']}"
+            )
+            
+        self.ui.show_class_selection(display_options)
+        choice = self.ui.get_class_choice(['1', '2', '3'])
+        
+        # Create player with selected class
+        idx = int(choice) - 1
+        selected_class = CharacterClassFactory.create(class_options[idx])
+        self.player = Player(name, selected_class)
+        
+        self.ui.show_welcome_message(name, selected_class.name)
+        time.sleep(1)
+        
+    def _start_new_game(self):
+        """Start a new game."""
+        print("\nYour adventure begins...")
+        
+        # Ask if player wants tutorial
+        print("\nWould you like to play the tutorial? (yes/no)")
+        choice = input("> ").strip().lower()
+        if choice in ['yes', 'y']:
+            tutorial_manager.start_tutorial()
+            # Show intro tutorial step
+            step = tutorial_manager.get_current_step()
+            if step:
+                for line in tutorial_manager.format_tutorial_message(step):
+                    print(line)
+                input()  # Wait for Enter
+                tutorial_manager.advance_tutorial("continue")
+        else:
+            print("\nTutorial skipped. Type 'help' anytime for assistance!")
+        
+        print("\nTIP: All commands work with just a single letter! Press H for help.")
+        print("\nYou enter the dungeon on floor 1...")
+        time.sleep(1)
+        
+        # Generate the first floor
+        self._generate_new_floor()
 
     def run(self):
         """The main game loop."""
         print("Welcome to The Shadowed Keep!")
-        print("Your adventure begins...")
-        time.sleep(1)
+        
+        # Character creation for new game
+        if not self.save_manager.has_autosave():
+            self._character_creation()
+        
+        # Check for existing save
+        if self.save_manager.has_autosave():
+            if self.ui.show_load_game_prompt():
+                if self.load_game():
+                    print(f"\nWelcome back, {self.player.name}!")
+                    print(f"You are on floor {self.floor_number}.")
+                else:
+                    print("Failed to load save. Starting new game...")
+                    self._start_new_game()
+            else:
+                # Delete old save and start new
+                self.save_manager.delete_save()
+                self._start_new_game()
+        else:
+            self._start_new_game()
 
         while not self.game_over:
-            print(f"\n--- Dungeon Level: {self.player.dungeon_level} ---")
+            # Display map
+            self.ui.display_map()
             
-            room = self.dungeon.generate_room()
+            # Get current room
+            current_room = self.dungeon_map.get_current_room()
             
-            if room["type"] == "monster":
-                self._handle_monster_room(room)
-            elif room["type"] == "treasure":
-                self._handle_treasure_room(room)
-            elif room["type"] == "empty":
-                self._handle_empty_room(room)
-
+            # If room is unexplored, generate and handle content
+            if current_room.state == RoomState.CURRENT and current_room.content is None:
+                self._explore_current_room()
+                
+            # Regenerate mana for mages after room
+            if (hasattr(self.player, 'character_class') and 
+                hasattr(self.player.character_class, 'regenerate_mana')):
+                self.player.character_class.regenerate_mana()
+            
+            # If player died during room exploration
             if not self.player.is_alive():
                 self.game_over = True
-                print(f"\n--- GAME OVER ---")
-                print(f"You reached dungeon level {self.player.dungeon_level}.")
-                print(f"You collected {self.player.gold} gold.")
+                self.ui.show_game_over()
+                # Delete save on death
+                self.save_manager.delete_save()
                 break
-
-            print("\nYou see a staircase leading deeper into the keep.")
-            print("Do you want to 'continue' to the next level or 'quit'?")
+                
+            # Auto-save after each room completion
+            self.save_game()
+                
+            # Check achievements periodically
+            self._check_periodic_achievements()
             
-            while True:
-                command = input("> ").strip().lower()
-                if command == "continue":
-                    self.player.dungeon_level += 1
-                    self.dungeon.level = self.player.dungeon_level
-                    print("You descend deeper into the darkness...")
-                    time.sleep(1)
+            # Show navigation options
+            self._show_navigation_options()
+            
+    def _generate_new_floor(self):
+        """Generate a new dungeon floor."""
+        self.dungeon_map = DungeonMap()
+        self.dungeon_map.generate_floor()
+        
+        # Add boss room on certain floors (every 3rd floor starting from floor 3)
+        if self.floor_number % 3 == 0 and self.floor_number >= 3:
+            self._place_boss_room()
+        
+        self.ui.show_floor_banner(self.floor_number)
+        
+    def _place_boss_room(self):
+        """Place a boss room on the current floor."""
+        from room_content import RoomContentFactory
+        import random
+        
+        # Find a suitable room (preferably far from stairs and start)
+        available_rooms = []
+        start_pos = (self.dungeon_map.width // 2, self.dungeon_map.height // 2)
+        
+        for pos, room in self.dungeon_map.rooms.items():
+            # Skip start room, stairs room, and rooms too close to start
+            if (pos == start_pos or 
+                pos == self.dungeon_map.stairs_position or
+                abs(pos[0] - start_pos[0]) + abs(pos[1] - start_pos[1]) <= 1):
+                continue
+            available_rooms.append(room)
+        
+        if available_rooms:
+            # Choose a random room from available ones
+            boss_room_location = random.choice(available_rooms)
+            
+            # Create boss content based on dungeon level
+            boss_content = RoomContentFactory.create_boss_room(self.dungeon_level)
+            boss_room_location.content = boss_content
+            
+            print(f"\n🔥 A powerful presence stirs on this floor... 🔥")
+        
+        
+    def _explore_current_room(self):
+        """Explore the current room and generate its content."""
+        current_room = self.dungeon_map.get_current_room()
+        
+        # Check if this is the stairs room
+        if current_room.position == self.dungeon_map.stairs_position:
+            current_room.content = RoomContentFactory.create(RoomContentType.STAIRS)
+            messages = current_room.content.on_enter(self)
+            for msg in messages:
+                print(msg)
+            return
+            
+        # Generate room content with difficulty scaling
+        current_room.content = RoomContentFactory.get_random_content_with_scaling(
+            self.dungeon_level, game=self
+        )
+        
+        # Handle the room content
+        print(f"\n--- Exploring Room ---")
+        self._handle_room_content(current_room.content)
+            
+    def _show_navigation_options(self):
+        """Show movement and action options."""
+        current_room = self.dungeon_map.get_current_room()
+        directions = self.dungeon_map.get_available_directions()
+        
+        # Show available options
+        self.ui.show_navigation_options(directions)
+        
+        # Additional room-specific options
+        if current_room.position == self.dungeon_map.stairs_position:
+            print("[D]escend the stairs to the next floor")
+            
+        if current_room.content:
+            if isinstance(current_room.content, MerchantRoom):
+                print("[S]hop - Browse merchant's wares")
+            elif isinstance(current_room.content, HealingFountainRoom) and current_room.content.uses_remaining > 0:
+                print("[F]ountain - Drink from the healing fountain")
+        
+        # Get player input
+        while True:
+            command = self.ui.get_player_action()
+            
+            # Movement commands
+            if command in ['n', 'north'] and Direction.NORTH in directions:
+                if self.dungeon_map.move(Direction.NORTH):
+                    print("You move north.")
                     break
-                elif command == "quit":
-                    print("You flee from the keep with your treasure. Coward!")
+            elif command in ['s', 'south'] and Direction.SOUTH in directions:
+                if self.dungeon_map.move(Direction.SOUTH):
+                    print("You move south.")
+                    break
+            elif command in ['e', 'east'] and Direction.EAST in directions:
+                if self.dungeon_map.move(Direction.EAST):
+                    print("You move east.")
+                    break
+            elif command in ['w', 'west'] and Direction.WEST in directions:
+                if self.dungeon_map.move(Direction.WEST):
+                    print("You move west.")
+                    break
+                    
+            # Other commands
+            elif command in ['d', 'descend'] and current_room.position == self.dungeon_map.stairs_position:
+                self.floor_number += 1
+                self.dungeon_level = self.floor_number
+                print("\nYou descend deeper into the darkness...")
+                time.sleep(1)
+                self._generate_new_floor()
+                break
+            elif command in ['m', 'map']:
+                self.ui.display_map()
+            elif command in ['i', 'inventory']:
+                self.ui.show_inventory()
+            elif command in ['t', 'stats']:
+                self.ui.show_stats()
+            elif command in ['h', 'help']:
+                self.ui.show_help()
+            elif command == 'legend':
+                self.ui.display_legend()
+            elif command in ['log', 'combatlog']:
+                combat_log.display(10)  # Show last 10 actions
+            elif command in ['q', 'quit']:
+                if self.ui.confirm_quit():
+                    print("Saving game...")
+                    self.save_game()
+                    print("Game saved. You can continue your adventure later.")
                     self.game_over = True
                     break
-                else:
-                    print("Invalid command.")
+                
+            # Special room interactions
+            elif command in ['s', 'shop'] and isinstance(current_room.content, MerchantRoom):
+                self.room_handler._handle_merchant_room(current_room.content)
+                        
+            elif command in ['f', 'fountain'] and isinstance(current_room.content, HealingFountainRoom):
+                self.room_handler._handle_healing_fountain_room(current_room.content)
+                
+            elif command.startswith('use '):
+                item_name = command[4:].strip()
+                self._use_item(item_name)
+                
+            elif command in ['achievements', 'a']:
+                self._show_achievements()
+                    
+            else:
+                print("Invalid command. Type 'help' for available commands.")
+                
+    def _use_item(self, item_name: str):
+        """Use an item from inventory."""
+        from consumables import ConsumableType
+        
+        # Find matching item in inventory
+        item_to_use = None
+        for item_type, count in self.player.inventory.get_all_items():
+            if count > 0:
+                items = self.player.inventory.items[item_type]
+                if items and (items[0].name.lower() == item_name.lower() or 
+                            items[0].name.lower().startswith(item_name.lower())):
+                    item_to_use = item_type
+                    break
+        
+        if not item_to_use:
+            print(f"You don't have any '{item_name}'.")
+            return
+        
+        # Remove and use the item
+        item = self.player.inventory.remove_item(item_to_use)
+        if item:
+            can_use, reason = item.can_use(self.player, in_combat=False)
+            if can_use:
+                messages = item.use(self.player)
+                for msg in messages:
+                    print(msg)
+                    
+                # Track item usage for achievements
+                self.achievement_manager.check_item_use(item_to_use)
+            else:
+                # Put it back
+                self.player.inventory.add_item(item)
+                print(f"Can't use {item.name}: {reason}")
+                
+    def _check_periodic_achievements(self):
+        """Check achievements that need periodic checking."""
+        # Check exploration achievements
+        self.achievement_manager.check_exploration_achievements(self.player, self.dungeon_map)
+        
+        # Check collection achievements
+        self.achievement_manager.check_collection_achievements(self.player)
+        
+        # Check progression achievements
+        self.achievement_manager.check_progression_achievements(self.player)
+        
+        # Show any notifications
+        notifications = self.achievement_manager.get_and_clear_notifications()
+        for achievement in notifications:
+            print("\n" + "="*50)
+            print("🏆 ACHIEVEMENT UNLOCKED! 🏆")
+            print(f"{achievement.name} - {achievement.points} points")
+            print(f"{achievement.description}")
+            
+            if achievement.unlock_reward:
+                print(f"\nReward: New content unlocked!")
+                
+            print("="*50)
+            time.sleep(1.5)
+            
+    def _show_achievements(self):
+        """Display achievement progress."""
+        tracker = self.achievement_tracker
+        
+        print("\n=== ACHIEVEMENTS ===")
+        print(f"Completion: {tracker.get_completion_percentage():.1f}%")
+        print(f"Total Points: {tracker.get_total_points()}")
+        
+        from achievements import AchievementCategory
+        
+        for category in AchievementCategory:
+            achievements = tracker.get_achievements_by_category(category)
+            if not achievements:
+                continue
+                
+            print(f"\n--- {category.value.upper()} ---")
+            for achievement in achievements:
+                status = "✓" if achievement.id in tracker.completed_achievements else "✗"
+                name = achievement.get_display_name()
+                desc = achievement.get_display_description()
+                print(f"  {status} {name} ({achievement.points}pts)")
+                print(f"      {desc}")
+                
+        # Show unlocks
+        unlocks_shown = False
+        for unlock_type, items in tracker.unlocks.items():
+            if items:
+                if not unlocks_shown:
+                    print("\n--- UNLOCKED CONTENT ---")
+                    unlocks_shown = True
+                print(f"{unlock_type.value}: {', '.join(items)}")
+
 
 
 if __name__ == "__main__":
