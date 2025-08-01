@@ -1,18 +1,22 @@
 {
   "completed": [
+    "well_equipped",
     "untouchable",
     "first_blood",
-    "well_equipped"
+    "explorer"
   ],
   "progress": {
     "explorer": {
-      "rooms": 99
+      "rooms": 190
     },
     "monster_slayer": {
-      "kills": 20
+      "kills": 43
     },
     "untouchable": {
-      "no_damage_kills": 20
+      "no_damage_kills": 43
+    },
+    "potion_master": {
+      "items_used": 1
     }
   },
   "unlocks": {

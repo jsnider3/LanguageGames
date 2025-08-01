@@ -82,7 +82,9 @@ class Room:
             if self.content.content_type == RoomContentType.EMPTY:
                 return "."
             elif self.content.content_type == RoomContentType.MONSTER:
-                return "X" if self.content.is_cleared() else "M"
+                # Debug: Check if monster room is properly marked as cleared
+                is_cleared = self.content.is_cleared()
+                return "X" if is_cleared else "M"
             elif self.content.content_type == RoomContentType.TREASURE:
                 return "x" if self.content.is_cleared() else "$"
             elif self.content.content_type == RoomContentType.EQUIPMENT:

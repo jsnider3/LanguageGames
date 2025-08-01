@@ -64,7 +64,7 @@ class RoomHandler:
         # Show monster ASCII art
         if not room_content.defeated:
             monster_art = ASCIIArt.get_monster_art(room_content.monster.name)
-            visual_fx.print_ascii_art(monster_art, Colors.BRIGHT_RED)
+            visual_fx.print_ascii_art(monster_art, Colors.BRIGHT_RED, center=False)
             visual_fx.print_colored(f"⚔️ A {room_content.monster.name} blocks your path! ⚔️", Colors.BRIGHT_RED, bold=True)
             
         if not room_content.defeated:
@@ -203,8 +203,54 @@ class RoomHandler:
                         player_max_hp=self.game.player.max_hp
                     )
                     
-                    room_content.defeated = True
-                    visual_fx.print_colored(f"\n🎉 Victory! You defeated the {room_content.monster.name}! 🎉", Colors.BRIGHT_GREEN, bold=True)
+                    # Check if slime should split
+                    if hasattr(room_content.monster, 'will_split') and room_content.monster.will_split:
+                        # Create two mini slimes to fight sequentially
+                        from monsters import Slime
+                        visual_fx.print_colored("\n💧 The slime splits apart! 💧", Colors.BRIGHT_BLUE, bold=True)
+                        
+                        # Store that we need to fight 2 mini slimes
+                        if not hasattr(room_content, 'mini_slimes_remaining'):
+                            room_content.mini_slimes_remaining = 2
+                            room_content.original_slime_defeated = True
+                        
+                        # Create and fight the next mini slime
+                        mini_slime = Slime(is_mini=True)
+                        room_content.mini_slimes_remaining -= 1
+                        
+                        if room_content.mini_slimes_remaining == 1:
+                            visual_fx.print_colored(f"\nThe first {mini_slime.name} emerges from the puddle!", Colors.BRIGHT_YELLOW)
+                        else:
+                            visual_fx.print_colored(f"\nThe second {mini_slime.name} emerges!", Colors.BRIGHT_YELLOW)
+                        
+                        room_content.monster = mini_slime
+                        
+                        # Continue combat with the mini slime
+                        time.sleep(1)
+                        self.combat_manager.start_combat(self.game.player, mini_slime)
+                        continue  # Continue the combat loop
+                        
+                    # Check if we just defeated a mini slime and there are more to fight
+                    elif hasattr(room_content, 'mini_slimes_remaining') and room_content.mini_slimes_remaining > 0:
+                        visual_fx.print_colored(f"\n✨ One mini slime down, {room_content.mini_slimes_remaining} to go! ✨", Colors.BRIGHT_CYAN)
+                        
+                        # Create the next mini slime
+                        from monsters import Slime
+                        mini_slime = Slime(is_mini=True)
+                        room_content.mini_slimes_remaining -= 1
+                        
+                        visual_fx.print_colored(f"\nThe next {mini_slime.name} attacks!", Colors.BRIGHT_YELLOW)
+                        room_content.monster = mini_slime
+                        
+                        # Continue combat
+                        time.sleep(1)
+                        self.combat_manager.start_combat(self.game.player, mini_slime)
+                        continue
+                        
+                    else:
+                        # Normal victory - room is cleared
+                        room_content.defeated = True
+                        visual_fx.print_colored(f"\n🎉 Victory! You defeated the {room_content.monster.name}! 🎉", Colors.BRIGHT_GREEN, bold=True)
                     
                     # Check combat achievements
                     self.game.achievement_manager.check_combat_achievements(
@@ -354,6 +400,57 @@ class RoomHandler:
             
         if not room_content.taken:
             equipment = room_content.equipment
+            
+            # Show comparison with current equipment
+            current_equipment = self.game.player.equipment.slots[equipment.slot]
+            if current_equipment:
+                visual_fx.print_colored(f"\n📊 Equipment Comparison:", Colors.BRIGHT_CYAN)
+                visual_fx.print_colored(f"Current: {current_equipment}", Colors.YELLOW)
+                
+                # Compare stats
+                current_stats = current_equipment.stats
+                new_stats = equipment.stats
+                
+                # Attack comparison
+                if hasattr(current_stats, 'attack_bonus') and hasattr(new_stats, 'attack_bonus'):
+                    diff = new_stats.attack_bonus - current_stats.attack_bonus
+                    if diff > 0:
+                        visual_fx.print_colored(f"New:     {equipment} (Attack: +{new_stats.attack_bonus} ↑ +{diff})", Colors.BRIGHT_GREEN)
+                    elif diff < 0:
+                        visual_fx.print_colored(f"New:     {equipment} (Attack: +{new_stats.attack_bonus} ↓ {diff})", Colors.BRIGHT_RED)
+                    else:
+                        visual_fx.print_colored(f"New:     {equipment} (Attack: +{new_stats.attack_bonus} =)", Colors.WHITE)
+                
+                # Defense comparison
+                elif hasattr(current_stats, 'defense_bonus') and hasattr(new_stats, 'defense_bonus'):
+                    diff = new_stats.defense_bonus - current_stats.defense_bonus
+                    if diff > 0:
+                        visual_fx.print_colored(f"New:     {equipment} (Defense: +{new_stats.defense_bonus} ↑ +{diff})", Colors.BRIGHT_GREEN)
+                    elif diff < 0:
+                        visual_fx.print_colored(f"New:     {equipment} (Defense: +{new_stats.defense_bonus} ↓ {diff})", Colors.BRIGHT_RED)
+                    else:
+                        visual_fx.print_colored(f"New:     {equipment} (Defense: +{new_stats.defense_bonus} =)", Colors.WHITE)
+                
+                # HP comparison (for accessories)
+                elif hasattr(current_stats, 'hp_bonus') and hasattr(new_stats, 'hp_bonus'):
+                    diff = new_stats.hp_bonus - current_stats.hp_bonus
+                    if diff > 0:
+                        visual_fx.print_colored(f"New:     {equipment} (HP: +{new_stats.hp_bonus} ↑ +{diff})", Colors.BRIGHT_GREEN)
+                    elif diff < 0:
+                        visual_fx.print_colored(f"New:     {equipment} (HP: +{new_stats.hp_bonus} ↓ {diff})", Colors.BRIGHT_RED)
+                    else:
+                        visual_fx.print_colored(f"New:     {equipment} (HP: +{new_stats.hp_bonus} =)", Colors.WHITE)
+            else:
+                visual_fx.print_colored(f"\n📊 You have no {equipment.slot.value} equipped.", Colors.BRIGHT_CYAN)
+                
+                # Show what the new equipment provides
+                if hasattr(equipment.stats, 'attack_bonus'):
+                    visual_fx.print_colored(f"New: {equipment} (Attack: +{equipment.stats.attack_bonus})", Colors.BRIGHT_GREEN)
+                elif hasattr(equipment.stats, 'defense_bonus'):
+                    visual_fx.print_colored(f"New: {equipment} (Defense: +{equipment.stats.defense_bonus})", Colors.BRIGHT_GREEN)
+                elif hasattr(equipment.stats, 'hp_bonus'):
+                    visual_fx.print_colored(f"New: {equipment} (HP: +{equipment.stats.hp_bonus})", Colors.BRIGHT_GREEN)
+            
             print("\nDo you want to take it? (yes/no)")
             
             while True:
@@ -375,6 +472,17 @@ class RoomHandler:
                         
                         if old_equipment:
                             visual_fx.print_colored(f"\nYou unequip {old_equipment} and equip {equipment}.", Colors.BRIGHT_GREEN)
+                            
+                            # Drop the old equipment on the ground
+                            # Replace the current room's content with the dropped equipment
+                            current_room = self.game.dungeon_map.get_current_room()
+                            from room_content import EquipmentRoom
+                            dropped_equipment_room = EquipmentRoom(old_equipment)
+                            dropped_equipment_room.explored = True  # Mark as explored since we're already here
+                            current_room.content = dropped_equipment_room
+                            
+                            visual_fx.print_colored(f"💎 You drop {old_equipment} on the ground.", Colors.BRIGHT_YELLOW)
+                            visual_fx.print_colored("(You can come back for it later)", Colors.BRIGHT_BLACK)
                         else:
                             visual_fx.print_colored(f"\nYou equip {equipment}.", Colors.BRIGHT_GREEN)
                         
@@ -404,6 +512,12 @@ class RoomHandler:
         for msg in messages:
             visual_fx.print_colored(msg, Colors.BRIGHT_CYAN)
             
+        # Show any dropped equipment
+        if hasattr(room_content, 'dropped_equipment') and room_content.dropped_equipment:
+            visual_fx.print_colored("\n📦 Dropped equipment on the floor:", Colors.BRIGHT_YELLOW)
+            for eq in room_content.dropped_equipment:
+                visual_fx.print_colored(f"  • {eq}", Colors.YELLOW)
+            
         # Show merchant tutorial if this is the first merchant
         if tutorial_manager.should_show_tutorial("merchant"):
             step = tutorial_manager.get_current_step()
@@ -424,6 +538,29 @@ class RoomHandler:
                 messages = room_content.interact(self.game, "shop")
                 for msg in messages:
                     print(msg)
+            elif choice.startswith("pickup ") and hasattr(room_content, 'dropped_equipment') and room_content.dropped_equipment:
+                # Handle picking up dropped equipment
+                item_name = choice[7:].strip().lower()
+                picked_up = False
+                for i, eq in enumerate(room_content.dropped_equipment):
+                    if eq.name.lower() == item_name or eq.name.lower().startswith(item_name):
+                        # Pick up the equipment
+                        old_equipment = self.game.player.equipment.equip(eq)
+                        room_content.dropped_equipment.pop(i)
+                        
+                        if old_equipment:
+                            # Drop the old equipment in its place
+                            room_content.dropped_equipment.append(old_equipment)
+                            visual_fx.print_colored(f"\nYou pick up {eq} and drop {old_equipment} in its place.", Colors.BRIGHT_GREEN)
+                        else:
+                            visual_fx.print_colored(f"\nYou pick up and equip {eq}.", Colors.BRIGHT_GREEN)
+                        
+                        self.game.player.update_max_hp()
+                        picked_up = True
+                        break
+                
+                if not picked_up:
+                    visual_fx.print_colored(f"There's no '{item_name}' on the floor.", Colors.BRIGHT_RED)
             elif choice.startswith("buy"):
                 messages = room_content.interact(self.game, choice)
                 for msg in messages:
@@ -432,7 +569,10 @@ class RoomHandler:
                 print("You bid farewell to the merchant.")
                 break
             else:
-                print("Type 'shop' to see wares, 'buy [number]' to purchase, or 'leave' to exit.")
+                help_msg = "Type 'shop' to see wares, 'buy [item]' to purchase, or 'leave' to exit."
+                if hasattr(room_content, 'dropped_equipment') and room_content.dropped_equipment:
+                    help_msg += "\nType 'pickup [item]' to pick up dropped equipment."
+                print(help_msg)
                 
         return True
         
@@ -753,7 +893,7 @@ class RoomHandler:
         """Handle special loot drops from bosses."""
         from consumables import (HealingPotion, ManaPotion, StrengthPotion, 
                                DefensePotion, RegenerationPotion)
-        from equipment import SteelSword, ChainMail, PowerRing
+        from equipment import SteelSword, ChainMail, HealthRing
         
         # Bosses always drop good loot
         loot_pool = []
@@ -763,11 +903,11 @@ class RoomHandler:
         elif boss.name == "Orc Warlord":
             loot_pool = [SteelSword, ChainMail, DefensePotion]
         elif boss.name == "Skeleton Lord":
-            loot_pool = [ManaPotion, RegenerationPotion, PowerRing]
+            loot_pool = [ManaPotion, RegenerationPotion, HealthRing]
         elif boss.name == "Troll Chieftain":
             loot_pool = [RegenerationPotion, DefensePotion, ChainMail]
         elif boss.name == "Shadow Lord":
-            loot_pool = [PowerRing, RegenerationPotion, ManaPotion]
+            loot_pool = [HealthRing, RegenerationPotion, ManaPotion]
         else:
             # Default boss loot
             loot_pool = [HealingPotion, StrengthPotion]
@@ -805,6 +945,16 @@ class RoomHandler:
                                 old_equipment = self.game.player.equipment.equip(item)
                                 if old_equipment:
                                     visual_fx.print_colored(f"You unequip {old_equipment} and equip {item}.", Colors.BRIGHT_GREEN)
+                                    
+                                    # Drop the old equipment on the ground in the merchant's room
+                                    current_room = self.game.dungeon_map.get_current_room()
+                                    visual_fx.print_colored(f"💎 You drop {old_equipment} on the floor of the shop.", Colors.BRIGHT_YELLOW)
+                                    visual_fx.print_colored("The merchant eyes it with interest...", Colors.BRIGHT_BLACK)
+                                    
+                                    # Store the dropped equipment in the merchant room
+                                    if not hasattr(room_content, 'dropped_equipment'):
+                                        room_content.dropped_equipment = []
+                                    room_content.dropped_equipment.append(old_equipment)
                                 else:
                                     visual_fx.print_colored(f"You equip {item}.", Colors.BRIGHT_GREEN)
                                 self.game.player.update_max_hp()

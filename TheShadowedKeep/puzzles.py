@@ -491,8 +491,8 @@ class PuzzleManager:
             from consumables import RegenerationPotion, StrengthPotion
             special_items.extend([RegenerationPotion, StrengthPotion])
         if dungeon_level >= 5:
-            from equipment import PowerRing
-            special_items.append(PowerRing)
+            from equipment import HealthRing
+            special_items.append(HealthRing)
             
         secret_room = SecretRoom(puzzle_id, name, description, treasure_value, special_items)
         self.secret_rooms[puzzle_id] = secret_room

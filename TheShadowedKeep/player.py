@@ -70,13 +70,16 @@ class Player:
         shield = self.status_effects.get_shield()
         if shield:
             damage = shield.absorb_damage(damage)
-            
-        # Apply defense reduction
-        actual_damage = max(1, damage - self.defense)
-        self.hp -= actual_damage
-        if self.hp < 0:
-            self.hp = 0
-        return actual_damage  # Return actual damage for display
+
+        # Apply defense reduction only if there's remaining damage
+        if damage > 0:
+            actual_damage = max(1, damage - self.defense)
+            self.hp -= actual_damage
+            if self.hp < 0:
+                self.hp = 0
+            return actual_damage
+        
+        return 0  # No damage taken if shield absorbed it all
             
     def gain_xp(self, amount):
         """Award XP and check for level up. Returns True if leveled up."""

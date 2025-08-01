@@ -1,0 +1,154 @@
+{
+  "version": "1.0",
+  "timestamp": "2025-08-01T17:11:21.367982",
+  "game_state": {
+    "player": {
+      "name": "s[a]",
+      "hp": 51,
+      "max_hp": 52,
+      "base_attack_power": 8,
+      "base_defense": 2,
+      "gold": 48,
+      "dungeon_level": 1,
+      "level": 4,
+      "xp": 18,
+      "xp_to_next_level": 40,
+      "_base_max_hp": 37,
+      "equipment": {
+        "slots": {
+          "weapon": null,
+          "armor": {
+            "name": "Leather Armor",
+            "class": "LeatherArmor"
+          },
+          "accessory": {
+            "name": "Health Ring",
+            "class": "HealthRing"
+          }
+        }
+      },
+      "character_class": {
+        "class_type": "warrior",
+        "name": "Warrior"
+      }
+    },
+    "dungeon_map": {
+      "width": 5,
+      "height": 5,
+      "current_position": [
+        3,
+        2
+      ],
+      "stairs_position": [
+        3,
+        4
+      ],
+      "rooms": [
+        {
+          "x": 2,
+          "y": 2,
+          "state": "explored",
+          "connections": {
+            "east": true,
+            "north": true,
+            "west": true
+          },
+          "content_type": "empty",
+          "content_cleared": true
+        },
+        {
+          "x": 3,
+          "y": 2,
+          "state": "current",
+          "connections": {
+            "west": true,
+            "south": true,
+            "east": true
+          },
+          "content_type": "monster",
+          "content_cleared": true,
+          "monster_type": "Spider",
+          "monster_hp": 0
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "state": "unexplored",
+          "connections": {
+            "north": true,
+            "south": true
+          },
+          "content_type": "boss",
+          "content_cleared": false
+        },
+        {
+          "x": 2,
+          "y": 1,
+          "state": "explored",
+          "connections": {
+            "south": true
+          },
+          "content_type": "monster",
+          "content_cleared": true,
+          "monster_type": "Goblin",
+          "monster_hp": 0
+        },
+        {
+          "x": 1,
+          "y": 2,
+          "state": "explored",
+          "connections": {
+            "east": true,
+            "south": true
+          },
+          "content_type": "trap",
+          "content_cleared": true
+        },
+        {
+          "x": 1,
+          "y": 3,
+          "state": "explored",
+          "connections": {
+            "north": true
+          },
+          "content_type": "merchant",
+          "content_cleared": false
+        },
+        {
+          "x": 3,
+          "y": 4,
+          "state": "unexplored",
+          "connections": {
+            "north": true
+          },
+          "content_type": null
+        },
+        {
+          "x": 4,
+          "y": 2,
+          "state": "unexplored",
+          "connections": {
+            "west": true
+          },
+          "content_type": null
+        }
+      ]
+    },
+    "floor_number": 3,
+    "dungeon_level": 3,
+    "difficulty": {
+      "difficulty_manager": {
+        "ng_plus_cycle": 0,
+        "base_difficulty": 1.0,
+        "floor_based_scaling": true,
+        "elite_monsters_enabled": true
+      },
+      "adaptive_difficulty": {
+        "player_performance_score": 0.7765362397542064,
+        "recent_deaths": 0,
+        "recent_victories": 10,
+        "enabled": true
+      }
+    }
+  }
+}

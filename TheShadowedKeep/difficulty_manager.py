@@ -123,7 +123,12 @@ class DifficultyManager:
             "difficulty_bonus": f"+{int(self.ng_plus_cycle * NG_PLUS_DIFFICULTY_MULTIPLIER * 100)}%",
             "gold_bonus": f"+{int(self.ng_plus_cycle * NG_PLUS_BONUS_GOLD_MULTIPLIER * 100)}%",
             "xp_bonus": f"+{int(self.ng_plus_cycle * NG_PLUS_BONUS_XP_MULTIPLIER * 100)}%",
-            "rare_item_chance": f"{int(self.get_rare_item_chance() * 100)}%"
+            "rare_item_chance": f"{int(self.get_rare_item_chance() * 100)}%",
+            # Next cycle bonuses
+            "next_difficulty_bonus": f"+{int((self.ng_plus_cycle + 1) * NG_PLUS_DIFFICULTY_MULTIPLIER * 100)}%",
+            "next_gold_bonus": f"+{int((self.ng_plus_cycle + 1) * NG_PLUS_BONUS_GOLD_MULTIPLIER * 100)}%",
+            "next_xp_bonus": f"+{int((self.ng_plus_cycle + 1) * NG_PLUS_BONUS_XP_MULTIPLIER * 100)}%",
+            "next_rare_item_chance": f"{int((self.ng_plus_cycle + 1) * NG_PLUS_RARE_ITEM_CHANCE * 100)}%"
         }
         
     def get_difficulty_display(self, floor_number: int) -> str:

@@ -17,17 +17,17 @@ class TestMerchantRoom(unittest.TestCase):
         """Set up test fixtures."""
         self.room = MerchantRoom()
         self.game = MagicMock()
+        # Mock the player and inventory
         self.game.player = MagicMock()
         self.game.player.gold = 50
-        self.game.player.hp = 10
-        self.game.player.max_hp = 20
+        self.game.player.inventory = MagicMock()
+        self.game.player.inventory.add_item.return_value = True # Assume inventory has space
         
     def test_merchant_room_creation(self):
         """Test merchant room initialization."""
         self.assertEqual(self.room.content_type, RoomContentType.MERCHANT)
         self.assertFalse(self.room.visited)
-        self.assertEqual(self.room.healing_potion_price, 20)
-        self.assertEqual(self.room.healing_potion_stock, 3)
+        self.assertTrue(len(self.room.items_for_sale) > 0)
         
     def test_merchant_on_enter(self):
         """Test entering a merchant room."""
@@ -43,35 +43,40 @@ class TestMerchantRoom(unittest.TestCase):
     def test_shop_interaction(self):
         """Test shopping interaction."""
         messages = self.room.interact(self.game, "shop")
-        self.assertIn("MERCHANT'S WARES", " ".join(messages))
-        self.assertIn("Healing Potion", " ".join(messages))
-        self.assertIn(str(self.game.player.gold), " ".join(messages))
+        self.assertIn("MERCHANT'S WARES", messages[0])
+        self.assertTrue(any("Healing Potion" in msg for msg in messages))
+        self.assertTrue(any(str(self.game.player.gold) in msg for msg in messages))
         
     def test_buy_potion_success(self):
         """Test successfully buying a potion."""
         initial_gold = self.game.player.gold
-        messages = self.room.interact(self.game, "buy 1")
+        initial_stock = self.room.items_for_sale["healing_potion"]["stock"]
+        
+        messages = self.room.interact(self.game, "buy healing potion")
         
         # Check purchase happened
-        self.assertEqual(self.game.player.gold, initial_gold - 20)
-        self.assertEqual(self.room.healing_potion_stock, 2)
+        self.assertEqual(self.game.player.gold, initial_gold - self.room.items_for_sale["healing_potion"]["price"])
+        self.assertEqual(self.room.items_for_sale["healing_potion"]["stock"], initial_stock - 1)
         self.assertIn("purchase", " ".join(messages).lower())
+        self.game.player.inventory.add_item.assert_called()
         
     def test_buy_potion_no_gold(self):
         """Test buying without enough gold."""
         self.game.player.gold = 10  # Less than potion price
-        messages = self.room.interact(self.game, "buy 1")
+        initial_stock = self.room.items_for_sale["healing_potion"]["stock"]
         
-        self.assertIn("only have 10", " ".join(messages))
+        messages = self.room.interact(self.game, "buy healing potion")
+        
+        self.assertTrue(any("need" in msg and "gold" in msg for msg in messages))
         self.assertEqual(self.game.player.gold, 10)  # Gold unchanged
-        self.assertEqual(self.room.healing_potion_stock, 3)  # Stock unchanged
+        self.assertEqual(self.room.items_for_sale["healing_potion"]["stock"], initial_stock)  # Stock unchanged
         
     def test_buy_potion_sold_out(self):
         """Test buying when sold out."""
-        self.room.healing_potion_stock = 0
-        messages = self.room.interact(self.game, "buy 1")
+        self.room.items_for_sale["healing_potion"]["stock"] = 0
+        messages = self.room.interact(self.game, "buy healing potion")
         
-        self.assertIn("out of healing potions", " ".join(messages).lower())
+        self.assertIn("all out", " ".join(messages).lower())
         
     def test_merchant_never_cleared(self):
         """Test that merchant rooms are never 'cleared'."""

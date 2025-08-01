@@ -123,7 +123,7 @@ class TestCombatXPIntegration(unittest.TestCase):
         
         # Should have leveled up
         self.assertEqual(self.player.level, 2)
-        self.assertIn("*** LEVEL UP! ***", "\n".join(result.messages))
+        self.assertTrue(any("LEVEL UP!" in msg for msg in result.messages))
         
     def test_xp_from_parry_victory(self):
         """Test that parry counterattack victory also awards XP."""

@@ -162,7 +162,7 @@ class UIManager:
                 print("Start a new adventure with increased difficulty and rewards!")
             else:
                 print(f"Continue your NG+{ng_info['cycle']} journey!")
-            print(f"Next cycle bonuses: {ng_info['difficulty_bonus']} difficulty, {ng_info['gold_bonus']} gold, {ng_info['xp_bonus']} XP")
+            print(f"Next cycle bonuses: {ng_info['next_difficulty_bonus']} difficulty, {ng_info['next_gold_bonus']} gold, {ng_info['next_xp_bonus']} XP")
         
     def show_victory_screen(self):
         """Display victory screen when player completes the game."""
@@ -187,11 +187,11 @@ class UIManager:
         
         print(f"\n=== NEW GAME PLUS ===")
         print(f"Current cycle: NG+{ng_info['cycle']}")
-        print(f"Next cycle benefits:")
-        print(f"  • {ng_info['difficulty_bonus']} increased difficulty")
-        print(f"  • {ng_info['gold_bonus']} bonus gold from all sources")
-        print(f"  • {ng_info['xp_bonus']} bonus XP from all sources")
-        print(f"  • {ng_info['rare_item_chance']} chance for rare bonus items")
+        print(f"Next cycle (NG+{ng_info['cycle'] + 1}) benefits:")
+        print(f"  • {ng_info['next_difficulty_bonus']} increased difficulty")
+        print(f"  • {ng_info['next_gold_bonus']} bonus gold from all sources")
+        print(f"  • {ng_info['next_xp_bonus']} bonus XP from all sources")
+        print(f"  • {ng_info['next_rare_item_chance']} chance for rare bonus items")
         print(f"\nStart New Game Plus? (yes/no)")
         
         while True:

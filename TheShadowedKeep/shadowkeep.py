@@ -88,7 +88,16 @@ class Game:
         self.ui.show_character_creation()
         name = self.ui.get_character_name()
         
-        # Display class options
+        class_type = self._select_character_class()
+        
+        selected_class = CharacterClassFactory.create(class_type)
+        self.player = Player(name, selected_class)
+        
+        self.ui.show_welcome_message(name, selected_class.name)
+        time.sleep(1)
+
+    def _select_character_class(self):
+        """Gets the player's class choice."""
         descriptions = CharacterClassFactory.get_class_descriptions()
         
         class_options = []
@@ -103,21 +112,25 @@ class Game:
             )
             
         self.ui.show_class_selection(display_options)
-        choice = self.ui.get_class_choice(['1', '2', '3'])
+        choice = self.ui.get_class_choice([str(i) for i in range(1, len(class_options) + 1)])
         
-        # Create player with selected class
-        idx = int(choice) - 1
-        selected_class = CharacterClassFactory.create(class_options[idx])
-        self.player = Player(name, selected_class)
-        
-        self.ui.show_welcome_message(name, selected_class.name)
-        time.sleep(1)
+        return class_options[int(choice) - 1]
         
     def _start_new_game(self):
         """Start a new game."""
         print("\nYour adventure begins...")
         
-        # Ask if player wants tutorial
+        self._handle_tutorial_start()
+        
+        print("\nTIP: All commands work with just a single letter! Press H for help.")
+        print("\nYou enter the dungeon on floor 1...")
+        time.sleep(1)
+        
+        # Generate the first floor
+        self._generate_new_floor()
+
+    def _handle_tutorial_start(self):
+        """Handles the tutorial prompt at the start of a new game."""
         print("\nWould you like to play the tutorial? (yes/no)")
         choice = input("> ").strip().lower()
         if choice in ['yes', 'y']:
@@ -131,70 +144,67 @@ class Game:
                 tutorial_manager.advance_tutorial("continue")
         else:
             print("\nTutorial skipped. Type 'help' anytime for assistance!")
-        
-        print("\nTIP: All commands work with just a single letter! Press H for help.")
-        print("\nYou enter the dungeon on floor 1...")
-        time.sleep(1)
-        
-        # Generate the first floor
-        self._generate_new_floor()
 
     def run(self):
         """The main game loop."""
         print("Welcome to The Shadowed Keep!")
         
-        # Character creation for new game
-        if not self.save_manager.has_autosave():
-            self._character_creation()
-        
-        # Check for existing save
-        if self.save_manager.has_autosave():
-            if self.ui.show_load_game_prompt():
-                if self.load_game():
-                    print(f"\nWelcome back, {self.player.name}!")
-                    print(f"You are on floor {self.floor_number}.")
-                else:
-                    print("Failed to load save. Starting new game...")
-                    self._start_new_game()
-            else:
-                # Delete old save and start new
-                self.save_manager.delete_save()
-                self._start_new_game()
-        else:
-            self._start_new_game()
+        self._initialize_game_session()
 
         while not self.game_over:
-            # Display map
             self.ui.display_map()
             
-            # Get current room
-            current_room = self.dungeon_map.get_current_room()
+            self._handle_current_room()
             
-            # If room is unexplored, generate and handle content
-            if current_room.state == RoomState.CURRENT and current_room.content is None:
-                self._explore_current_room()
-                
-            # Regenerate mana for mages after room
-            if (hasattr(self.player, 'character_class') and 
-                hasattr(self.player.character_class, 'regenerate_mana')):
-                self.player.character_class.regenerate_mana()
-            
-            # If player died during room exploration
-            if not self.player.is_alive():
-                self.game_over = True
-                self.ui.show_game_over()
-                # Delete save on death
-                self.save_manager.delete_save()
+            if self.game_over:
                 break
                 
-            # Auto-save after each room completion
-            self.save_game()
-                
-            # Check achievements periodically
-            self._check_periodic_achievements()
+            self._post_room_actions()
             
-            # Show navigation options
             self._show_navigation_options()
+
+    def _initialize_game_session(self):
+        """Handles the initial setup of the game session, either by loading a save or starting a new game."""
+        if not self.save_manager.has_autosave():
+            self._character_creation()
+            self._start_new_game()
+        elif self.ui.show_load_game_prompt():
+            if self.load_game():
+                print(f"\nWelcome back, {self.player.name}!")
+                print(f"You are on floor {self.floor_number}.")
+            else:
+                print("Failed to load save. Starting new game...")
+                self._character_creation()
+                self._start_new_game()
+        else:
+            self.save_manager.delete_save()
+            self._character_creation()
+            self._start_new_game()
+
+    def _handle_current_room(self):
+        """Handles the logic for the player's current room."""
+        current_room = self.dungeon_map.get_current_room()
+        
+        if current_room.content is None:
+            self._explore_current_room()
+        elif not current_room.content.is_cleared():
+            print(f"\n--- Exploring Room ---")
+            self._handle_room_content(current_room.content)
+
+    def _post_room_actions(self):
+        """Actions to be performed after a room is handled."""
+        if not self.player.is_alive():
+            self.game_over = True
+            self.ui.show_game_over()
+            self.save_manager.delete_save()
+            return
+            
+        if (hasattr(self.player, 'character_class') and 
+            hasattr(self.player.character_class, 'regenerate_mana')):
+            self.player.character_class.regenerate_mana()
+        
+        self.save_game()
+        self._check_periodic_achievements()
             
     def _generate_new_floor(self):
         """Generate a new dungeon floor."""
@@ -257,89 +267,80 @@ class Game:
         self._handle_room_content(current_room.content)
             
     def _show_navigation_options(self):
-        """Show movement and action options."""
-        current_room = self.dungeon_map.get_current_room()
-        directions = self.dungeon_map.get_available_directions()
-        
-        # Show available options
-        self.ui.show_navigation_options(directions)
-        
-        # Additional room-specific options
-        if current_room.position == self.dungeon_map.stairs_position:
-            print("[D]escend the stairs to the next floor")
+        """Show movement and action options and handle player input."""
+        while not self.game_over:
+            current_room = self.dungeon_map.get_current_room()
+            directions = self.dungeon_map.get_available_directions()
             
-        if current_room.content:
-            if isinstance(current_room.content, MerchantRoom):
-                print("[S]hop - Browse merchant's wares")
-            elif isinstance(current_room.content, HealingFountainRoom) and current_room.content.uses_remaining > 0:
-                print("[F]ountain - Drink from the healing fountain")
-        
-        # Get player input
-        while True:
+            self.ui.show_navigation_options(directions)
+            
+            # Additional room-specific options
+            if current_room.position == self.dungeon_map.stairs_position:
+                print("[D]escend the stairs to the next floor")
+            if current_room.content:
+                if isinstance(current_room.content, MerchantRoom):
+                    print("[S]hop - Browse merchant's wares")
+                elif isinstance(current_room.content, HealingFountainRoom) and current_room.content.uses_remaining > 0:
+                    print("[F]ountain - Drink from the healing fountain")
+            
             command = self.ui.get_player_action()
             
-            # Movement commands
-            if command in ['n', 'north'] and Direction.NORTH in directions:
-                if self.dungeon_map.move(Direction.NORTH):
-                    print("You move north.")
-                    break
-            elif command in ['s', 'south'] and Direction.SOUTH in directions:
-                if self.dungeon_map.move(Direction.SOUTH):
-                    print("You move south.")
-                    break
-            elif command in ['e', 'east'] and Direction.EAST in directions:
-                if self.dungeon_map.move(Direction.EAST):
-                    print("You move east.")
-                    break
-            elif command in ['w', 'west'] and Direction.WEST in directions:
-                if self.dungeon_map.move(Direction.WEST):
-                    print("You move west.")
-                    break
-                    
-            # Other commands
-            elif command in ['d', 'descend'] and current_room.position == self.dungeon_map.stairs_position:
-                self.floor_number += 1
-                self.dungeon_level = self.floor_number
-                print("\nYou descend deeper into the darkness...")
-                time.sleep(1)
-                self._generate_new_floor()
+            if self._process_navigation_command(command, directions, current_room):
                 break
-            elif command in ['m', 'map']:
-                self.ui.display_map()
-            elif command in ['i', 'inventory']:
-                self.ui.show_inventory()
-            elif command in ['t', 'stats']:
-                self.ui.show_stats()
-            elif command in ['h', 'help']:
-                self.ui.show_help()
-            elif command == 'legend':
-                self.ui.display_legend()
-            elif command in ['log', 'combatlog']:
-                combat_log.display(10)  # Show last 10 actions
-            elif command in ['q', 'quit']:
-                if self.ui.confirm_quit():
-                    print("Saving game...")
-                    self.save_game()
-                    print("Game saved. You can continue your adventure later.")
-                    self.game_over = True
-                    break
-                
-            # Special room interactions
-            elif command in ['s', 'shop'] and isinstance(current_room.content, MerchantRoom):
-                self.room_handler._handle_merchant_room(current_room.content)
-                        
-            elif command in ['f', 'fountain'] and isinstance(current_room.content, HealingFountainRoom):
-                self.room_handler._handle_healing_fountain_room(current_room.content)
-                
-            elif command.startswith('use '):
-                item_name = command[4:].strip()
-                self._use_item(item_name)
-                
-            elif command in ['achievements', 'a']:
-                self._show_achievements()
-                    
-            else:
-                print("Invalid command. Type 'help' for available commands.")
+
+    def _process_navigation_command(self, command: str, directions: list, current_room) -> bool:
+        """Processes a single navigation or action command. Returns True if the turn should end."""
+        # Movement commands
+        move_map = {
+            'n': Direction.NORTH, 'north': Direction.NORTH,
+            's': Direction.SOUTH, 'south': Direction.SOUTH,
+            'e': Direction.EAST, 'east': Direction.EAST,
+            'w': Direction.WEST, 'west': Direction.WEST
+        }
+        if command in move_map and move_map[command] in directions:
+            if self.dungeon_map.move(move_map[command]):
+                print(f"You move {move_map[command].value}.")
+                return True
+
+        # Other commands
+        elif command in ['d', 'descend'] and current_room.position == self.dungeon_map.stairs_position:
+            self.floor_number += 1
+            self.dungeon_level = self.floor_number
+            print("\nYou descend deeper into the darkness...")
+            time.sleep(1)
+            self._generate_new_floor()
+            return True
+        elif command in ['m', 'map']:
+            self.ui.display_map()
+        elif command in ['i', 'inventory']:
+            self.ui.show_inventory()
+        elif command in ['t', 'stats']:
+            self.ui.show_stats()
+        elif command in ['h', 'help']:
+            self.ui.show_help()
+        elif command == 'legend':
+            self.ui.display_legend()
+        elif command in ['log', 'combatlog']:
+            combat_log.display(10)
+        elif command in ['q', 'quit']:
+            if self.ui.confirm_quit():
+                print("Saving game...")
+                self.save_game()
+                print("Game saved. You can continue your adventure later.")
+                self.game_over = True
+                return True
+        elif command in ['s', 'shop'] and isinstance(current_room.content, MerchantRoom):
+            self.room_handler._handle_merchant_room(current_room.content)
+        elif command in ['f', 'fountain'] and isinstance(current_room.content, HealingFountainRoom):
+            self.room_handler._handle_healing_fountain_room(current_room.content)
+        elif command.startswith('use '):
+            self._use_item(command[4:].strip())
+        elif command in ['achievements', 'a']:
+            self._show_achievements()
+        else:
+            print("Invalid command. Type 'help' for available commands.")
+        
+        return False
                 
     def _use_item(self, item_name: str):
         """Use an item from inventory."""
