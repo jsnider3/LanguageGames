@@ -378,10 +378,21 @@
     
     <div id="levelSelectScreen" style="display:none;">
         <h2>LEVEL SELECT</h2>
-        <div class="menu-options">
+        <div class="menu-options" style="max-height: 400px; overflow-y: auto;">
             <button class="menu-button level-select-btn" data-level="tutorial">Tutorial - Vatican Inquisition</button>
             <button class="menu-button level-select-btn" data-level="chapter1">Chapter 1 - Desecrated Chapel</button>
             <button class="menu-button level-select-btn" data-level="chapter2" id="chapter2Btn">Chapter 2 - The Armory</button>
+            <button class="menu-button level-select-btn" data-level="laboratory">Chapter 3 - Laboratory Complex</button>
+            <button class="menu-button level-select-btn" data-level="containment">Chapter 4 - Containment Area</button>
+            <button class="menu-button level-select-btn" data-level="tunnels">Chapter 5 - Tunnel Network</button>
+            <button class="menu-button level-select-btn" data-level="spawning">Chapter 6 - Spawning Grounds</button>
+            <button class="menu-button level-select-btn" data-level="observatory">Chapter 7 - Observatory Tower</button>
+            <button class="menu-button level-select-btn" data-level="communications">Chapter 8 - Communications Tower</button>
+            <button class="menu-button level-select-btn" data-level="reactor">Chapter 9 - Reactor Core</button>
+            <button class="menu-button level-select-btn" data-level="finalarena">Chapter 10 - Final Arena</button>
+            <hr style="border-color: #444; margin: 10px 0;">
+            <button class="menu-button level-select-btn" data-level="archive" style="color: #ffaa00;">SECRET - Forbidden Archive</button>
+            <button class="menu-button level-select-btn" data-level="techfacility" style="color: #ffaa00;">SECRET - Black Site Omega</button>
             <button class="menu-button" id="backToMenuBtn">Back to Menu</button>
         </div>
         <div style="color: #666; margin-top: 20px; font-size: 14px;">
@@ -1436,6 +1447,7 @@ window.addEventListener('DOMContentLoaded', () => {
         import { ChapelLevel } from './levels/chapelLevel.js';
         import { TutorialLevel } from './levels/tutorialLevel.js';
         import { ArmoryLevel } from './levels/armoryLevel.js';
+        import { LaboratoryLevel } from './levels/laboratoryLevel.js';
         import { NarrativeSystem } from './narrative.js';
         import { PossessedScientist } from './enemies/possessedScientist.js';
         import { Hellhound } from './enemies/hellhound.js';
@@ -1501,6 +1513,7 @@ window.addEventListener('DOMContentLoaded', () => {
         window.ChapelLevel = ChapelLevel;
         window.TutorialLevel = TutorialLevel;
         window.ArmoryLevel = ArmoryLevel;
+        window.LaboratoryLevel = LaboratoryLevel;
         window.NarrativeSystem = NarrativeSystem;
         window.PossessedScientist = PossessedScientist;
         window.Hellhound = Hellhound;

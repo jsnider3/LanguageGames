@@ -208,6 +208,25 @@ export class Game {
             if (this.armoryLevel.updatePickups) {
                 this.armoryLevel.updatePickups(deltaTime);
             }
+            // Check for level exit
+            if (this.armoryLevel.checkExitCollision && this.armoryLevel.checkExitCollision(this.player)) {
+                console.log('Armory level complete! Loading next level...');
+                this.loadLevel('laboratory'); // Load the Laboratory Complex level
+            }
+        }
+        
+        // Update laboratory level if active
+        if (this.currentLevelInstance && this.currentLevelInstance.levelName === 'Laboratory Complex') {
+            // Update the level (animations, etc)
+            if (this.currentLevelInstance.update) {
+                this.currentLevelInstance.update(deltaTime);
+            }
+            
+            // Check for level exit
+            if (this.currentLevelInstance.checkExitCollision && this.currentLevelInstance.checkExitCollision(this.player)) {
+                console.log('Laboratory level complete! Loading next level...');
+                this.loadLevel('containment'); // Load the Containment level
+            }
         }
         
         // Clean up broken enemies or handle deaths that weren't caught by combat
@@ -1421,6 +1440,29 @@ export class Game {
                         this.narrativeSystem.currentChapter = 1;
                         this.narrativeSystem.setObjective("Reach the armory");
                     }
+                }
+                break;
+                
+            case 'laboratory':
+                // Load Laboratory Complex level
+                if (window.LaboratoryLevel) {
+                    this.laboratoryLevel = new window.LaboratoryLevel(this);
+                    this.currentLevelInstance = this.laboratoryLevel;
+                    const levelData = this.laboratoryLevel.create();
+                    this.level = new window.Level(this.scene);
+                    this.level.walls = levelData.walls || [];
+                    this.enemies = levelData.enemies || [];
+                    
+                    // Player has collected weapons from armory
+                    this.player.weapons = ['sword', 'shotgun', 'rifle', 'holywater', 'crucifix'];
+                    this.player.position.set(0, 1.7, 0);
+                    
+                    if (this.narrativeSystem) {
+                        this.narrativeSystem.setObjective("Find keycards and access the main lab");
+                    }
+                } else {
+                    console.warn('Laboratory level not loaded, falling back to test level');
+                    this.loadLevel('chapter2'); // Fall back to armory
                 }
                 break;
                 

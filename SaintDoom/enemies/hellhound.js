@@ -3,7 +3,7 @@ import { GAME_CONFIG } from '../modules/GameConfig.js';
 import { AudioManager } from '../modules/Utils.js';
 
 export class Hellhound extends Enemy {
-    constructor(scene, position) {
+    constructor(scene, position, pack = null) {
         // Call parent constructor first
         super(scene, position);
         
@@ -22,6 +22,23 @@ export class Hellhound extends Enemy {
         this.type = 'HELLHOUND';
         this.radius = 0.4;
         this.height = config.SIZE.HEIGHT;
+        
+        // Pack behavior
+        this.pack = pack || [];
+        this.packLeader = false;
+        this.packRadius = 10;
+        this.howlCooldown = 10000;
+        this.lastHowlTime = 0;
+        this.flankTarget = null;
+        
+        // Leap attack
+        this.leapRange = 8;
+        this.leapCooldown = 3000;
+        this.lastLeapTime = 0;
+        this.isLeaping = false;
+        this.leapTarget = null;
+        this.leapStartPosition = null;
+        this.leapProgress = 0;
         
         // Override the mesh created by parent
         this.scene.remove(this.mesh);
@@ -93,6 +110,20 @@ export class Hellhound extends Enemy {
         // Additional Hellhound-specific behavior
         if (this.state === 'dead') return;
         
+        // Pack coordination
+        this.updatePackBehavior(player);
+        
+        // Check for leap attack
+        const distanceToPlayer = this.position.distanceTo(player.position);
+        if (distanceToPlayer > this.attackRange && distanceToPlayer <= this.leapRange && !this.isLeaping) {
+            this.attemptLeapAttack(player);
+        }
+        
+        // Update leap if in progress
+        if (this.isLeaping && this.leapTarget) {
+            this.updateLeap(deltaTime);
+        }
+        
         // Update rotation to face player (Hellhound-specific)
         if ((this.state === 'chasing' || this.state === 'attacking') && this.target) {
             // Create a target position at the same height as the enemy
@@ -125,12 +156,158 @@ export class Hellhound extends Enemy {
         }
     }
     
+    updatePackBehavior(player) {
+        if (this.pack.length === 0) return;
+        
+        // Find pack leader (first alive member)
+        const alivePackMembers = this.pack.filter(h => !h.isDead);
+        if (alivePackMembers.length > 0 && alivePackMembers[0] === this) {
+            this.packLeader = true;
+            
+            // Leader howls to coordinate pack
+            const now = Date.now();
+            if (now - this.lastHowlTime > this.howlCooldown && this.state === 'chasing') {
+                this.howl();
+                this.lastHowlTime = now;
+            }
+        }
+        
+        // Pack tactics - surround player
+        if (!this.packLeader && alivePackMembers.length > 1) {
+            const angleOffset = (this.pack.indexOf(this) / this.pack.length) * Math.PI * 2;
+            const targetOffset = new THREE.Vector3(
+                Math.cos(angleOffset) * 3,
+                0,
+                Math.sin(angleOffset) * 3
+            );
+            
+            // Adjust chase target to flank
+            this.flankTarget = player.position.clone().add(targetOffset);
+        }
+    }
+    
+    howl() {
+        // Coordinate pack attack
+        this.pack.forEach(member => {
+            if (!member.isDead && member !== this) {
+                member.state = 'chasing';
+                member.moveSpeed *= 1.2; // Temporary speed boost
+                setTimeout(() => {
+                    if (!member.isDead) {
+                        member.moveSpeed /= 1.2;
+                    }
+                }, 3000);
+            }
+        });
+        
+        // Visual effect
+        this.createHowlEffect();
+        
+        // Audio
+        this.playHowl();
+    }
+    
+    createHowlEffect() {
+        // Create expanding ring to show howl
+        const ringGeometry = new THREE.RingGeometry(0.5, 1, 16);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+        
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.position.copy(this.position);
+        ring.position.y += 1;
+        ring.rotation.x = -Math.PI / 2;
+        this.scene.add(ring);
+        
+        // Animate ring
+        const animateRing = () => {
+            ring.scale.multiplyScalar(1.1);
+            ring.material.opacity *= 0.9;
+            
+            if (ring.material.opacity > 0.01) {
+                requestAnimationFrame(animateRing);
+            } else {
+                this.scene.remove(ring);
+            }
+        };
+        animateRing();
+    }
+    
+    attemptLeapAttack(player) {
+        const now = Date.now();
+        if (now - this.lastLeapTime < this.leapCooldown || this.isLeaping) return;
+        
+        // Check line of sight
+        if (!this.canSeePlayer()) return;
+        
+        // Initiate leap
+        this.isLeaping = true;
+        this.lastLeapTime = now;
+        this.leapTarget = player.position.clone();
+        this.leapStartPosition = this.position.clone();
+        this.leapProgress = 0;
+        
+        // Set state
+        this.state = 'leaping';
+        
+        // Visual telegraph
+        this.prepareLeapVisual();
+    }
+    
+    prepareLeapVisual() {
+        // Crouch animation
+        if (this.mesh) {
+            this.mesh.scale.y = 0.6;
+            setTimeout(() => {
+                if (this.mesh) {
+                    this.mesh.scale.y = 1;
+                }
+            }, 300);
+        }
+    }
+    
+    updateLeap(deltaTime) {
+        if (!this.isLeaping || !this.leapTarget) return;
+        
+        this.leapProgress += deltaTime * 3; // Leap speed
+        
+        if (this.leapProgress >= 1) {
+            // Leap complete
+            this.position.copy(this.leapTarget);
+            this.isLeaping = false;
+            this.leapTarget = null;
+            this.state = 'attacking';
+            
+            // Damage on landing
+            if (this.target) {
+                const distance = this.position.distanceTo(this.target.position);
+                if (distance <= this.attackRange) {
+                    this.performAttack();
+                }
+            }
+        } else {
+            // Interpolate position with arc
+            const t = this.leapProgress;
+            this.position.lerpVectors(this.leapStartPosition, this.leapTarget, t);
+            
+            // Add jump arc
+            this.position.y = this.leapStartPosition.y + Math.sin(t * Math.PI) * 2;
+        }
+    }
+    
     updateChasing(deltaTime, walls) {
         if (!this.target) return;
         
+        // Use flanking position if available
+        const targetPos = this.flankTarget || this.target.position;
         const distance = this.position.distanceTo(this.target.position);
+        const targetDistance = this.position.distanceTo(targetPos);
         
-        if (distance <= this.attackRange) {
+        if (distance <= this.attackRange && !this.flankTarget) {
             this.state = 'attacking';
             return;
         }
@@ -140,9 +317,9 @@ export class Hellhound extends Enemy {
             return;
         }
         
-        // Calculate base direction toward player
+        // Calculate base direction toward target (player or flank position)
         let direction = new THREE.Vector3()
-            .subVectors(this.target.position, this.position)
+            .subVectors(targetPos, this.position)
             .normalize();
         
         direction.y = 0;
@@ -332,5 +509,40 @@ export class Hellhound extends Enemy {
         
         oscillator.start();
         oscillator.stop(audioContext.currentTime + duration);
+    }
+    
+    playHowl() {
+        const audioContext = AudioManager.getContext();
+        if (!audioContext) return;
+        const duration = 1.5;
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + duration * 0.3);
+        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + duration);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + duration);
+    }
+    
+    // Static method to create a pack
+    static createPack(scene, positions) {
+        const pack = [];
+        
+        positions.forEach(pos => {
+            const hellhound = new Hellhound(scene, pos, pack);
+            pack.push(hellhound);
+        });
+        
+        return pack;
     }
 }

@@ -40,14 +40,23 @@ export class ArmoryLevel {
         // Create entry corridor from chapel
         this.createEntryCorridor(concreteMaterial);
         
+        // Create connecting corridor from entry to armory
+        this.createConnectingCorridor(concreteMaterial);
+        
         // Create main armory room
         this.createArmoryRoom(-20, concreteMaterial, metalMaterial);
         
         // Create weapons storage areas
         this.createWeaponRacks(-20, metalMaterial);
         
-        // Create exit to deeper levels
-        this.createExitCorridor(-40, concreteMaterial);
+        // Create exit connecting corridor
+        this.createExitConnectingCorridor(concreteMaterial);
+        
+        // Create final exit area
+        this.createExitArea(concreteMaterial);
+        
+        // Add boundary walls to prevent walking out of level
+        this.createBoundaryWalls(concreteMaterial);
         
         // Add lighting
         this.addLighting();
@@ -62,28 +71,28 @@ export class ArmoryLevel {
     }
     
     createEntryCorridor(material) {
-        // Entry from chapel (connecting at z=10)
+        // Entry from chapel (z = 10 to z = -5)
         const corridorFloor = new THREE.Mesh(
-            new THREE.PlaneGeometry(6, 20),
+            new THREE.PlaneGeometry(6, 15),
             material
         );
         corridorFloor.rotation.x = -Math.PI / 2;
-        corridorFloor.position.set(0, 0, 0);
+        corridorFloor.position.set(0, 0, 2.5);
         corridorFloor.receiveShadow = true;
         this.scene.add(corridorFloor);
         
         // Ceiling
         const corridorCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry(6, 20),
+            new THREE.PlaneGeometry(6, 15),
             material
         );
         corridorCeiling.rotation.x = Math.PI / 2;
-        corridorCeiling.position.set(0, 3, 0);
+        corridorCeiling.position.set(0, 3, 2.5);
         this.scene.add(corridorCeiling);
         
         // Walls
-        this.createWall(-3, 1.5, 0, 0.5, 3, 20, material);  // Left wall
-        this.createWall(3, 1.5, 0, 0.5, 3, 20, material);   // Right wall
+        this.createWall(-3, 1.5, 2.5, 0.5, 3, 15, material);  // Left wall
+        this.createWall(3, 1.5, 2.5, 0.5, 3, 15, material);   // Right wall
         
         // Entry door frame (connects to chapel door)
         this.createWall(0, 1.5, 10, 6, 3, 0.5, material);
@@ -92,6 +101,31 @@ export class ArmoryLevel {
         this.createDoor(0, 1.5, 10, 'fromChapel');
     }
     
+    createConnectingCorridor(material) {
+        // Connecting corridor from entry to armory (z = -5 to z = -5)
+        const corridorFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(6, 10),
+            material
+        );
+        corridorFloor.rotation.x = -Math.PI / 2;
+        corridorFloor.position.set(0, 0, -10);
+        corridorFloor.receiveShadow = true;
+        this.scene.add(corridorFloor);
+        
+        // Ceiling
+        const corridorCeiling = new THREE.Mesh(
+            new THREE.PlaneGeometry(6, 10),
+            material
+        );
+        corridorCeiling.rotation.x = Math.PI / 2;
+        corridorCeiling.position.set(0, 3, -10);
+        this.scene.add(corridorCeiling);
+        
+        // Walls
+        this.createWall(-3, 1.5, -10, 0.5, 3, 10, material);  // Left wall
+        this.createWall(3, 1.5, -10, 0.5, 3, 10, material);   // Right wall
+    }
+
     createArmoryRoom(z, concreteMaterial, metalMaterial) {
         // Large armory room (30x30)
         const armoryFloor = new THREE.Mesh(
@@ -112,12 +146,15 @@ export class ArmoryLevel {
         armoryCeiling.position.set(0, 5, z);
         this.scene.add(armoryCeiling);
         
-        // Walls
+        // Walls (with opening at back for exit)
         this.createWall(-15, 2.5, z, 0.5, 5, 30, concreteMaterial);  // Left
         this.createWall(15, 2.5, z, 0.5, 5, 30, concreteMaterial);   // Right
-        this.createWall(0, 2.5, z - 15, 30, 5, 0.5, concreteMaterial); // Back
+        // Back wall with exit opening
+        this.createWall(-12, 2.5, z - 15, 6, 5, 0.5, concreteMaterial); // Left of exit
+        this.createWall(12, 2.5, z - 15, 6, 5, 0.5, concreteMaterial);  // Right of exit
+        this.createWall(0, 4, z - 15, 6, 2, 0.5, concreteMaterial);     // Above exit
         
-        // Front wall with entrance
+        // Front wall with large entrance opening (no walls blocking entry from corridor)
         this.createWall(-12, 2.5, z + 15, 6, 5, 0.5, concreteMaterial);  // Left of entrance
         this.createWall(12, 2.5, z + 15, 6, 5, 0.5, concreteMaterial);   // Right of entrance
         this.createWall(0, 4, z + 15, 6, 2, 0.5, concreteMaterial);      // Above entrance
@@ -260,32 +297,74 @@ export class ArmoryLevel {
         this.cacheLock = lock;
     }
     
-    createExitCorridor(z, material) {
-        // Exit to deeper levels
+    createExitConnectingCorridor(material) {
+        // Connecting corridor from armory to exit (z = -35 to z = -40)
+        const corridorFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(6, 10),
+            material
+        );
+        corridorFloor.rotation.x = -Math.PI / 2;
+        corridorFloor.position.set(0, 0, -37.5);
+        corridorFloor.receiveShadow = true;
+        this.scene.add(corridorFloor);
+        
+        // Ceiling
+        const corridorCeiling = new THREE.Mesh(
+            new THREE.PlaneGeometry(6, 10),
+            material
+        );
+        corridorCeiling.rotation.x = Math.PI / 2;
+        corridorCeiling.position.set(0, 3, -37.5);
+        this.scene.add(corridorCeiling);
+        
+        // Walls
+        this.createWall(-3, 1.5, -37.5, 0.5, 3, 10, material);  // Left wall
+        this.createWall(3, 1.5, -37.5, 0.5, 3, 10, material);   // Right wall
+    }
+
+    createExitArea(material) {
+        // Final exit area with the green door
         const exitFloor = new THREE.Mesh(
-            new THREE.PlaneGeometry(8, 15),
+            new THREE.PlaneGeometry(8, 10),
             material
         );
         exitFloor.rotation.x = -Math.PI / 2;
-        exitFloor.position.set(0, 0, z - 7.5);
+        exitFloor.position.set(0, 0, -47);
         exitFloor.receiveShadow = true;
         this.scene.add(exitFloor);
         
         // Ceiling
         const exitCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry(8, 15),
+            new THREE.PlaneGeometry(8, 10),
             material
         );
         exitCeiling.rotation.x = Math.PI / 2;
-        exitCeiling.position.set(0, 3, z - 7.5);
+        exitCeiling.position.set(0, 3, -47);
         this.scene.add(exitCeiling);
         
         // Walls
-        this.createWall(-4, 1.5, z - 7.5, 0.5, 3, 15, material);  // Left
-        this.createWall(4, 1.5, z - 7.5, 0.5, 3, 15, material);   // Right
+        this.createWall(-4, 1.5, -47, 0.5, 3, 10, material);  // Left
+        this.createWall(4, 1.5, -47, 0.5, 3, 10, material);   // Right
         
-        // Sealed door (opens after collecting weapons)
-        this.createSealedDoor(0, 1.5, z - 15);
+        // Back wall with doorway gap - create two wall sections on either side of door
+        // Door is 4 units wide, so walls go from -4 to -2 and from 2 to 4
+        this.createWall(-3, 1.5, -52, 2, 3, 0.5, material);   // Back wall left side (2 units wide)
+        this.createWall(3, 1.5, -52, 2, 3, 0.5, material);    // Back wall right side (2 units wide)
+        
+        // Sealed door in the doorway gap
+        this.createSealedDoor(0, 1.5, -52);  // Door aligned with back wall
+        
+        // Add arrow pointing down at the door
+        const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);  // Made it 8-sided for smoother look
+        const arrowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00
+            // Removed emissive properties - MeshBasicMaterial doesn't support them
+        });
+        const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+        arrow.position.set(0, 4, -50);  // Position above and in front of door
+        arrow.rotation.x = Math.PI;  // Point downward
+        this.scene.add(arrow);
+        this.exitArrow = arrow;
     }
     
     createDoor(x, y, z, type) {
@@ -311,19 +390,20 @@ export class ArmoryLevel {
     }
     
     createSealedDoor(x, y, z) {
-        const doorGeometry = new THREE.BoxGeometry(4, 3, 0.5);
+        const doorGeometry = new THREE.BoxGeometry(4, 3, 0.5);  // Door thickness matches wall
         const doorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x202020,
-            metalness: 0.9,
-            roughness: 0.2,
+            color: 0x404040,  // Lighter gray so it's more visible
+            metalness: 0.7,
+            roughness: 0.3,
             emissive: 0xff0000,
-            emissiveIntensity: 0.3  // More visible red glow
+            emissiveIntensity: 0.5  // Stronger red glow
         });
         
         const door = new THREE.Mesh(doorGeometry, doorMaterial);
-        door.position.set(x, y, z);
+        door.position.set(x, y, z);  // Door flush with wall
         door.userData = { 
             isSealedDoor: true,
+            isExitDoor: true,  // Mark as the exit door
             locked: true
         };
         
@@ -335,11 +415,11 @@ export class ArmoryLevel {
             emissiveIntensity: 0.5
         });
         const sign = new THREE.Mesh(signGeometry, signMaterial);
-        sign.position.set(x, y + 2, z + 0.26);
+        sign.position.set(x, y + 2, z + 0.3);  // Sign in front of door
         
         // Add a point light to make the door more visible
         const doorLight = new THREE.PointLight(0xff0000, 0.5, 10);
-        doorLight.position.set(x, y, z + 1);
+        doorLight.position.set(x, y, z + 2);  // Light in front of door
         this.scene.add(doorLight);
         this.doorLight = doorLight;
         
@@ -373,12 +453,15 @@ export class ArmoryLevel {
     }
     
     addLighting() {
-        // Flickering fluorescent lights
+        // Flickering fluorescent lights throughout the facility
         const positions = [
-            { x: 0, z: 0 },
-            { x: 0, z: -20 },
-            { x: -10, z: -20 },
-            { x: 10, z: -20 }
+            { x: 0, z: 2 },      // Entry corridor
+            { x: 0, z: -10 },    // Connecting corridor 1
+            { x: 0, z: -20 },    // Main armory
+            { x: -10, z: -20 },  // Armory left
+            { x: 10, z: -20 },   // Armory right
+            { x: 0, z: -37 },    // Connecting corridor 2
+            { x: 0, z: -47 }     // Exit area
         ];
         
         positions.forEach(pos => {
@@ -387,7 +470,7 @@ export class ArmoryLevel {
             light.castShadow = true;
             this.scene.add(light);
             
-            // Flicker effect
+            // Flicker effect for some lights
             if (Math.random() > 0.5) {
                 setInterval(() => {
                     light.intensity = light.intensity === 0.8 ? 0.3 : 0.8;
@@ -395,10 +478,15 @@ export class ArmoryLevel {
             }
         });
         
-        // Emergency red lighting
+        // Emergency red lighting at exit
         const emergencyLight = new THREE.PointLight(0xff0000, 0.3, 20);
-        emergencyLight.position.set(0, 2, -40);
+        emergencyLight.position.set(0, 2, -47);
         this.scene.add(emergencyLight);
+        
+        // Bright light on the green exit door
+        const exitDoorLight = new THREE.PointLight(0x00ff00, 1.2, 12);
+        exitDoorLight.position.set(0, 2, -49);
+        this.scene.add(exitDoorLight);
     }
     
     addEnvironmentalDetails(warningMaterial) {
@@ -557,8 +645,8 @@ export class ArmoryLevel {
             }
             
             if (this.game.narrativeSystem) {
-                this.game.narrativeSystem.setObjective("Walk through the GREEN GLOWING DOOR at the far end (z = -55)");
-                this.game.narrativeSystem.displaySubtitle("The armory door unseals. Walk STRAIGHT BACK to the green door.");
+                this.game.narrativeSystem.setObjective("Walk through the GREEN GLOWING DOOR at the far end");
+                this.game.narrativeSystem.displaySubtitle("The armory door unseals. Walk STRAIGHT BACK through the corridors to the green door.");
             }
             
             // Animate door sliding up
@@ -569,14 +657,21 @@ export class ArmoryLevel {
     animateDoorOpening() {
         if (!this.sealedDoor) return;
         
-        // Slide door up slowly
-        const slideUp = () => {
-            if (this.sealedDoor.position.y < 4) {
-                this.sealedDoor.position.y += 0.02;
-                requestAnimationFrame(slideUp);
+        // Don't animate the door sliding up - just make it passable
+        // The transparency and green color already indicate it's open
+        // This prevents the floating door issue
+        
+        // Keep the door visible but transparent so players can see it
+        // Don't fade it completely
+        const fadeOut = () => {
+            if (this.sealedDoor.material.opacity > 0.3) {
+                this.sealedDoor.material.opacity -= 0.01;
+                requestAnimationFrame(fadeOut);
             }
+            // Don't make it invisible - keep it at 30% opacity
         };
-        slideUp();
+        // Start fade after a short delay so player sees the green change first
+        setTimeout(fadeOut, 1000);
     }
     
     updatePickups(deltaTime) {
@@ -598,6 +693,46 @@ export class ArmoryLevel {
                 pickup.rotation.y += 0.02;
             }
         }
+    }
+    
+    createBoundaryWalls(material) {
+        // Create invisible boundary walls to prevent walking out of the level
+        const boundaries = [
+            // Far perimeter walls
+            { x: 0, y: 2.5, z: 15, width: 40, height: 5, depth: 0.5 },      // North boundary
+            { x: 0, y: 2.5, z: -60, width: 40, height: 5, depth: 0.5 },     // South boundary  
+            { x: -20, y: 2.5, z: -22, width: 0.5, height: 5, depth: 80 },   // West boundary
+            { x: 20, y: 2.5, z: -22, width: 0.5, height: 5, depth: 80 }     // East boundary
+        ];
+        
+        boundaries.forEach(boundary => {
+            this.createWall(
+                boundary.x, boundary.y, boundary.z,
+                boundary.width, boundary.height, boundary.depth,
+                material
+            );
+        });
+    }
+    
+    checkExitCollision(player) {
+        // Check if player has reached the exit door
+        if (!player || !player.position) return false;
+        
+        // Check if door is unlocked first
+        if (this.sealedDoor && !this.sealedDoor.userData.locked) {
+            // Exit door is at z = -51.5, check if player is near it
+            const playerZ = player.position.z;
+            const playerX = player.position.x;
+            
+            // Check if player has passed through the door area
+            // Made the detection area larger and more forgiving
+            if (playerZ < -48 && Math.abs(playerX) < 4) {
+                console.log('Player reached exit! Position:', player.position);
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     clearLevel() {
