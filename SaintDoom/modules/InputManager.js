@@ -1,3 +1,6 @@
+// Input Manager Module
+// Handles all keyboard and mouse input for the game
+
 export class InputManager {
     constructor() {
         this.keys = {};
@@ -12,12 +15,10 @@ export class InputManager {
     }
     
     setupEventListeners() {
-        // Keyboard events
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
-            
-            // Prevent default for game keys
-            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].includes(e.code)) {
+            // E key handled silently
+            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyE'].includes(e.code)) {
                 e.preventDefault();
             }
         });
@@ -26,13 +27,15 @@ export class InputManager {
             this.keys[e.code] = false;
         });
         
-        // Mouse events
         window.addEventListener('mousedown', (e) => {
             this.mouseButtons[e.button] = true;
             
-            // Request pointer lock on click
+            // Request pointer lock if game is running and not paused
             if (!this.isPointerLocked) {
-                document.body.requestPointerLock();
+                const game = window.currentGame; // We'll set this reference
+                if (game && game.isRunning && !game.isPaused) {
+                    document.body.requestPointerLock();
+                }
             }
         });
         
@@ -47,18 +50,14 @@ export class InputManager {
             }
         });
         
-        // Pointer lock events
         document.addEventListener('pointerlockchange', () => {
             this.isPointerLocked = document.pointerLockElement === document.body;
-            
             if (!this.isPointerLocked) {
-                // Reset mouse deltas when pointer lock is lost
                 this.mouseDeltaX = 0;
                 this.mouseDeltaY = 0;
             }
         });
         
-        // Prevent right-click context menu
         window.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
@@ -66,52 +65,36 @@ export class InputManager {
     
     getInput() {
         const input = {
-            // Movement
             forward: this.keys['KeyW'] || false,
             backward: this.keys['KeyS'] || false,
             left: this.keys['KeyA'] || false,
             right: this.keys['KeyD'] || false,
             jump: this.keys['Space'] || false,
             sprint: this.keys['ShiftLeft'] || false,
-            
-            // Combat
-            attack: this.mouseButtons[0] || false,  // Left click
-            block: this.mouseButtons[2] || false,   // Right click
-            
-            // Weapon switching
+            attack: this.mouseButtons[0] || false,
+            block: this.mouseButtons[2] || false,
             weapon1: this.keys['Digit1'] || false,
             weapon2: this.keys['Digit2'] || false,
             weapon3: this.keys['Digit3'] || false,
             weapon4: this.keys['Digit4'] || false,
-            
-            // Interaction
-            use: this.keys['KeyE'] || false,
-            reload: this.keys['KeyR'] || false,
-            
-            // Mouse look
+            rage: this.keys['KeyR'] || false,
+            interact: this.keys['KeyE'] || false,
             mouseDeltaX: this.mouseDeltaX,
             mouseDeltaY: this.mouseDeltaY,
-            
-            // System
             pause: this.keys['Escape'] || false
         };
         
-        // Reset mouse deltas after reading
         this.mouseDeltaX = 0;
         this.mouseDeltaY = 0;
+        this.mouseButtons[0] = false;
         
-        // Clear single-press inputs
-        this.mouseButtons[0] = false; // Attack is single press
+        // Clear weapon switch and rage inputs after reading
+        this.keys['Digit1'] = false;
+        this.keys['Digit2'] = false;
+        this.keys['KeyR'] = false;
+        // Don't clear KeyE here - let it be handled naturally
         
         return input;
-    }
-    
-    isKeyPressed(keyCode) {
-        return this.keys[keyCode] || false;
-    }
-    
-    isMouseButtonPressed(button) {
-        return this.mouseButtons[button] || false;
     }
     
     reset() {

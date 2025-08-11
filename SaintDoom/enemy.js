@@ -15,6 +15,8 @@ export class Enemy {
         
         // AI state
         this.state = 'idle'; // idle, chasing, attacking, hurt, dead
+        this.isDead = false;
+        this.deathCounted = false;
         this.sightRange = 15;
         this.hearingRange = 20;
         this.target = null;
@@ -63,8 +65,7 @@ export class Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.03, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000
+            color: 0xff0000
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -228,7 +229,10 @@ export class Enemy {
         
         // Simple melee attack
         const distance = this.position.distanceTo(this.target.position);
-        if (distance <= this.attackRange) {
+        const heightDifference = Math.abs(this.position.y - this.target.position.y);
+        
+        // Only attack if within range AND at similar height (within 1 meter)
+        if (distance <= this.attackRange && heightDifference < 1.0) {
             this.target.takeDamage(this.damage);
             
             // Visual feedback - lunge forward
@@ -258,15 +262,27 @@ export class Enemy {
     }
     
     applyKnockback(force) {
-        // Apply knockback force
-        this.position.add(force);
+        // Validate force vector
+        if (!force || isNaN(force.x) || isNaN(force.y) || isNaN(force.z)) {
+            return;
+        }
         
-        // Also push the velocity for smoother movement
-        this.velocity.add(force.multiplyScalar(0.5));
+        // Apply knockback force (clone to avoid modifying the original)
+        this.position.add(force.clone());
+        
+        // Also push the velocity for smoother movement (use a clone)
+        this.velocity.add(force.clone().multiplyScalar(0.5));
+        
+        // Validate position after knockback
+        if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
+            // Reset to a valid position
+            this.position.set(0, 1, 0);
+        }
     }
     
     onDeath() {
         this.state = 'dead';
+        this.isDead = true;  // Set isDead flag for kill counting
         
         // Death animation - fall over
         if (this.mesh) {
