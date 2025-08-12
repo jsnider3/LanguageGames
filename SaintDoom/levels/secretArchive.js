@@ -1,9 +1,16 @@
 import * as THREE from 'three';
-import { BaseLevel } from './BaseLevel.js';
+import { BaseLevel } from './baseLevel.js';
 
 export class SecretArchive extends BaseLevel {
-    constructor(scene, camera, player) {
-        super(scene, camera, player);
+    constructor(game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 3) {
+            // Old signature: (scene, camera, player)
+            super(arguments[0], arguments[1], arguments[2]);
+        } else {
+            // New signature: (game)
+            super(game);
+        }
         
         this.name = 'The Forbidden Archive';
         this.description = 'Ancient Vatican archives containing dangerous knowledge and sealed artifacts';
@@ -47,6 +54,18 @@ export class SecretArchive extends BaseLevel {
         
         this.currentSection = 'entrance';
         this.sectionsVisited = new Set();
+        
+        // Initialize arrays that were missing
+        this.rooms = [];
+        this.doors = [];
+        this.items = [];
+        this.enemies = [];
+        this.walls = [];
+    }
+    
+    create() {
+        // Wrapper for generate to match expected interface
+        return this.generate();
     }
 
     generate() {
@@ -62,11 +81,8 @@ export class SecretArchive extends BaseLevel {
         this.createHiddenPassages();
         
         return {
-            rooms: this.rooms,
-            doors: this.doors,
-            items: this.items,
-            enemies: this.enemies,
-            objectives: this.createObjectives()
+            walls: this.walls || [],
+            enemies: this.enemies || []
         };
     }
 
@@ -154,7 +170,7 @@ export class SecretArchive extends BaseLevel {
             entranceGroup.add(door);
             
             // Add mystical symbols
-            this.addMysticalSymbols(door);
+            this.createMysticalSymbols(door);
         }
         
         hallGroup.add(entranceGroup);
@@ -406,6 +422,58 @@ export class SecretArchive extends BaseLevel {
         group.add(altar);
     }
 
+    createReliquary() {
+        // Main reliquary chamber with holy artifacts
+        const reliquaryGroup = new THREE.Group();
+        reliquaryGroup.position.set(40, 0, -60);
+        
+        // Reliquary chamber walls
+        const wallMaterial = new THREE.MeshPhongMaterial({
+            color: 0x8b7355,
+            emissive: 0x2a1f15,
+            emissiveIntensity: 0.1
+        });
+        
+        this.createRoomWalls(reliquaryGroup, 25, 20, wallMaterial);
+        
+        // Add golden glow
+        const holyLight = new THREE.PointLight(0xffd700, 0.8, 30);
+        holyLight.position.set(0, 8, 0);
+        reliquaryGroup.add(holyLight);
+        
+        // Create multiple reliquary sections
+        const sections = [
+            { position: new THREE.Vector3(-8, 0, -5), type: 'holy' },
+            { position: new THREE.Vector3(8, 0, -5), type: 'blessed' },
+            { position: new THREE.Vector3(-8, 0, 5), type: 'sacred' },
+            { position: new THREE.Vector3(8, 0, 5), type: 'divine' }
+        ];
+        
+        sections.forEach(section => {
+            const sectionGroup = new THREE.Group();
+            sectionGroup.position.copy(section.position);
+            this.createReliquarySection(sectionGroup);
+            reliquaryGroup.add(sectionGroup);
+        });
+        
+        // Add protective barriers
+        const barrierGeometry = new THREE.TorusGeometry(15, 0.3, 8, 32);
+        const barrierMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffd700,
+            emissive: 0xffaa00,
+            emissiveIntensity: 0.3,
+            opacity: 0.5,
+            transparent: true
+        });
+        const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
+        barrier.rotation.x = Math.PI / 2;
+        barrier.position.y = 3;
+        reliquaryGroup.add(barrier);
+        
+        this.rooms.push(reliquaryGroup);
+        this.scene.add(reliquaryGroup);
+    }
+    
     createSecretVault() {
         // Ultimate secret room with the most powerful artifacts
         const vaultGroup = new THREE.Group();
@@ -643,6 +711,8 @@ export class SecretArchive extends BaseLevel {
             
             const librarian = {
                 mesh: librarianGroup,
+                position: librarianGroup.position,  // Reference to mesh position
+                velocity: new THREE.Vector3(0, 0, 0),  // Add velocity for collision system
                 path: [],
                 currentTarget: null,
                 speed: 1,
@@ -650,7 +720,89 @@ export class SecretArchive extends BaseLevel {
                 alertRadius: 15,
                 attackRadius: 3,
                 damage: 20,
-                lastAttack: 0
+                lastAttack: 0,
+                health: 30,
+                maxHealth: 30,
+                radius: 0.8,  // Add collision radius
+                floatingBooks: librarianGroup.children.filter(child => 
+                    child.geometry instanceof THREE.BoxGeometry),
+                // Add required update method
+                update: function(deltaTime, playerPosition) {
+                    if (!this.mesh) return;
+                    
+                    // Rotate floating books
+                    if (this.floatingBooks) {
+                        this.floatingBooks.forEach((book, index) => {
+                            const time = Date.now() * 0.001;
+                            const angle = (index / 3) * Math.PI * 2 + time;
+                            book.position.x = Math.cos(angle) * 1.5;
+                            book.position.z = Math.sin(angle) * 1.5;
+                            book.rotation.y += deltaTime * 2;
+                        });
+                    }
+                    
+                    // Reset velocity
+                    this.velocity.set(0, 0, 0);
+                    
+                    // Basic patrol/chase behavior
+                    if (playerPosition) {
+                        const dx = playerPosition.x - this.position.x;
+                        const dz = playerPosition.z - this.position.z;
+                        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+                        
+                        if (distToPlayer < this.alertRadius) {
+                            this.state = 'chase';
+                            // Set velocity towards player
+                            if (distToPlayer > this.attackRadius) {
+                                this.velocity.x = (dx / distToPlayer) * this.speed;
+                                this.velocity.z = (dz / distToPlayer) * this.speed;
+                            }
+                            // Face player
+                            this.mesh.rotation.y = Math.atan2(dx, dz);
+                        } else {
+                            this.state = 'patrol';
+                        }
+                    }
+                    
+                    // Apply velocity (collision system will handle wall collisions)
+                    this.position.x += this.velocity.x * deltaTime;
+                    this.position.z += this.velocity.z * deltaTime;
+                    
+                    // Update attack cooldown
+                    if (this.lastAttack > 0) {
+                        this.lastAttack -= deltaTime;
+                    }
+                },
+                // Add takeDamage method
+                takeDamage: function(amount) {
+                    this.health = (this.health || 30) - amount;
+                    if (this.health <= 0 && this.mesh) {
+                        if (this.mesh.parent) {
+                            this.mesh.parent.remove(this.mesh);
+                        }
+                        this.mesh = null;
+                        return true; // Enemy died
+                    }
+                    return false;
+                },
+                // Add applyKnockback method
+                applyKnockback: function(force) {
+                    if (this.velocity && force) {
+                        // Apply knockback by adding force to velocity
+                        this.velocity.x += force.x;
+                        this.velocity.z += force.z;
+                    }
+                },
+                // Add onDeath method
+                onDeath: function() {
+                    this.isDead = true;
+                    // Create death effect - ghostly dissipation
+                    if (this.mesh && this.mesh.parent) {
+                        // Fade out effect could be added here
+                        this.mesh.parent.remove(this.mesh);
+                    }
+                    this.mesh = null;
+                }
             };
             
             this.ghostlyLibrarians.push(librarian);
@@ -730,6 +882,40 @@ export class SecretArchive extends BaseLevel {
         librarian.updateInterval = updateInterval;
     }
 
+    placeAncientTome(position) {
+        // Place a single ancient tome at the given position
+        const tomeGroup = new THREE.Group();
+        
+        // Book mesh
+        const bookGeometry = new THREE.BoxGeometry(0.6, 0.15, 0.8);
+        const bookMaterial = new THREE.MeshPhongMaterial({
+            color: 0x331100,
+            emissive: 0x110000,
+            emissiveIntensity: 0.2
+        });
+        const book = new THREE.Mesh(bookGeometry, bookMaterial);
+        book.position.y = 0.1;
+        tomeGroup.add(book);
+        
+        // Small glow effect
+        const glowLight = new THREE.PointLight(0xff4400, 0.5, 3);
+        glowLight.position.y = 0.5;
+        tomeGroup.add(glowLight);
+        
+        tomeGroup.position.copy(position);
+        tomeGroup.position.y += 1;
+        this.scene.add(tomeGroup);
+        
+        this.ancientTomes.push({
+            mesh: tomeGroup,
+            name: 'Ancient Tome',
+            power: 'knowledge',
+            collected: false
+        });
+        
+        return tomeGroup;
+    }
+    
     placeAncientTomes() {
         const tomeLocations = [
             { pos: { x: 0, z: 0 }, name: 'Codex Gigas', power: 'demon_knowledge' },

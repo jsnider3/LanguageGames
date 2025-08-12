@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Confession Mechanic System
 // Extract intel from dying enemies to reveal secrets and lore
 

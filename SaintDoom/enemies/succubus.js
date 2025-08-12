@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Succubus Infiltrator Enemy Type
 // Ranged psychic attacks with teleportation ability
 
@@ -83,12 +84,10 @@ export class Succubus extends Enemy {
         rightHorn.rotation.z = Math.PI / 6;
         group.add(rightHorn);
         
-        // Hypnotic eyes
+        // Hypnotic eyes - MeshBasicMaterial doesn't support emissive
         const eyeGeometry = new THREE.SphereGeometry(0.04, 6, 6);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
-            emissive: 0xff00ff,
-            emissiveIntensity: 2
+            color: 0xff00ff
         });
         
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -179,11 +178,12 @@ export class Succubus extends Enemy {
             this.aura.material.opacity = pulse;
         }
         
-        // Eye glow when attacking
+        // Eye glow when attacking - use color brightness instead
         if (this.state === 'attacking') {
-            const glow = Math.sin(Date.now() * 0.01) * 0.5 + 1.5;
-            this.leftEye.material.emissiveIntensity = glow;
-            this.rightEye.material.emissiveIntensity = glow;
+            const glow = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+            const glowColor = new THREE.Color(1, glow, 1);
+            this.leftEye.material.color = glowColor;
+            this.rightEye.material.color = glowColor;
         }
         
         // Update illusions

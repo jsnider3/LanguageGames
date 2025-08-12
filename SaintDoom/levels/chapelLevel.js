@@ -1,11 +1,24 @@
+import * as THREE from 'three';
+import { BaseLevel } from './baseLevel.js';
 // Desecrated Chapel Level
 // The first objective - find and cleanse the chapel
 
-export class ChapelLevel {
+export class ChapelLevel extends BaseLevel {
     constructor(scene, game) {
-        this.scene = scene;
-        this.game = game;
-        this.walls = [];
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.scene = arguments[0].scene;
+            this.game = arguments[0];
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
+        
+        // walls is already initialized in BaseLevel
         this.chapelReached = false;
         this.chapelCleansed = false;
     }
@@ -207,29 +220,7 @@ export class ChapelLevel {
         this.scene.add(trigger);
     }
     
-    createWall(x, y, z, width, height, depth, material) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const wall = new THREE.Mesh(geometry, material);
-        wall.position.set(x, y, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        this.scene.add(wall);
-        
-        // Store wall bounds for collision
-        this.walls.push({
-            mesh: wall,
-            min: new THREE.Vector3(
-                x - width/2,
-                y - height/2,
-                z - depth/2
-            ),
-            max: new THREE.Vector3(
-                x + width/2,
-                y + height/2,
-                z + depth/2
-            )
-        });
-    }
+    // createWall method is now inherited from BaseLevel
     
     addLighting() {
         // Corridor lights (dim, flickering)
@@ -399,12 +390,11 @@ export class ChapelLevel {
     }
     
     clearLevel() {
-        // Remove all level geometry
-        this.walls.forEach(wall => {
-            if (wall.mesh) {
-                this.scene.remove(wall.mesh);
-            }
-        });
-        this.walls = [];
+        // Call parent cleanup to handle intervals, timeouts, walls, etc.
+        if (super.cleanup) {
+            super.cleanup();
+        }
+        
+        // Additional chapel-specific cleanup below
     }
 }

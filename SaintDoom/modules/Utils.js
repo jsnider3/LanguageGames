@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { GAME_CONFIG } from './GameConfig.js';
 
 // ============= UTILITY CLASSES =============

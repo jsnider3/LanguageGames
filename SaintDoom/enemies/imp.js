@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Imp Enemy Type
 // Small, agile demons with fireball projectile attacks
 
@@ -75,9 +76,7 @@ export class Imp extends Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.03, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffaa00,
-            emissive: 0xffaa00,
-            emissiveIntensity: 1
+            color: 0xffaa00
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -226,9 +225,7 @@ export class Imp extends Enemy {
     createFireball() {
         const fireballGeometry = new THREE.SphereGeometry(0.15, 8, 6);
         const fireballMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
-            emissive: 0xff3300,
-            emissiveIntensity: 1
+            color: 0xff6600
         });
         
         const fireball = new THREE.Mesh(fireballGeometry, fireballMaterial);

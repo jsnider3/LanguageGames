@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // WeaponSystem.js - Weapon management and combat classes for SaintDoom
 // Dependencies: THREE, GAME_CONFIG, AudioManager (available as globals from index.html)
 
@@ -250,22 +251,30 @@ class HolyWaterWeapon {
     }
     
     playThrowSound() {
-        const audioContext = AudioManager.getContext();
-        if (!audioContext) return; // Exit if no audio context
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
-        
-        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
+        try {
+            const audioContext = AudioManager.getContext();
+            if (!audioContext) {
+                console.warn('[WeaponSystem] No audio context available');
+                return;
+            }
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (error) {
+            console.error('[WeaponSystem] Failed to play throw sound:', error);
+        }
     }
     
     playExplosionSound() {
@@ -462,41 +471,55 @@ class CrucifixLauncher {
     }
     
     playLaunchSound() {
-        const audioContext = AudioManager.getContext();
-        if (!audioContext) return; // Exit if no audio context
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
+        try {
+            const audioContext = AudioManager.getContext();
+            if (!audioContext) {
+                console.warn('[WeaponSystem] No audio context available');
+                return;
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (error) {
+            console.error('[WeaponSystem] Failed to play launch sound:', error);
+        }
     }
     
     playImpactSound() {
-        const audioContext = AudioManager.getContext();
-        if (!audioContext) return; // Exit if no audio context
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
-        
-        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.2);
+        try {
+            const audioContext = AudioManager.getContext();
+            if (!audioContext) {
+                console.warn('[WeaponSystem] No audio context available');
+                return;
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (error) {
+            console.error('[WeaponSystem] Failed to play impact sound:', error);
+        }
     }
 }
 
@@ -1000,18 +1023,99 @@ class MeleeCombat {
     }
     
     createSwordModel() {
-        const swordGeometry = new THREE.BoxGeometry(0.1, 0.1, 1.5);
-        const swordMaterial = new THREE.MeshStandardMaterial({
-            color: 0xc0c0c0,
-            metalness: 0.8,
-            roughness: 0.2,
-            emissive: 0x444444,
+        // Create a group to hold all sword parts
+        const swordGroup = new THREE.Group();
+        
+        // Blade material - shiny steel
+        const bladeMaterial = new THREE.MeshStandardMaterial({
+            color: 0xd0d0d0,
+            metalness: 0.9,
+            roughness: 0.1,
+            emissive: 0x666666,
             emissiveIntensity: 0.2
         });
         
-        this.swordMesh = new THREE.Mesh(swordGeometry, swordMaterial);
+        // Create blade as a simple elongated box for better visual
+        const bladeGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.02);
+        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+        blade.position.set(0, 0, -0.65);  // Position blade extending from guard
+        swordGroup.add(blade);
+        
+        // Add blade tip
+        const tipGeometry = new THREE.ConeGeometry(0.04, 0.1, 4);
+        const tip = new THREE.Mesh(tipGeometry, bladeMaterial);
+        tip.position.set(0, 0, -1.3);  // At the end of blade
+        tip.rotation.x = Math.PI / 2;
+        swordGroup.add(tip);
+        
+        // Create fuller (blood groove) for realism
+        const fullerGeometry = new THREE.BoxGeometry(0.01, 0.9, 0.025);
+        const fullerMaterial = new THREE.MeshStandardMaterial({
+            color: 0x808080,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const fuller = new THREE.Mesh(fullerGeometry, fullerMaterial);
+        fuller.position.set(0, 0, -0.65);
+        swordGroup.add(fuller);
+        
+        // Create crossguard
+        const guardGeometry = new THREE.BoxGeometry(0.2, 0.03, 0.04);
+        const guardMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,  // Gold
+            metalness: 0.8,
+            roughness: 0.3,
+            emissive: 0xffd700,
+            emissiveIntensity: 0.1
+        });
+        const guard = new THREE.Mesh(guardGeometry, guardMaterial);
+        guard.position.set(0, 0, 0.02);
+        swordGroup.add(guard);
+        
+        // Create handle/grip
+        const handleGeometry = new THREE.CylinderGeometry(0.02, 0.025, 0.18, 8);
+        const handleMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4a2511,  // Dark leather brown
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.rotation.x = Math.PI / 2;
+        handle.position.z = 0.12;
+        swordGroup.add(handle);
+        
+        // Create pommel
+        const pommelGeometry = new THREE.SphereGeometry(0.03, 8, 6);
+        const pommelMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,  // Gold
+            metalness: 0.8,
+            roughness: 0.3,
+            emissive: 0xffd700,
+            emissiveIntensity: 0.1
+        });
+        const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
+        pommel.position.z = 0.22;
+        swordGroup.add(pommel);
+        
+        // Add holy inscription on blade (optional decorative element)
+        const inscriptionGeometry = new THREE.PlaneGeometry(0.015, 0.4);
+        const inscriptionMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            emissive: 0xffd700,
+            emissiveIntensity: 0.3,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        const inscription = new THREE.Mesh(inscriptionGeometry, inscriptionMaterial);
+        inscription.position.set(0.041, 0, -0.65);  // Positioned on blade
+        inscription.rotation.y = Math.PI / 2;
+        swordGroup.add(inscription);
+        
+        this.swordMesh = swordGroup;
         this.swordMesh.castShadow = true;
         this.swordMesh.receiveShadow = true;
+        
         // Position sword relative to camera for FPS view
         this.swordMesh.position.set(0.4, -0.3, -0.8);
         this.swordMesh.rotation.set(-0.2, -0.1, -0.785);
@@ -1133,10 +1237,14 @@ class MeleeCombat {
         
         hits.forEach(enemy => {
             const damage = this.comboDamage[this.currentCombo] * rageDamageMultiplier;
-            enemy.takeDamage(damage);
+            if (enemy.takeDamage) {
+                enemy.takeDamage(damage);
+            }
             
             const knockbackForce = this.player.getForwardVector().multiplyScalar((this.currentCombo + 1) * 2 * rageKnockbackMultiplier);
-            enemy.applyKnockback(knockbackForce);
+            if (enemy.applyKnockback) {
+                enemy.applyKnockback(knockbackForce);
+            }
             
             // Heal more during rage mode
             const healAmount = this.player.isRaging ? 20 : (enemy.health <= 0 ? 10 : 5);
@@ -1229,14 +1337,19 @@ class MeleeCombat {
                 this.forearm.rotation.z = Math.PI / 3 + swingProgress * Math.PI / 4;
             }
             
-            // Make sword glow during swing
-            this.swordMesh.material.emissiveIntensity = 0.2 + swingProgress * 0.5;
+            // Make sword glow during swing (blade is first child of group)
+            if (this.swordMesh.children && this.swordMesh.children[0]) {
+                this.swordMesh.children[0].material.emissiveIntensity = 0.2 + swingProgress * 0.5;
+            }
             
             if (progress < 1) {
                 this.swingAnimation = requestAnimationFrame(animate);
             } else {
                 this.swingAnimation = null;
-                this.swordMesh.material.emissiveIntensity = 0.2;
+                // Reset blade glow (blade is first child of group)
+                if (this.swordMesh.children && this.swordMesh.children[0]) {
+                    this.swordMesh.children[0].material.emissiveIntensity = 0.2;
+                }
                 this.updateSwordPosition();
             }
         };

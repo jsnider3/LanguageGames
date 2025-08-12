@@ -1,0 +1,171 @@
+// Game Constants
+// Extracted magic numbers and values for better maintainability
+
+export const PHYSICS = {
+    GRAVITY: -9.8,
+    TERMINAL_VELOCITY: -50,
+    FRICTION: 0.9,
+    AIR_RESISTANCE: 0.95,
+    JUMP_FORCE: 5,
+    PLAYER_RADIUS: 0.3,
+    PLAYER_HEIGHT: 1.8,
+    DEFAULT_ENEMY_RADIUS: 0.3,
+    DEFAULT_ENEMY_HEIGHT: 1.5
+};
+
+export const MOVEMENT = {
+    BASE_MOVE_SPEED: 8,
+    SPRINT_MULTIPLIER: 1.5,
+    CROUCH_MULTIPLIER: 0.5,
+    STRAFE_MULTIPLIER: 0.7,
+    BACKWARD_MULTIPLIER: 0.8,
+    MAX_VELOCITY: 20,
+    ACCELERATION: 30,
+    DECELERATION: 10
+};
+
+export const COMBAT = {
+    MELEE_RANGE: 3,
+    MELEE_DAMAGE: 10,
+    MELEE_COOLDOWN: 500, // ms
+    SHOTGUN_RANGE: 20,
+    SHOTGUN_SPREAD: 0.15,
+    GRENADE_BLAST_RADIUS: 8,
+    GRENADE_DAMAGE: 50,
+    HOLY_WATER_RADIUS: 5,
+    HOLY_WATER_DAMAGE: 30,
+    KNOCKBACK_FORCE: 15,
+    DAMAGE_FLASH_DURATION: 200 // ms
+};
+
+export const ENEMY_AI = {
+    DEFAULT_SIGHT_RANGE: 15,
+    DEFAULT_ATTACK_RANGE: 2,
+    DEFAULT_MOVE_SPEED: 3,
+    IDLE_TURN_CHANCE: 0.02,
+    STUCK_THRESHOLD: 30, // frames
+    MIN_MOVEMENT_THRESHOLD: 0.01,
+    WALL_AVOIDANCE_STRENGTH: 0.7,
+    ZIGZAG_AMPLITUDE: 0.3,
+    PATROL_RADIUS: 5,
+    AGGRO_DURATION: 5000 // ms
+};
+
+export const LEVEL_BOUNDS = {
+    DEFAULT_SIZE: 9.5,
+    LEVEL_2_SIZE: 14.5,
+    LEVEL_3_SIZE: 19.5,
+    CHAPEL_X: 9.5,
+    CHAPEL_Z_MIN: -49,
+    CHAPEL_Z_MAX: 11.5,
+    ARMORY_SIZE: 19.5,
+    ARMORY_Z_MIN: -49,
+    BOUND_MARGIN: 0.5
+};
+
+export const RENDERING = {
+    FOV: 75,
+    NEAR_PLANE: 0.1,
+    FAR_PLANE: 1000,
+    SHADOW_MAP_SIZE: 2048,
+    MAX_PARTICLES: 100,
+    PARTICLE_LIFETIME: 1000, // ms
+    MUZZLE_FLASH_DURATION: 100, // ms
+    BLOOD_PARTICLE_COUNT: 5,
+    EXPLOSION_PARTICLE_COUNT: 20
+};
+
+export const AUDIO = {
+    MASTER_VOLUME: 0.8,
+    SFX_VOLUME: 0.6,
+    MUSIC_VOLUME: 0.4,
+    FOOTSTEP_INTERVAL: 500, // ms
+    DAMAGE_SOUND_COOLDOWN: 200, // ms
+    AMBIENT_FADE_TIME: 2000, // ms
+    MAX_SIMULTANEOUS_SOUNDS: 10
+};
+
+export const UI = {
+    HUD_OPACITY: 0.8,
+    HEALTH_BAR_WIDTH: 200,
+    HEALTH_BAR_HEIGHT: 20,
+    AMMO_DISPLAY_SIZE: 32,
+    CROSSHAIR_SIZE: 20,
+    DAMAGE_INDICATOR_DURATION: 500, // ms
+    MESSAGE_DISPLAY_TIME: 3000, // ms
+    MENU_TRANSITION_TIME: 300 // ms
+};
+
+export const ANIMATION = {
+    BOB_SPEED: 8,
+    BOB_AMPLITUDE: 0.1,
+    IDLE_SWAY_SPEED: 2,
+    IDLE_SWAY_AMPLITUDE: 0.05,
+    HURT_FLASH_SPEED: 20,
+    DEATH_FALL_SPEED: 0.15,
+    TELEPORT_EFFECT_SCALE: 1.1,
+    WING_FLAP_SPEED: 8,
+    HOVER_HEIGHT: 0.5,
+    HOVER_SPEED: 0.002
+};
+
+export const PICKUPS = {
+    HEALTH_PACK_HEAL: 25,
+    AMMO_PACK_COUNT: 10,
+    ARMOR_PACK_AMOUNT: 25,
+    POWERUP_DURATION: 30000, // ms
+    RESPAWN_TIME: 30000, // ms
+    PICKUP_RADIUS: 1,
+    FLOAT_HEIGHT: 0.5,
+    FLOAT_SPEED: 2,
+    ROTATE_SPEED: 1
+};
+
+export const NETWORK = {
+    TICK_RATE: 60,
+    INTERPOLATION_DELAY: 100, // ms
+    TIMEOUT_DURATION: 10000, // ms
+    MAX_PREDICTION_FRAMES: 10,
+    PACKET_SIZE_LIMIT: 1024 // bytes
+};
+
+export const PERFORMANCE = {
+    TARGET_FPS: 60,
+    LOW_FPS_THRESHOLD: 30,
+    LOD_DISTANCES: [10, 25, 50, 100],
+    MAX_ENEMIES_PER_FRAME: 50,
+    MAX_PROJECTILES: 100,
+    SPATIAL_HASH_CELL_SIZE: 10,
+    UPDATE_RADIUS: 50,
+    CULL_DISTANCE: 100
+};
+
+export const GAME_STATES = {
+    MENU: 'menu',
+    LOADING: 'loading',
+    PLAYING: 'playing',
+    PAUSED: 'paused',
+    GAME_OVER: 'game_over',
+    VICTORY: 'victory',
+    CUTSCENE: 'cutscene'
+};
+
+export const DAMAGE_TYPES = {
+    NORMAL: 'normal',
+    HOLY: 'holy',
+    FIRE: 'fire',
+    POISON: 'poison',
+    ELECTRIC: 'electric',
+    PSYCHIC: 'psychic'
+};
+
+export const OBJECTIVE_TYPES = {
+    KILL_ALL: 'kill_all',
+    SURVIVE: 'survive',
+    COLLECT: 'collect',
+    REACH_EXIT: 'reach_exit',
+    DEFEND: 'defend',
+    ESCORT: 'escort',
+    DESTROY_TARGET: 'destroy_target',
+    ACTIVATE_SWITCHES: 'activate_switches'
+};

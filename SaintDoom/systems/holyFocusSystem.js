@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Holy Focus System
 // Switch between different divine aspects for varied combat approaches
 

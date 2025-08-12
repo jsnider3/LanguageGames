@@ -1,6 +1,8 @@
+import * as THREE from 'three';
 import { Enemy } from '../enemy.js';
 import { GAME_CONFIG } from '../modules/GameConfig.js';
 import { AudioManager } from '../modules/Utils.js';
+import { ANIMATION, ENEMY_AI, COMBAT } from '../modules/Constants.js';
 
 export class Hellhound extends Enemy {
     constructor(scene, position, pack = null) {
@@ -143,7 +145,7 @@ export class Hellhound extends Enemy {
         // Running animation (faster than base Enemy)
         if (this.velocity.length() > 0.1) {
             this.bobAmount += deltaTime * 12;  // Faster animation
-            const bobOffset = Math.sin(this.bobAmount) * 0.1;
+            const bobOffset = Math.sin(this.bobAmount) * ANIMATION.BOB_AMPLITUDE;
             this.mesh.position.y = this.position.y + Math.abs(bobOffset);
         }
         
@@ -376,7 +378,7 @@ export class Hellhound extends Enemy {
             }
         } else {
             // No wall, add zigzag movement for harder targeting (but still face player)
-            const zigzag = Math.sin(Date.now() * 0.003) * 0.3;
+            const zigzag = Math.sin(Date.now() * 0.003) * ENEMY_AI.ZIGZAG_AMPLITUDE;
             const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
             direction.add(perpendicular.multiplyScalar(zigzag));
             direction.normalize();
@@ -390,9 +392,9 @@ export class Hellhound extends Enemy {
         
         // Check if stuck
         const moved = this.position.distanceTo(this.lastPosition);
-        if (moved < 0.01) {
+        if (moved < ENEMY_AI.MIN_MOVEMENT_THRESHOLD) {
             this.stuckCounter++;
-            if (this.stuckCounter > 30) {
+            if (this.stuckCounter > ENEMY_AI.STUCK_THRESHOLD) {
                 // Try random direction to escape
                 const angle = Math.random() * Math.PI * 2;
                 direction.x = Math.cos(angle);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Enemy } from './enemy.js';
+import { Enemy } from '../enemy.js';
 
 export class AlienHybrid extends Enemy {
     constructor(scene, position) {

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 export class ObjectPool {
     constructor(createFn, resetFn, maxSize = 100) {
         this.createFn = createFn;

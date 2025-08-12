@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Game Module  
 // Main game class containing all game logic, state management, and level handling
 
@@ -7,6 +8,7 @@ import { InputManager } from './InputManager.js';
 import { Player } from './Player.js';
 import { CollisionSystem } from './CollisionSystem.js';
 import { WeaponSystem } from './WeaponSystem.js';
+import { LevelFactory } from './LevelFactory.js';
 
 export class Game {
     constructor() {
@@ -28,17 +30,32 @@ export class Game {
         this.gameOver = false;
         this.deathCount = 0;
         this.martyrdomMode = false;
+        this.divineWrathUsed = false; // Track if divine wrath has been used after death
         this.respawnTimer = 0;
         this.score = 0;
+        
+        // Store base player stats for resetting after divine wrath
+        this.basePlayerStats = {
+            maxHealth: 100,
+            moveSpeed: 5,
+            rageDuration: 10,
+            rageDecayRate: 1
+        };
         this.kills = 0;
         this.combo = 0;
         this.comboTimer = 0;
+        
+        // Initialize level factory
+        this.levelFactory = null;
     }
 
     async init(levelName = 'tutorial') {
         this.currentLevel = levelName;
         this.setupRenderer();
         this.setupScene();
+        
+        // Initialize level factory
+        this.levelFactory = new LevelFactory(this);
         
         this.clock = new THREE.Clock();
         this.inputManager = new InputManager();
@@ -70,8 +87,8 @@ export class Game {
         this.gameOver = false;
         this.isRunning = false;
         
-        // Start with loading the level
-        this.loadLevel(levelName);
+        // Start with loading the level (await it)
+        await this.loadLevel(levelName);
         
         // Hide start screen and show game UI
         document.getElementById('startScreen').style.display = 'none';
@@ -180,6 +197,7 @@ export class Game {
         
         const input = this.inputManager.getInput();
         
+        // Core game updates
         this.updatePlayer(deltaTime, input);
         this.handleWeaponInput(input);
         this.handleCombat(input, deltaTime);
@@ -190,77 +208,11 @@ export class Game {
         this.updateCollisions(deltaTime);
         this.updateHUD();
         
-        // Check tutorial progress
-        if (this.tutorialLevel && this.tutorialLevel.checkTutorialProgress) {
-            this.tutorialLevel.checkTutorialProgress(input, this.player);
-        }
-        
-        // Check chapel trigger if chapel level exists
-        if (this.chapelLevel && !this.chapelLevel.chapelReached) {
-            this.chapelLevel.checkChapelTrigger(this.player.position);
-        }
-        
-        // Check armory weapon collection
-        if (this.armoryLevel && this.armoryLevel.checkWeaponCollection) {
-            this.armoryLevel.checkWeaponCollection(this.player.position);
-            this.armoryLevel.checkExitCondition();
-            // Update pickup animations
-            if (this.armoryLevel.updatePickups) {
-                this.armoryLevel.updatePickups(deltaTime);
-            }
-            // Check for level exit
-            if (this.armoryLevel.checkExitCollision && this.armoryLevel.checkExitCollision(this.player)) {
-                console.log('Armory level complete! Loading next level...');
-                this.loadLevel('laboratory'); // Load the Laboratory Complex level
-            }
-        }
-        
-        // Update laboratory level if active
-        if (this.currentLevelInstance && this.currentLevelInstance.levelName === 'Laboratory Complex') {
-            // Update the level (animations, etc)
-            if (this.currentLevelInstance.update) {
-                this.currentLevelInstance.update(deltaTime);
-            }
-            
-            // Check for level exit
-            if (this.currentLevelInstance.checkExitCollision && this.currentLevelInstance.checkExitCollision(this.player)) {
-                console.log('Laboratory level complete! Loading next level...');
-                this.loadLevel('containment'); // Load the Containment level
-            }
-        }
+        // Level-specific updates
+        this.updateLevelSpecificLogic(deltaTime, input);
         
         // Clean up broken enemies or handle deaths that weren't caught by combat
-        this.enemies = this.enemies.filter(enemy => {
-            // Check for invalid position
-            const hasInvalidPosition = !enemy.position || 
-                isNaN(enemy.position.x) || 
-                isNaN(enemy.position.y) || 
-                isNaN(enemy.position.z);
-            
-            // Remove if has invalid position
-            if (hasInvalidPosition) {
-                this.cleanupEnemy(enemy);
-                return false;
-            }
-            
-            // Check if enemy fell through the floor
-            if (enemy.position.y < -10) {
-                return false;
-            }
-            
-            // Check if enemy is dead but wasn't counted
-            if (this.isEnemyDead(enemy)) {
-                if (!enemy.deathCounted) {
-                    this.processDeadEnemy(enemy);
-                    // Schedule cleanup
-                    setTimeout(() => this.cleanupEnemy(enemy), 2000);
-                }
-                return false;
-            }
-            
-            // Keep enemy if still alive
-            return true;
-        });
+        this.cleanupDeadAndInvalidEnemies();
         if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
             // Check if all enemies are dead
             if (this.enemies.length === 0) {
@@ -326,6 +278,160 @@ export class Game {
         
         this.applyCameraEffects();
         this.checkPlayerDeath();
+    }
+    
+    updateLevelSpecificLogic(deltaTime, input) {
+        // Check tutorial progress
+        if (this.tutorialLevel && this.tutorialLevel.checkTutorialProgress) {
+            this.tutorialLevel.checkTutorialProgress(input, this.player);
+        }
+        
+        // Check chapel trigger if chapel level exists
+        if (this.chapelLevel && !this.chapelLevel.chapelReached) {
+            this.chapelLevel.checkChapelTrigger(this.player.position);
+        }
+        
+        // Check armory weapon collection
+        if (this.armoryLevel && this.armoryLevel.checkWeaponCollection) {
+            this.updateArmoryLevel(deltaTime);
+        }
+        
+        // Update laboratory level if active
+        if (this.currentLevelInstance && this.currentLevelInstance.levelName === 'Laboratory Complex') {
+            this.updateLaboratoryLevel(deltaTime);
+        }
+        
+        // Handle chapel cleansing
+        this.handleChapelCleansing(input);
+        
+        // Check door interaction
+        this.handleDoorInteraction(input);
+    }
+    
+    updateArmoryLevel(deltaTime) {
+        this.armoryLevel.checkWeaponCollection(this.player.position);
+        this.armoryLevel.checkExitCondition();
+        // Update pickup animations
+        if (this.armoryLevel.updatePickups) {
+            this.armoryLevel.updatePickups(deltaTime);
+        }
+        // Check for level exit
+        if (this.armoryLevel.checkExitCollision && this.armoryLevel.checkExitCollision(this.player)) {
+            this.loadLevel('laboratory'); // Load the Laboratory Complex level
+        }
+    }
+    
+    updateLaboratoryLevel(deltaTime) {
+        // Update the level (animations, etc)
+        if (this.currentLevelInstance.update) {
+            this.currentLevelInstance.update(deltaTime);
+        }
+        
+        // Check for level exit
+        if (this.currentLevelInstance.checkExitCollision && this.currentLevelInstance.checkExitCollision(this.player)) {
+            console.log('Laboratory level complete! Loading next level...');
+            this.loadLevel('containment'); // Load the Containment level
+        }
+    }
+    
+    handleChapelCleansing(input) {
+        if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
+            // Check if all enemies are dead
+            if (this.enemies.length === 0) {
+                // Enemies defeated, now check if player is near altar to cleanse it
+                const altarPos = new THREE.Vector3(0, 0, -48);
+                const distanceToAltar = this.player.position.distanceTo(altarPos);
+                
+                if (!this.altarCanBeCleansed) {
+                    this.altarCanBeCleansed = true;
+                    if (this.narrativeSystem) {
+                        this.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
+                        this.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
+                    }
+                }
+                
+                // Show interaction prompt when close to altar
+                if (distanceToAltar < 5) {
+                    this.showInteractPrompt("Press E to cleanse the altar");
+                    
+                    // Check if player is pressing E (use the input we already got)
+                    if (input.interact) {
+                        this.cleanseAltar();
+                        this.hideInteractPrompt();
+                    }
+                } else {
+                    this.hideInteractPrompt();
+                }
+            }
+        }
+    }
+    
+    handleDoorInteraction(input) {
+        if (this.exitDoor) {
+            const doorPos = new THREE.Vector3(4.9, 0, -25);
+            const doorDistance = this.player.position.distanceTo(doorPos);
+            
+            // Show prompt when near door
+            if (doorDistance < 3 && !this.doorOpening) {
+                this.showInteractPrompt("Press E to enter the Armory");
+                
+                if (input.interact) {
+                    // Animate door opening
+                    if (this.exitDoorMesh && !this.doorOpening) {
+                        this.doorOpening = true;
+                        this.hideInteractPrompt();
+                        let rotation = 0;
+                        const openDoor = setInterval(() => {
+                            rotation += 0.05;
+                            this.exitDoorMesh.rotation.y = -rotation;
+                            if (rotation >= Math.PI / 2) {
+                                clearInterval(openDoor);
+                                // Transition to Chapter 2
+                                setTimeout(() => {
+                                    this.loadLevel('chapter2');
+                                }, 500);
+                            }
+                        }, 16);
+                    }
+                }
+            } else if (doorDistance >= 3) {
+                this.hideInteractPrompt();
+            }
+        }
+    }
+    
+    cleanupDeadAndInvalidEnemies() {
+        this.enemies = this.enemies.filter(enemy => {
+            // Check for invalid position
+            const hasInvalidPosition = !enemy.position || 
+                isNaN(enemy.position.x) || 
+                isNaN(enemy.position.y) || 
+                isNaN(enemy.position.z);
+            
+            // Remove if has invalid position
+            if (hasInvalidPosition) {
+                this.cleanupEnemy(enemy);
+                return false;
+            }
+            
+            // Check if enemy fell through the floor
+            if (enemy.position.y < -10) {
+                return false;
+            }
+            
+            // Check if enemy is dead but wasn't counted
+            if (this.isEnemyDead(enemy)) {
+                if (!enemy.deathCounted) {
+                    this.processDeadEnemy(enemy);
+                    // Schedule cleanup
+                    setTimeout(() => this.cleanupEnemy(enemy), 2000);
+                }
+                return false;
+            }
+            
+            // Keep enemy if still alive
+            return true;
+        });
     }
     
     updateComboTimer(deltaTime) {
@@ -501,6 +607,10 @@ export class Game {
     
     updateCollisions(deltaTime) {
         // Check all collisions (walls and enemies)
+        if (!this.level) {
+            console.warn('Level not initialized in updateCollisions');
+            return;
+        }
         const walls = this.level.walls || [];
         this.collisionSystem.checkPlayerWallCollisions(this.player, walls, deltaTime, this.level, this.enemies);
         // Still do separation if overlapping
@@ -861,6 +971,15 @@ export class Game {
         this.gameOver = true;
         this.deathCount++;
         
+        // Reset player stats if divine wrath was active
+        if (this.martyrdomMode && this.divineWrathUsed && this.basePlayerStats.stored) {
+            this.player.maxHealth = this.basePlayerStats.maxHealth;
+            this.player.moveSpeed = this.basePlayerStats.moveSpeed;
+            this.player.rageDuration = this.basePlayerStats.rageDuration;
+            this.player.rageDecayRate = this.basePlayerStats.rageDecayRate;
+            this.player.isRaging = false; // Stop rage mode
+        }
+        
         // Release pointer lock so player can click buttons
         if (document.pointerLockElement) {
             document.exitPointerLock();
@@ -913,7 +1032,15 @@ export class Game {
                 border: 2px solid #ff0000;
                 cursor: pointer;
                 margin-top: 20px;
-            ">RISE AGAIN</button>
+                transition: all 0.2s;
+                outline: none;
+                user-select: none;
+                position: relative;
+                z-index: 2001;
+            " onmouseover="this.style.background='#aa0000'; this.style.transform='scale(1.05)'" 
+               onmouseout="this.style.background='#800000'; this.style.transform='scale(1)'"
+               onmousedown="this.style.transform='scale(0.95)'"
+               onmouseup="this.style.transform='scale(1.05)'">RISE AGAIN</button>
         `;
         
         document.body.appendChild(deathScreen);
@@ -923,18 +1050,76 @@ export class Game {
             this.martyrdomMode = true;
             deathScreen.querySelector('h1').textContent = 'MARTYRDOM MODE';
             deathScreen.querySelector('h1').style.color = '#ffff00';
-            deathScreen.querySelector('#respawnButton').textContent = 'UNLEASH DIVINE WRATH';
+            
+            // Only show divine wrath option if not used yet this death
+            if (!this.divineWrathUsed) {
+                deathScreen.querySelector('#respawnButton').textContent = 'UNLEASH DIVINE WRATH';
+            } else {
+                deathScreen.querySelector('#respawnButton').textContent = 'RESPAWN';
+                // Add note that divine wrath was already used
+                const note = document.createElement('p');
+                note.textContent = 'Divine Wrath already unleashed';
+                note.style.color = '#888888';
+                note.style.fontSize = '14px';
+                note.style.marginTop = '10px';
+                deathScreen.querySelector('#respawnButton').parentNode.appendChild(note);
+            }
+        }
+        
+        // Prevent pointer lock capture while death screen is visible
+        const preventPointerLock = (e) => {
+            if (document.getElementById('deathScreen')) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        
+        // Temporarily block pointer lock requests on the canvas
+        if (this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.addEventListener('click', preventPointerLock, true);
         }
         
         // Respawn button handler
-        document.getElementById('respawnButton').addEventListener('click', () => {
-            // Remove death screen immediately
-            const deathScreenToRemove = document.getElementById('deathScreen');
-            if (deathScreenToRemove) {
-                deathScreenToRemove.remove();
-            }
-            this.respawn();
-        });
+        const respawnBtn = document.getElementById('respawnButton');
+        if (respawnBtn) {
+            // Prevent default browser behavior
+            respawnBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            
+            // Handle actual click
+            respawnBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Remove death screen immediately
+                const deathScreenToRemove = document.getElementById('deathScreen');
+                if (deathScreenToRemove) {
+                    deathScreenToRemove.remove();
+                }
+                
+                // Remove the pointer lock prevention after a short delay
+                setTimeout(() => {
+                    if (this.renderer && this.renderer.domElement) {
+                        this.renderer.domElement.removeEventListener('click', preventPointerLock, true);
+                    }
+                }, 100);
+                
+                this.respawn();
+            });
+            
+            // Also handle keyboard Enter/Space on the button
+            respawnBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    respawnBtn.click();
+                }
+            });
+            
+            // Focus the button so Enter key works immediately
+            respawnBtn.focus();
+        }
         
         // Play death sound
         this.playDeathSound();
@@ -942,17 +1127,30 @@ export class Game {
     
     respawn() {
         this.gameOver = false;
+        this.isPaused = false; // Make sure game is unpaused
+        
+        // Hide any pause menus that might be visible
+        const pauseMenu = document.getElementById('pauseMenu');
+        if (pauseMenu) pauseMenu.style.display = 'none';
+        const settingsPanel = document.getElementById('settingsPanel');
+        if (settingsPanel) settingsPanel.style.display = 'none';
+        const clickToResume = document.getElementById('clickToResume');
+        if (clickToResume) clickToResume.style.display = 'none';
         
         // Re-capture pointer lock for gameplay (with error handling)
         if (this.renderer && this.renderer.domElement) {
-            // Use a small delay to avoid SecurityError
+            // Use a longer delay to ensure death screen is fully removed
             setTimeout(() => {
                 if (this.renderer && this.renderer.domElement) {
-                    this.renderer.domElement.requestPointerLock().catch(err => {
-                        // Ignore pointer lock errors - user can click to re-capture
-                    });
+                    // Only request pointer lock if death screen is gone
+                    if (!document.getElementById('deathScreen')) {
+                        this.renderer.domElement.requestPointerLock().catch(err => {
+                            // Silently ignore - user can click to re-capture
+                            console.log('Click game area to resume');
+                        });
+                    }
                 }
-            }, 100);
+            }, 500); // Increased delay to ensure UI is ready
         }
         
         // Reset player stats
@@ -963,10 +1161,23 @@ export class Game {
         this.player.rage = 0;
         
         // Apply martyrdom mode bonuses
-        if (this.martyrdomMode) {
+        if (this.martyrdomMode && !this.divineWrathUsed) {
+            // First time using divine wrath after 7 deaths
+            this.divineWrathUsed = true;
+            
+            // Store original values if not stored yet
+            if (!this.basePlayerStats.stored) {
+                this.basePlayerStats.maxHealth = this.player.maxHealth;
+                this.basePlayerStats.moveSpeed = this.player.moveSpeed;
+                this.basePlayerStats.rageDuration = this.player.rageDuration || 10;
+                this.basePlayerStats.rageDecayRate = this.player.rageDecayRate || 1;
+                this.basePlayerStats.stored = true;
+            }
+            
+            // Apply divine wrath buffs (temporary for this life)
             this.player.health = 200; // Double health
             this.player.maxHealth = 200;
-            this.player.moveSpeed *= 1.5; // Permanent speed boost
+            this.player.moveSpeed = this.basePlayerStats.moveSpeed * 1.5; // 50% speed boost
             this.player.rage = 100; // Start with full rage
             this.player.activateRage(); // Auto-activate rage
             
@@ -974,11 +1185,25 @@ export class Game {
             this.player.ammo.shells = this.player.maxAmmo.shells;
             this.player.ammo.bullets = this.player.maxAmmo.bullets;
             
-            this.showMessage("MARTYRDOM MODE: Unlimited rage! Divine power courses through you!");
+            this.showMessage("DIVINE WRATH UNLEASHED! One-time divine power granted!");
             
-            // Make rage permanent in martyrdom mode
+            // Make rage permanent for this life only
             this.player.rageDuration = 99999;
             this.player.rageDecayRate = 0;
+            
+            // Execute divine wrath explosion immediately
+            this.executeDivineWrathExplosion();
+        } else if (this.martyrdomMode && this.divineWrathUsed) {
+            // Already used divine wrath, reset to base stats for normal respawn
+            // Reset player stats to original values
+            this.player.maxHealth = this.basePlayerStats.maxHealth;
+            this.player.moveSpeed = this.basePlayerStats.moveSpeed;
+            this.player.rageDuration = this.basePlayerStats.rageDuration;
+            this.player.rageDecayRate = this.basePlayerStats.rageDecayRate;
+            
+            // Normal respawn with slight penalty
+            this.player.health = Math.max(75, this.basePlayerStats.maxHealth - (this.deathCount * 5));
+            this.showMessage("Divine Wrath exhausted. Fight with honor!");
         } else {
             // Normal respawn with small health penalty
             this.player.health = Math.max(50, this.player.maxHealth - (this.deathCount * 10));
@@ -1249,13 +1474,8 @@ export class Game {
         });
         this.enemies = [];
         
-        // Respawn enemies for current level
-        this.spawnLevelEnemies();
-        
-        // Reset pickups
-        this.pickups.forEach(pickup => this.cleanupPickup(pickup));
-        this.pickups = [];
-        this.spawnLevelPickups();
+        // Reload the current level to respawn enemies and reset everything
+        this.loadLevel(this.currentLevel);
         
         // Close menus and resume
         document.getElementById('pauseMenu').style.display = 'none';
@@ -1320,9 +1540,275 @@ export class Game {
         this.currentLevel = 1;
         this.deathCount = 0;
         this.martyrdomMode = false;
+        this.divineWrathUsed = false;
     }
     
-    loadLevel(levelName) {
+    executeDivineWrathExplosion() {
+        // Create holy explosion at player position
+        const explosionRadius = 20;
+        
+        // Visual effect - golden explosion
+        const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+        const sphereMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 1,
+            emissive: 0xffff00,
+            emissiveIntensity: 2
+        });
+        
+        const explosion = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        explosion.position.copy(this.player.position);
+        this.scene.add(explosion);
+        
+        // Screen flash effect
+        const flash = document.createElement('div');
+        flash.style.position = 'fixed';
+        flash.style.top = '0';
+        flash.style.left = '0';
+        flash.style.width = '100%';
+        flash.style.height = '100%';
+        flash.style.backgroundColor = 'yellow';
+        flash.style.opacity = '0.8';
+        flash.style.pointerEvents = 'none';
+        flash.style.zIndex = '10000';
+        document.body.appendChild(flash);
+        
+        // Fade out flash
+        setTimeout(() => {
+            flash.style.transition = 'opacity 0.5s';
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 500);
+        }, 100);
+        
+        // Expand explosion and damage enemies
+        const expandExplosion = () => {
+            explosion.scale.multiplyScalar(1.3);
+            explosion.material.opacity *= 0.92;
+            
+            // Check if explosion reached max size
+            if (explosion.scale.x < explosionRadius) {
+                // Damage all enemies in radius
+                if (this.enemies) {
+                    this.enemies.forEach(enemy => {
+                        if (enemy && enemy.position && !enemy.hitByDivineWrath) {
+                            const distance = enemy.position.distanceTo(this.player.position);
+                            if (distance <= explosion.scale.x) {
+                                // Instant kill enemies within range
+                                const damage = 500; // Massive damage
+                                enemy.takeDamage(damage, 'holy');
+                                enemy.hitByDivineWrath = true;
+                                
+                                // Knockback and disintegrate effect
+                                const knockbackDir = new THREE.Vector3()
+                                    .subVectors(enemy.position, this.player.position)
+                                    .normalize()
+                                    .multiplyScalar(20);
+                                knockbackDir.y = 10;
+                                
+                                if (enemy.applyKnockback) {
+                                    enemy.applyKnockback(knockbackDir);
+                                }
+                                
+                                // Create holy fire on enemy
+                                this.createHolyFire(enemy.position);
+                            }
+                        }
+                    });
+                }
+                
+                requestAnimationFrame(expandExplosion);
+            } else {
+                // Cleanup
+                this.scene.remove(explosion);
+                
+                // Reset hit flags
+                if (this.enemies) {
+                    this.enemies.forEach(enemy => {
+                        if (enemy) delete enemy.hitByDivineWrath;
+                    });
+                }
+            }
+        };
+        expandExplosion();
+        
+        // Create ground cracks radiating outward
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            this.createHolyCrack(angle);
+        }
+        
+        // Play sound effect (if available)
+        this.playDivineWrathSound();
+        
+        // Show message
+        this.showMessage("DIVINE WRATH UNLEASHED!");
+    }
+    
+    createHolyFire(position) {
+        // Create golden flames at position
+        const fireGeometry = new THREE.ConeGeometry(0.3, 1, 6);
+        const fireMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const fire = new THREE.Mesh(fireGeometry, fireMaterial);
+        fire.position.copy(position);
+        fire.position.y += 0.5;
+        this.scene.add(fire);
+        
+        // Animate fire
+        const animateFire = () => {
+            fire.position.y += 0.05;
+            fire.scale.y *= 1.02;
+            fire.material.opacity *= 0.95;
+            fire.rotation.y += 0.1;
+            
+            if (fire.material.opacity > 0.01) {
+                requestAnimationFrame(animateFire);
+            } else {
+                this.scene.remove(fire);
+            }
+        };
+        animateFire();
+    }
+    
+    createHolyCrack(angle) {
+        // Create glowing cracks in the ground
+        const crackGeometry = new THREE.PlaneGeometry(0.3, 8);
+        const crackMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const crack = new THREE.Mesh(crackGeometry, crackMaterial);
+        crack.position.copy(this.player.position);
+        crack.position.y = 0.02;
+        crack.rotation.x = -Math.PI / 2;
+        crack.rotation.z = angle;
+        this.scene.add(crack);
+        
+        // Fade crack
+        const fadeCrack = () => {
+            crack.material.opacity *= 0.96;
+            crack.scale.y *= 1.05; // Extend outward
+            
+            if (crack.material.opacity > 0.01) {
+                requestAnimationFrame(fadeCrack);
+            } else {
+                this.scene.remove(crack);
+            }
+        };
+        setTimeout(fadeCrack, 500);
+    }
+    
+    playDivineWrathSound() {
+        // Placeholder for divine wrath sound effect
+        // Could be implemented with Web Audio API or Howler.js
+        console.log('Divine Wrath sound effect triggered');
+    }
+    
+    showLoadingScreen(levelName) {
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingText = document.getElementById('loadingText');
+        const loadingTip = document.getElementById('loadingTip');
+        const loadingBar = document.querySelector('.loading-bar');
+        
+        if (loadingScreen) {
+            loadingScreen.style.display = 'flex';
+            loadingScreen.style.zIndex = '100000'; // Ensure it's on top of everything
+            
+            // Random loading messages based on level
+            const loadingMessages = {
+                'tutorial': ['Blessing weapons...', 'Preparing holy water...', 'Loading sacred texts...'],
+                'chapter1': ['Sanctifying the chapel...', 'Summoning divine protection...', 'Preparing for battle...'],
+                'chapter2': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
+                'laboratory': ['Analyzing specimens...', 'Securing keycards...', 'Initializing containment...'],
+                'containment': ['Securing perimeter...', 'Loading emergency protocols...', 'Preparing evacuation routes...'],
+                'tunnels': ['Mapping tunnel network...', 'Activating emergency lighting...', 'Scanning for threats...'],
+                'spawning': ['Detecting hell portals...', 'Preparing for swarm...', 'Loading heavy ordnance...'],
+                'observatory': ['Calibrating sensors...', 'Scanning skies...', 'Preparing observation deck...'],
+                'communications': ['Establishing connection...', 'Restoring signal...', 'Decrypting messages...'],
+                'reactor': ['Stabilizing core...', 'Checking radiation levels...', 'Preparing hazmat protocols...'],
+                'archive': ['Accessing forbidden knowledge...', 'Decrypting ancient texts...', 'Preparing protective wards...'],
+                'techfacility': ['Hacking security systems...', 'Loading classified data...', 'Preparing infiltration...']
+            };
+            
+            const tips = [
+                'TIP: Use holy water grenades to create safe zones',
+                'TIP: The blessed shotgun is most effective at close range',
+                'TIP: Block with your sword to reduce damage',
+                'TIP: Holy Rage makes you temporarily invincible',
+                'TIP: Some enemies are weak to specific weapons',
+                'TIP: Sprint to avoid enemy projectiles',
+                'TIP: Headshots deal critical damage',
+                'TIP: Look for keycards to unlock new areas',
+                'TIP: Environmental hazards can damage enemies too',
+                'TIP: Save your crucifix launcher for tough enemies'
+            ];
+            
+            // Set random loading message
+            const messages = loadingMessages[levelName] || ['Loading level...'];
+            if (loadingText) {
+                loadingText.textContent = messages[Math.floor(Math.random() * messages.length)];
+            }
+            
+            // Set random tip
+            if (loadingTip) {
+                loadingTip.textContent = tips[Math.floor(Math.random() * tips.length)];
+            }
+            
+            // Animate loading bar
+            if (loadingBar) {
+                loadingBar.style.width = '0%';
+                let progress = 0;
+                const loadingInterval = setInterval(() => {
+                    progress += Math.random() * 30;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(loadingInterval);
+                    }
+                    loadingBar.style.width = progress + '%';
+                }, 200);
+            }
+        }
+    }
+    
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            // Complete the loading bar first
+            const loadingBar = document.querySelector('.loading-bar');
+            if (loadingBar) {
+                loadingBar.style.width = '100%';
+            }
+            
+            // Hide after a short delay
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }
+    }
+    
+    async loadLevel(levelName) {
+        // Show loading screen immediately and ensure it's visible
+        this.showLoadingScreen(levelName);
+        
+        // Force a render frame to ensure loading screen is displayed
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                // Use setTimeout to give the loading screen time to be fully rendered
+                setTimeout(resolve, 50);
+            });
+        });
+        
+        await this.loadLevelActual(levelName);
+    }
+    
+    async loadLevelActual(levelName) {
         // Clear existing level
         if (this.currentLevelInstance) {
             if (this.currentLevelInstance.clearLevel) {
@@ -1380,101 +1866,76 @@ export class Game {
             this.scene.remove(obj);
         });
         
-        // Create new level based on name
-        switch(levelName) {
-            case 'tutorial':
-                if (window.TutorialLevel) {
-                    this.tutorialLevel = new window.TutorialLevel(this.scene, this);
-                    this.currentLevelInstance = this.tutorialLevel;
-                    this.level = new window.Level(this.scene);
-                    const tutorialWalls = this.tutorialLevel.create();
-                    this.level.walls = tutorialWalls || [];
-                    
-                    // Start position for tutorial
-                    this.player.position.set(0, 1.7, 0);
-                }
-                break;
-                
-            case 'chapter1':
-                if (window.ChapelLevel) {
-                    this.chapelLevel = new window.ChapelLevel(this.scene, this);
-                    this.currentLevelInstance = this.chapelLevel;
-                    this.level = new window.Level(this.scene);
-                    const chapelWalls = this.chapelLevel.create();
-                    this.level.walls = chapelWalls || [];
-                    
-                    // Exit door will be created after cleansing the altar
-                    
-                    // Restore all weapons for Chapter 1
-                    this.player.weapons = ['sword', 'shotgun', 'holywater', 'crucifix'];
-                    this.player.currentWeaponIndex = 0;
-                    this.player.currentWeapon = 'sword';
-                    this.weaponSystem.switchToWeapon('sword');
-                    
-                    // Start position for chapter 1
-                    this.player.position.set(0, 1.7, 8);
-                    
-                    // Don't play intro again if coming from tutorial
-                    // The intro already played during init for non-tutorial starts
-                }
-                break;
-                
-            case 'chapter2':
-                if (window.ArmoryLevel) {
-                    this.armoryLevel = new window.ArmoryLevel(this.scene, this);
-                    this.currentLevelInstance = this.armoryLevel;
-                    this.level = new window.Level(this.scene);
-                    const armoryWalls = this.armoryLevel.create();
-                    this.level.walls = armoryWalls || [];
-                    
-                    // Restore all weapons for Chapter 2
-                    this.player.weapons = ['sword', 'shotgun', 'holywater', 'crucifix'];
-                    this.player.currentWeaponIndex = 0;
-                    this.player.currentWeapon = 'sword';
-                    this.weaponSystem.switchToWeapon('sword');
-                    
-                    // Start position for chapter 2
-                    this.player.position.set(0, 1.7, 8);
-                    
-                    if (this.narrativeSystem) {
-                        this.narrativeSystem.currentChapter = 1;
-                        this.narrativeSystem.setObjective("Reach the armory");
-                    }
-                }
-                break;
-                
-            case 'laboratory':
-                // Load Laboratory Complex level
-                if (window.LaboratoryLevel) {
-                    this.laboratoryLevel = new window.LaboratoryLevel(this);
-                    this.currentLevelInstance = this.laboratoryLevel;
-                    const levelData = this.laboratoryLevel.create();
-                    this.level = new window.Level(this.scene);
-                    this.level.walls = levelData.walls || [];
-                    this.enemies = levelData.enemies || [];
-                    
-                    // Player has collected weapons from armory
-                    this.player.weapons = ['sword', 'shotgun', 'rifle', 'holywater', 'crucifix'];
-                    this.player.position.set(0, 1.7, 0);
-                    
-                    if (this.narrativeSystem) {
-                        this.narrativeSystem.setObjective("Find keycards and access the main lab");
-                    }
-                } else {
-                    console.warn('Laboratory level not loaded, falling back to test level');
-                    this.loadLevel('chapter2'); // Fall back to armory
-                }
-                break;
-                
-            default:
-                // Fallback to test level
-                this.level = new Level(this.scene);
+        // Create new level using factory (async)
+        const levelInstance = await this.levelFactory.createLevel(levelName);
+        
+        if (levelInstance) {
+            this.currentLevelInstance = levelInstance;
+            console.log(`[Game] Successfully loaded level: ${levelName}`);
+        } else {
+            console.error(`[Game] Failed to load level: ${levelName}, falling back to test level`);
+            // Create fallback test level
+            this.level = new window.Level(this.scene);
+            if (this.level.createTestLevel) {
                 this.level.createTestLevel();
-                this.player.position.set(0, 1.7, 0);
+            }
+            this.player.position.set(0, 1.7, 0);
         }
         
         // Reset player state
         this.player.velocity.set(0, 0, 0);
         this.player.health = 100;
+        
+        // Hide loading screen after a short delay
+        setTimeout(() => {
+            this.hideLoadingScreen();
+        }, 1000);
+    }
+    
+    restartGame() {
+        // Reset all game state
+        this.currentLevel = 1;
+        this.deathCount = 0;
+        this.martyrdomMode = false;
+        this.divineWrathUsed = false;
+        this.score = 0;
+        this.enemiesKilled = 0;
+        this.gameOver = false;
+        this.isPaused = false; // Make sure game is unpaused
+        
+        // Reset player to initial state
+        this.player.health = 100;
+        this.player.maxHealth = 100;
+        this.player.armor = 0;
+        this.player.rage = 0;
+        this.player.position.set(0, 1.7, 5);
+        this.player.velocity.set(0, 0, 0);
+        this.player.ammo.shells = 10;
+        this.player.ammo.bullets = 30;
+        
+        // Clear all enemies
+        if (this.enemies) {
+            this.enemies.forEach(enemy => {
+                if (enemy && enemy.mesh) {
+                    this.scene.remove(enemy.mesh);
+                }
+            });
+            this.enemies = [];
+        }
+        
+        // Reload first level
+        this.loadLevel('tutorial');
+        
+        // Show restart message
+        this.showMessage("New crusade begins... Seven resurrections granted.");
+        
+        // Re-capture pointer lock
+        setTimeout(() => {
+            if (this.renderer && this.renderer.domElement) {
+                this.renderer.domElement.requestPointerLock().catch(err => {
+                    // Ignore pointer lock errors
+                });
+            }
+        }, 100);
     }
 }

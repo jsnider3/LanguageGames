@@ -4,8 +4,19 @@ import { Imp } from '../enemies/imp.js';
 import * as THREE from 'three';
 
 export class ObservatoryLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         this.name = "Observatory Tower";
         this.description = "Ascend the corrupted observatory where reality bends and gravity fails";
         this.backgroundColor = new THREE.Color(0x0a0a2a);
@@ -25,6 +36,14 @@ export class ObservatoryLevel extends BaseLevel {
         this.starMap = null;
         
         this.init();
+    }
+    
+    create() {
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
     }
 
     init() {
@@ -75,6 +94,14 @@ export class ObservatoryLevel extends BaseLevel {
                 wall.position.set(x, floorY + floorHeight/2, z);
                 wall.lookAt(new THREE.Vector3(0, floorY + floorHeight/2, 0));
                 floorGroup.add(wall);
+                
+                // Add collision bounds for the wall
+                const box = new THREE.Box3().setFromObject(wall);
+                this.walls.push({
+                    mesh: wall,
+                    min: box.min,
+                    max: box.max
+                });
                 
                 // Windows (every other wall section)
                 if (i % 2 === 0) {
@@ -794,9 +821,25 @@ export class ObservatoryLevel extends BaseLevel {
         
         // Check if player reached the top
         if (this.game.player && this.game.player.position.y > this.maxFloors * 12 - 5) {
-            this.objectives[0].completed = true;
+            if (!this.objectives[0].completed) {
+                this.objectives[0].completed = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Observatory reached!");
+                }
+            }
         }
+        
+        // Check for level completion and portal interaction
+        this.updateObjectives();
+        this.checkExitPortalInteraction();
     }
+    
+    // Override to provide custom exit position
+    getExitPosition() {
+        return new THREE.Vector3(0, this.maxFloors * 12 + 2, -15);
+    }
+    
+    // Use base class completeLevel() - removed duplicate
 
     getSpawnPosition() {
         return new THREE.Vector3(0, 2, 12);

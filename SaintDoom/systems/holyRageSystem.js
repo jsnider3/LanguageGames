@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Holy Rage System
 // Build divine fury through combat to unlock devastating holy abilities
 

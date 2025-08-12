@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Power-up System
 // Temporary boosts and abilities that spawn throughout levels
 

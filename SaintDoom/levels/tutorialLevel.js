@@ -1,11 +1,24 @@
+import * as THREE from 'three';
+import { BaseLevel } from './baseLevel.js';
 // Tutorial Level - Vatican Inquisition Chamber
 // Player learns controls while being evaluated by the Inquisition
 
-export class TutorialLevel {
+export class TutorialLevel extends BaseLevel {
     constructor(scene, game) {
-        this.scene = scene;
-        this.game = game;
-        this.walls = [];
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.scene = arguments[0].scene;
+            this.game = arguments[0];
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
+        
+        // walls is already initialized in BaseLevel
         this.tutorialStep = 0;
         this.inquisitorSpoken = {};
         this.missileReady = false;
@@ -296,29 +309,7 @@ export class TutorialLevel {
         this.scene.add(missileGroup);
     }
     
-    createWall(x, y, z, width, height, depth, material) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const wall = new THREE.Mesh(geometry, material);
-        wall.position.set(x, y, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        this.scene.add(wall);
-        
-        // Store wall bounds for collision
-        this.walls.push({
-            mesh: wall,
-            min: new THREE.Vector3(
-                x - width/2,
-                y - height/2,
-                z - depth/2
-            ),
-            max: new THREE.Vector3(
-                x + width/2,
-                y + height/2,
-                z + depth/2
-            )
-        });
-    }
+    // createWall method is now inherited from BaseLevel
     
     addLighting() {
         // Warm cathedral lighting
@@ -347,9 +338,12 @@ export class TutorialLevel {
         this.scene.add(warningLight);
         
         // Flashing effect for warning light
-        setInterval(() => {
+        const warningInterval = this.addInterval(() => {
             warningLight.intensity = warningLight.intensity === 0.5 ? 0.1 : 0.5;
         }, 1000);
+        // Store interval for cleanup
+        this.intervals = this.intervals || [];
+        this.intervals.push(warningInterval);
     }
     
     addVaticanDecorations(goldMaterial) {
@@ -394,7 +388,7 @@ export class TutorialLevel {
         this.game.narrativeSystem.setObjective("Listen to the Inquisitor's instructions");
         
         // Start tutorial sequence after a delay
-        setTimeout(() => this.nextTutorialStep(), 3000);
+        this.addTimeout(() => this.nextTutorialStep(), 3000);
     }
     
     showTutorialControls(controls) {
@@ -472,13 +466,13 @@ export class TutorialLevel {
             case 6:
                 ns.displaySubtitle("\"Remember: holy water heals, ammunition is blessed, and death is temporary.\"");
                 ns.setObjective("Listen to final instructions");
-                setTimeout(() => this.nextTutorialStep(), 4000);
+                this.addTimeout(() => this.nextTutorialStep(), 4000);
                 break;
                 
             case 7:
                 ns.displaySubtitle("\"The Americans have opened a portal. Area 51. You know what to do.\"");
                 ns.setObjective("Proceed to the missile");
-                setTimeout(() => this.nextTutorialStep(), 4000);
+                this.addTimeout(() => this.nextTutorialStep(), 4000);
                 break;
                 
             case 8:
@@ -504,31 +498,31 @@ export class TutorialLevel {
         // Check movement
         if (this.waitForMovement && (input.forward || input.backward || input.left || input.right)) {
             this.waitForMovement = false;
-            setTimeout(() => this.nextTutorialStep(), 1000);
+            this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
         // Check mouse look (always true after first move since mouse moves constantly)
         if (this.waitForLook && (Math.abs(input.mouseDeltaX) > 0 || Math.abs(input.mouseDeltaY) > 0)) {
             this.waitForLook = false;
-            setTimeout(() => this.nextTutorialStep(), 1000);
+            this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
         // Check weapon switch
         if (this.waitForWeapon && input.weapon1) {
             this.waitForWeapon = false;
-            setTimeout(() => this.nextTutorialStep(), 1000);
+            this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
         // Check combat
         if (this.waitForCombat && (input.attack || input.block)) {
             this.waitForCombat = false;
-            setTimeout(() => this.nextTutorialStep(), 1000);
+            this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
         // Check sprint
         if (this.waitForSprint && input.sprint) {
             this.waitForSprint = false;
-            setTimeout(() => this.nextTutorialStep(), 1000);
+            this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
         // Check missile interaction
@@ -557,7 +551,7 @@ export class TutorialLevel {
         
         // Shake effect
         let shakeTime = 0;
-        const shakeInterval = setInterval(() => {
+        const shakeInterval = this.addInterval(() => {
             if (this.missileGroup) {
                 this.missileGroup.position.x = Math.random() * 0.2 - 0.1;
                 this.missileGroup.position.z = 25 + Math.random() * 0.2 - 0.1;
@@ -572,7 +566,7 @@ export class TutorialLevel {
             shakeTime += 50;
             
             if (shakeTime > 3000) {
-                clearInterval(shakeInterval);
+                this.clearInterval(shakeInterval);
                 // Launch animation
                 this.animateLaunch();
             }
@@ -584,7 +578,7 @@ export class TutorialLevel {
     
     animateLaunch() {
         let launchSpeed = 0.1;
-        const launchInterval = setInterval(() => {
+        const launchInterval = this.addInterval(() => {
             if (this.missileGroup) {
                 this.missileGroup.position.y += launchSpeed;
                 launchSpeed *= 1.1; // Accelerate
@@ -595,7 +589,7 @@ export class TutorialLevel {
                 }
                 
                 if (this.missileGroup.position.y > 20) {
-                    clearInterval(launchInterval);
+                    this.clearInterval(launchInterval);
                     // Transition to Chapter 1
                     this.completeTutorial();
                 }
@@ -625,13 +619,13 @@ export class TutorialLevel {
             this.scene.add(smoke);
             
             // Animate smoke rising and fading
-            const animateSmoke = setInterval(() => {
+            const animateSmoke = this.addInterval(() => {
                 smoke.position.y += 0.1;
                 smoke.material.opacity -= 0.01;
                 smoke.scale.multiplyScalar(1.02);
                 
                 if (smoke.material.opacity <= 0) {
-                    clearInterval(animateSmoke);
+                    this.clearInterval(animateSmoke);
                     this.scene.remove(smoke);
                 }
             }, 50);
@@ -648,19 +642,19 @@ export class TutorialLevel {
         }
         
         // Load Chapter 1
-        setTimeout(() => {
+        this.addTimeout(() => {
             this.game.loadLevel('chapter1');
         }, 2000);
     }
     
     clearLevel() {
-        // Remove all level geometry
-        this.walls.forEach(wall => {
-            if (wall.mesh) {
-                this.scene.remove(wall.mesh);
-            }
-        });
-        this.walls = [];
+        // Call parent cleanup to handle intervals, timeouts, etc.
+        if (super.cleanup) {
+            super.cleanup();
+        }
+        
+        // Remove all level geometry (now handled by parent)
+        // Additional tutorial-specific cleanup below
         
         // Clean up missile and decorations
         if (this.missileGroup) {

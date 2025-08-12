@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Lore Collectibles System
 // Scattered documents, audio logs, and artifacts that reveal the story
 

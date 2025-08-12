@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Base Entity class for all game objects with common properties
 export class Entity {
     constructor(scene, position = new THREE.Vector3(0, 0, 0)) {

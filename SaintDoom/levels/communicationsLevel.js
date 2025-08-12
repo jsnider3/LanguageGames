@@ -4,8 +4,19 @@ import { ShadowWraith } from '../enemies/shadowWraith.js';
 import * as THREE from 'three';
 
 export class CommunicationsLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         this.name = "Communications Tower";
         this.description = "Scale the massive radio tower to restore communications with the outside world";
         this.backgroundColor = new THREE.Color(0x1a1a2a);
@@ -31,6 +42,15 @@ export class CommunicationsLevel extends BaseLevel {
         
         this.init();
     }
+    
+    create() {
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
+    }
+
 
     init() {
         this.createGeometry();
@@ -1059,7 +1079,7 @@ export class CommunicationsLevel extends BaseLevel {
             
             if (opacity <= 0) {
                 this.scene.remove(wave);
-                clearInterval(waveInterval);
+                this.clearInterval(waveInterval);
             }
         }, 50);
     }
@@ -1116,11 +1136,153 @@ export class CommunicationsLevel extends BaseLevel {
                 if (!node.userData.activated) {
                     const distance = this.game.player.position.distanceTo(node.position);
                     if (distance < 2) {
-                        // Player can activate node
-                        node.userData.canActivate = true;
+                        // Auto-activate node when close
+                        this.activateNode(node);
                     }
                 }
             });
+            
+            // Check for antennas to repair
+            if (!this.objectives[1].completed) {
+                this.antennaArray.forEach(antenna => {
+                    if (antenna.userData.damaged && !antenna.userData.repaired) {
+                        const distance = this.game.player.position.distanceTo(antenna.position);
+                        if (distance < 3) {
+                            this.repairAntenna(antenna);
+                        }
+                    }
+                });
+            }
+            
+            // Check for power restoration
+            if (!this.objectives[2].completed && this.game.player.position.y > this.towerHeight - 10) {
+                this.restorePower();
+            }
+        }
+        
+        // Check for level completion
+        if (this.isComplete() && !this.exitPortalCreated) {
+            this.createExitPortal();
+        }
+        
+        // Check exit portal interaction
+        if (this.exitPortal && this.game.player) {
+            const distance = this.game.player.position.distanceTo(this.exitPortal.position);
+            if (distance < 4) {
+                this.completeLevel();
+            }
+        }
+    }
+    
+    createExitPortal() {
+        this.exitPortalCreated = true;
+        
+        // Create portal at the top of the tower
+        const portalGroup = new THREE.Group();
+        
+        // Portal ring
+        const ringGeometry = new THREE.TorusGeometry(3, 0.5, 16, 32);
+        const ringMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ff00,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.5
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        portalGroup.add(ring);
+        
+        // Portal surface
+        const portalGeometry = new THREE.CircleGeometry(3, 32);
+        const portalMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+        portalGroup.add(portal);
+        
+        // Position at tower top
+        portalGroup.position.set(0, this.towerHeight + 2, 0);
+        this.scene.add(portalGroup);
+        
+        // Add portal light
+        const portalLight = new THREE.PointLight(0x00ff00, 3, 15);
+        portalLight.position.copy(portalGroup.position);
+        this.scene.add(portalLight);
+        
+        // Store for interaction
+        this.exitPortal = portalGroup;
+        
+        // Animate portal
+        this.addInterval(setInterval(() => {
+            if (ring) {
+                ring.rotation.z += 0.02;
+                portal.rotation.z -= 0.01;
+                // Pulse effect
+                const scale = 1 + Math.sin(Date.now() * 0.003) * 0.1;
+                portalGroup.scale.set(scale, scale, scale);
+            }
+        }, 16));
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("Communications restored! Exit portal activated!");
+        }
+    }
+    
+    completeLevel() {
+        if (this.completed) return;
+        
+        this.completed = true;
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("Communications Level Complete!");
+        }
+        
+        // Load next level after delay
+        setTimeout(() => {
+            if (this.game.loadNextLevel) {
+                this.game.loadNextLevel();
+            }
+        }, 2000);
+    }
+    
+    repairAntenna(antenna) {
+        antenna.userData.repaired = true;
+        
+        // Change antenna appearance
+        antenna.material.emissive = new THREE.Color(0x00ff00);
+        antenna.material.emissiveIntensity = 0.3;
+        
+        // Check if all antennas repaired
+        const allRepaired = this.antennaArray.every(a => 
+            !a.userData.damaged || a.userData.repaired
+        );
+        
+        if (allRepaired) {
+            this.objectives[1].completed = true;
+            if (this.game.narrativeSystem) {
+                this.game.narrativeSystem.displaySubtitle("All antennas repaired!");
+            }
+        }
+    }
+    
+    restorePower() {
+        this.objectives[2].completed = true;
+        
+        // Light up the tower
+        const towerLight = new THREE.PointLight(0xffffff, 2, 100);
+        towerLight.position.set(0, this.towerHeight, 0);
+        this.scene.add(towerLight);
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("Main transmitter power restored!");
+        }
+        
+        // Check if ready to contact outside
+        if (this.objectives[0].completed && this.objectives[1].completed && this.objectives[2].completed) {
+            setTimeout(() => {
+                this.establishContact();
+            }, 2000);
         }
     }
 

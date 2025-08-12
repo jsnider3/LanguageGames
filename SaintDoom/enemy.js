@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export class Enemy {
     constructor(scene, position) {
         this.scene = scene;

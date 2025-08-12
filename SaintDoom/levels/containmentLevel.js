@@ -1,15 +1,28 @@
+import * as THREE from 'three';
 // Containment Area Level
 // Dangerous environment with multiple hazards and escaped specimens
 
 import { BaseLevel } from './baseLevel.js';
 import { BrimstoneGolem } from '../enemies/brimstoneGolem.js';
 import { Hellhound } from '../enemies/hellhound.js';
+import { Imp } from '../enemies/imp.js';
 import { Succubus } from '../enemies/succubus.js';
 import { DemonKnight } from '../enemies/demonKnight.js';
 
 export class ContainmentLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         
         this.levelName = 'Containment Area';
         this.levelNumber = 4;
@@ -48,7 +61,13 @@ export class ContainmentLevel extends BaseLevel {
     }
     
     create() {
-        super.create();
+        // Initialize base level properties (since BaseLevel doesn't have create())
+        this.init();
+        
+        // Set safe spawn position
+        if (this.game && this.game.player) {
+            this.game.player.position.set(0, 1.7, 15); // Start in safe zone south of hub
+        }
         
         // Create main containment structure
         this.createContainmentHub();
@@ -65,7 +84,7 @@ export class ContainmentLevel extends BaseLevel {
         
         // Hazard zones
         this.createRadiationZone();
-        this.createFireZone();
+        // Fire hazards are created in createCellBlockA()
         this.createElectricalHazards();
         this.createCorruptionZone();
         this.createGravityAnomaly();
@@ -78,6 +97,12 @@ export class ContainmentLevel extends BaseLevel {
         
         // Setup objectives
         this.setupContainmentObjectives();
+        
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
     }
     
     createContainmentHub() {
@@ -93,11 +118,13 @@ export class ContainmentLevel extends BaseLevel {
         hub.position.set(0, 5, 0);
         this.scene.add(hub);
         
+        // Add safe corridor markers on the floor
+        this.createSafePathMarkings();
+        
         // Central pillar with control systems
         const pillarGeometry = new THREE.CylinderGeometry(3, 3, 10, 8);
         const pillarMaterial = new THREE.MeshPhongMaterial({
-            color: 0x222222,
-            metalness: 0.8
+            color: 0x222222
         });
         const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
         pillar.position.set(0, 5, 0);
@@ -211,9 +238,7 @@ export class ContainmentLevel extends BaseLevel {
         // Main structure (reinforced)
         const blockGeometry = new THREE.BoxGeometry(30, 10, 20);
         const blockMaterial = new THREE.MeshPhongMaterial({
-            color: 0x555555,
-            metalness: 0.7,
-            roughness: 0.3
+            color: 0x555555
         });
         const block = new THREE.Mesh(blockGeometry, blockMaterial);
         block.position.copy(blockPosition);
@@ -367,8 +392,8 @@ export class ContainmentLevel extends BaseLevel {
         fireGroup.userData = {
             isHazard: true,
             type: 'fire',
-            damage: 10,
-            radius: 3
+            damage: 3,  // Reduced from 10
+            radius: 2  // Reduced from 3 for smaller danger zone
         };
         
         this.scene.add(fireGroup);
@@ -377,7 +402,7 @@ export class ContainmentLevel extends BaseLevel {
     
     createRadiationZone() {
         const zonePosition = new THREE.Vector3(30, 0, 0);
-        const zoneRadius = 15;
+        const zoneRadius = 10;  // Reduced from 15
         
         // Radiation particles (green glow)
         const particleCount = 200;
@@ -438,7 +463,7 @@ export class ContainmentLevel extends BaseLevel {
         radiationZone.userData = {
             isHazard: true,
             type: 'radiation',
-            damage: 3,
+            damage: 2,  // Reduced from 3
             radius: zoneRadius
         };
         
@@ -516,7 +541,7 @@ export class ContainmentLevel extends BaseLevel {
             hazardGroup.userData = {
                 isHazard: true,
                 type: 'electricity',
-                damage: 15,
+                damage: 5,  // Reduced from 15
                 radius: 2
             };
             
@@ -596,7 +621,7 @@ export class ContainmentLevel extends BaseLevel {
         corruption.userData = {
             isHazard: true,
             type: 'corruption',
-            damage: 5,
+            damage: 2,  // Reduced from 5
             radius: 15,
             effect: 'madness' // Special effect - causes hallucinations
         };
@@ -818,41 +843,56 @@ export class ContainmentLevel extends BaseLevel {
     }
     
     createSmoke() {
-        const smokeTexture = new THREE.TextureLoader().load('path/to/smoke.png');
-        const smokeGeometry = new THREE.PlaneGeometry(5, 5);
-        const smokeMaterial = new THREE.MeshBasicMaterial({
-            map: smokeTexture,
+        // Create procedural smoke particles instead of using texture
+        const particleCount = 200;
+        const smokeGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 60;
+            positions[i * 3 + 1] = Math.random() * 5;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 60;
+            sizes[i] = Math.random() * 3 + 1;
+        }
+        
+        smokeGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        smokeGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        
+        const smokeMaterial = new THREE.PointsMaterial({
+            color: 0x666666,
+            size: 2,
             transparent: true,
             opacity: 0.3,
+            blending: THREE.AdditiveBlending,
             depthWrite: false
         });
         
-        for (let i = 0; i < 20; i++) {
-            const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
-            smoke.position.set(
-                (Math.random() - 0.5) * 60,
-                Math.random() * 5,
-                (Math.random() - 0.5) * 60
-            );
-            smoke.rotation.z = Math.random() * Math.PI;
+        const smoke = new THREE.Points(smokeGeometry, smokeMaterial);
+        this.scene.add(smoke);
+        
+        // Animate smoke particles
+        const animateSmoke = () => {
+            const positions = smoke.geometry.attributes.position.array;
             
-            this.scene.add(smoke);
-            
-            // Animate smoke
-            const animateSmoke = () => {
-                smoke.position.y += 0.01;
-                smoke.rotation.z += 0.001;
-                smoke.material.opacity = 0.3 * (1 - smoke.position.y / 10);
+            for (let i = 0; i < particleCount; i++) {
+                // Move particles upward
+                positions[i * 3 + 1] += 0.02;
                 
-                if (smoke.position.y > 10) {
-                    smoke.position.y = 0;
-                    smoke.material.opacity = 0.3;
+                // Reset particles that go too high
+                if (positions[i * 3 + 1] > 10) {
+                    positions[i * 3 + 1] = 0;
+                    positions[i * 3] = (Math.random() - 0.5) * 60;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 60;
                 }
-                
-                requestAnimationFrame(animateSmoke);
-            };
-            animateSmoke();
-        }
+            }
+            
+            smoke.geometry.attributes.position.needsUpdate = true;
+            smoke.rotation.y += 0.001;
+            
+            requestAnimationFrame(animateSmoke);
+        };
+        animateSmoke();
     }
     
     playEmergencyAnnouncements() {
@@ -908,11 +948,133 @@ export class ContainmentLevel extends BaseLevel {
     
     setupContainmentObjectives() {
         this.objectives = [
-            { id: 'restore_fire', text: 'Activate Fire Suppression', completed: false },
-            { id: 'decontaminate', text: 'Start Decontamination', completed: false },
-            { id: 'seal_portal', text: 'Close Demonic Portal', completed: false },
+            { id: 'restore_fire', text: 'Activate Fire Suppression (Cell Block A)', completed: false },
+            { id: 'decontaminate', text: 'Start Decontamination (Cell Block B)', completed: false },
+            { id: 'seal_portal', text: 'Close Demonic Portal (Cell Block D)', completed: false },
             { id: 'evacuate', text: 'Reach Emergency Exit', completed: false }
         ];
+        
+        // Create control panels for objectives
+        this.createControlPanels();
+    }
+    
+    createControlPanels() {
+        // Fire suppression control panel in Cell Block A
+        const firePanel = this.createInteractivePanel(
+            new THREE.Vector3(-35, 2, 0),
+            0xff0000,
+            () => {
+                this.emergencySystems.fireSupression = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Fire suppression systems activating...");
+                }
+            }
+        );
+        
+        // Decontamination panel in Cell Block B
+        const deconPanel = this.createInteractivePanel(
+            new THREE.Vector3(35, 2, 0),
+            0x00ff00,
+            () => {
+                this.emergencySystems.decontamination = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Decontamination protocol initiated...");
+                }
+            }
+        );
+        
+        // Portal control in Cell Block D (requires defeating enemies first)
+        this.portalControl = this.createInteractivePanel(
+            new THREE.Vector3(0, 2, 30),
+            0x0000ff,
+            () => {
+                // Check if demon knight is defeated
+                const knightDefeated = !this.game.enemies.some(e => 
+                    e.type === 'demonKnight' && e.health > 0
+                );
+                
+                if (knightDefeated) {
+                    this.portalSealed = true;
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.displaySubtitle("Sealing demonic portal...");
+                    }
+                } else {
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.displaySubtitle("Cannot seal portal - Demon Knight still guards it!");
+                    }
+                }
+            }
+        );
+    }
+    
+    createInteractivePanel(position, color, onActivate) {
+        const panelGroup = new THREE.Group();
+        
+        // Panel base
+        const panelGeometry = new THREE.BoxGeometry(1, 2, 0.2);
+        const panelMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x333333,
+            emissive: color,
+            emissiveIntensity: 0.2
+        });
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+        panelGroup.add(panel);
+        
+        // Control button
+        const buttonGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 16);
+        const buttonMaterial = new THREE.MeshPhongMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.5
+        });
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.position.z = 0.15;
+        button.rotation.x = Math.PI / 2;
+        panelGroup.add(button);
+        
+        panelGroup.position.copy(position);
+        this.scene.add(panelGroup);
+        
+        // Store for interaction
+        panelGroup.userData = {
+            interactive: true,
+            onActivate: onActivate,
+            activated: false
+        };
+        
+        this.interactables = this.interactables || [];
+        this.interactables.push(panelGroup);
+        
+        return panelGroup;
+    }
+    
+    checkPanelInteractions() {
+        if (!this.game.player || !this.interactables) return;
+        
+        this.interactables.forEach(panel => {
+            if (panel.userData.activated) return;
+            
+            const distance = this.game.player.position.distanceTo(panel.position);
+            if (distance < 3) {
+                // Show interaction prompt
+                if (this.game.narrativeSystem && !panel.userData.promptShown) {
+                    this.game.narrativeSystem.displaySubtitle("Press E to interact");
+                    panel.userData.promptShown = true;
+                }
+                
+                // Check for interaction (would need input system)
+                // For now, auto-activate when close
+                if (distance < 2) {
+                    panel.userData.activated = true;
+                    panel.userData.onActivate();
+                    
+                    // Change panel appearance
+                    panel.children[0].material.emissiveIntensity = 0.8;
+                }
+            } else {
+                panel.userData.promptShown = false;
+            }
+        });
     }
     
     update(deltaTime) {
@@ -923,8 +1085,14 @@ export class ContainmentLevel extends BaseLevel {
             this.checkAllHazards(this.game.player);
         }
         
+        // Check panel interactions
+        this.checkPanelInteractions();
+        
         // Update containment status
         this.updateContainmentStatus();
+        
+        // Check exit portal interaction
+        this.checkExitPortalInteraction();
     }
     
     checkAllHazards(player) {
@@ -1028,7 +1196,12 @@ export class ContainmentLevel extends BaseLevel {
         // Check if objectives are completed
         if (this.emergencySystems.fireSupression) {
             const fireObjective = this.objectives.find(o => o.id === 'restore_fire');
-            if (fireObjective) fireObjective.completed = true;
+            if (fireObjective && !fireObjective.completed) {
+                fireObjective.completed = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Fire suppression activated!");
+                }
+            }
             
             // Extinguish fires
             this.hazards.fire.forEach(fire => {
@@ -1038,18 +1211,179 @@ export class ContainmentLevel extends BaseLevel {
         
         if (this.emergencySystems.decontamination) {
             const deconObjective = this.objectives.find(o => o.id === 'decontaminate');
-            if (deconObjective) deconObjective.completed = true;
+            if (deconObjective && !deconObjective.completed) {
+                deconObjective.completed = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Decontamination systems online!");
+                }
+            }
             
             // Reduce radiation
             this.hazards.radiation.forEach(rad => {
                 rad.userData.damage = Math.max(1, rad.userData.damage - 0.01);
             });
         }
+        
+        // Check for portal sealing (all enemies defeated in Cell Block D)
+        const portalObjective = this.objectives.find(o => o.id === 'seal_portal');
+        if (!portalObjective.completed && this.portalSealed) {
+            portalObjective.completed = true;
+            if (this.game.narrativeSystem) {
+                this.game.narrativeSystem.displaySubtitle("Demonic portal sealed!");
+            }
+        }
+        
+        // Check if all objectives are complete
+        const allComplete = this.objectives.filter(o => o.id !== 'evacuate').every(o => o.completed);
+        if (allComplete && !this.exitPortalCreated) {
+            this.createExitPortal();
+        }
+    }
+    
+    createExitPortal() {
+        this.exitPortalCreated = true;
+        
+        // Create exit portal at emergency exit location
+        const portalGroup = new THREE.Group();
+        
+        // Portal ring
+        const ringGeometry = new THREE.TorusGeometry(3, 0.5, 16, 32);
+        const ringMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ff00,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.5
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        portalGroup.add(ring);
+        
+        // Portal surface
+        const portalGeometry = new THREE.CircleGeometry(3, 32);
+        const portalMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+        portalGroup.add(portal);
+        
+        // Position at emergency exit
+        portalGroup.position.set(50, 2, 0);
+        portalGroup.rotation.y = Math.PI / 2;
+        this.scene.add(portalGroup);
+        
+        // Add light
+        const portalLight = new THREE.PointLight(0x00ff00, 2, 10);
+        portalLight.position.set(50, 2, 0);
+        this.scene.add(portalLight);
+        
+        // Store for interaction checking
+        this.exitPortal = portalGroup;
+        
+        // Update objective
+        const evacuateObjective = this.objectives.find(o => o.id === 'evacuate');
+        if (evacuateObjective) {
+            evacuateObjective.text = 'Reach Emergency Exit (ACTIVE)';
+        }
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("Emergency exit portal activated! Proceed to evacuate!");
+        }
+        
+        // Animate portal
+        this.addInterval(setInterval(() => {
+            if (ring) {
+                ring.rotation.z += 0.02;
+                portal.rotation.z -= 0.01;
+            }
+        }, 16));
+    }
+    
+    checkExitPortalInteraction() {
+        if (!this.exitPortal || !this.game.player) return;
+        
+        const distance = this.game.player.position.distanceTo(this.exitPortal.position);
+        if (distance < 4) {
+            // Complete level
+            const evacuateObjective = this.objectives.find(o => o.id === 'evacuate');
+            if (evacuateObjective) {
+                evacuateObjective.completed = true;
+            }
+            
+            this.completed = true;
+            
+            if (this.game.narrativeSystem) {
+                this.game.narrativeSystem.displaySubtitle("Containment Level Complete!");
+            }
+            
+            // Load next level after delay
+            setTimeout(() => {
+                if (this.game.loadNextLevel) {
+                    this.game.loadNextLevel();
+                }
+            }, 2000);
+        }
     }
     
     // Helper methods
     createFloorMarkings(radius) {
-        // Would create floor markings/patterns
+        // Create warning stripes on floor
+        const stripeCount = 8;
+        for (let i = 0; i < stripeCount; i++) {
+            const angle = (i / stripeCount) * Math.PI * 2;
+            const stripeGeometry = new THREE.PlaneGeometry(2, radius * 0.8);
+            const stripeMaterial = new THREE.MeshBasicMaterial({
+                color: i % 2 === 0 ? 0xffff00 : 0x000000,
+                side: THREE.DoubleSide
+            });
+            const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.rotation.z = angle;
+            stripe.position.set(
+                Math.cos(angle) * radius * 0.4,
+                0.01,
+                Math.sin(angle) * radius * 0.4
+            );
+            this.scene.add(stripe);
+        }
+    }
+    
+    createSafePathMarkings() {
+        // Create green safe path indicators
+        const pathMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        
+        // Safe path to south (player spawn)
+        const southPath = new THREE.Mesh(
+            new THREE.PlaneGeometry(4, 20),
+            pathMaterial
+        );
+        southPath.rotation.x = -Math.PI / 2;
+        southPath.position.set(0, 0.02, 10);
+        this.scene.add(southPath);
+        
+        // Safe corridor to control room (avoiding hazards)
+        const controlPath = new THREE.Mesh(
+            new THREE.PlaneGeometry(4, 15),
+            pathMaterial
+        );
+        controlPath.rotation.x = -Math.PI / 2;
+        controlPath.position.set(0, 0.02, -7.5);
+        this.scene.add(controlPath);
+        
+        // Add warning text on first spawn
+        if (!this.warningsShown) {
+            this.warningsShown = true;
+            setTimeout(() => {
+                if (this.game && this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("WARNING: Hazardous areas detected. Follow green paths for safe passage.");
+                }
+            }, 1000);
+        }
     }
     
     createDamagedWalls(position) {

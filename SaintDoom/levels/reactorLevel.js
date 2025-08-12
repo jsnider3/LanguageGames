@@ -4,8 +4,19 @@ import { ShadowWraith } from '../enemies/shadowWraith.js';
 import * as THREE from 'three';
 
 export class ReactorLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         this.name = "Reactor Core";
         this.description = "Navigate the unstable reactor core before it reaches critical meltdown";
         this.backgroundColor = new THREE.Color(0x2a1a00);
@@ -37,6 +48,15 @@ export class ReactorLevel extends BaseLevel {
         
         this.init();
     }
+    
+    create() {
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
+    }
+
 
     init() {
         this.createGeometry();
@@ -189,9 +209,13 @@ export class ReactorLevel extends BaseLevel {
         const originalIntensity = light.intensity;
         const blinkSpeed = 800 + Math.random() * 400;
         
-        setInterval(() => {
+        const blinkInterval = setInterval(() => {
             light.intensity = light.intensity > 0 ? 0 : originalIntensity;
         }, blinkSpeed);
+        
+        // Track interval for cleanup
+        this.intervals = this.intervals || [];
+        this.intervals.push(blinkInterval);
     }
 
     createReactorCore() {
@@ -211,7 +235,6 @@ export class ReactorLevel extends BaseLevel {
         const coreGeometry = new THREE.SphereGeometry(6, 16, 16);
         const coreMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xff6600,
-            emissive: 0xff3300,
             transparent: true,
             opacity: 0.8
         });
@@ -419,8 +442,7 @@ export class ReactorLevel extends BaseLevel {
         // Status display
         const displayGeometry = new THREE.PlaneGeometry(1, 0.8);
         const displayMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            emissive: 0x440000
+            color: 0xff0000
         });
         const display = new THREE.Mesh(displayGeometry, displayMaterial);
         display.position.set(2.51, 1.8, 0);
@@ -796,10 +818,11 @@ export class ReactorLevel extends BaseLevel {
             const core = this.reactorCore.userData.core;
             const coreLight = this.reactorCore.userData.coreLight;
             
-            if (core) {
+            if (core && core.material) {
                 const intensity = this.temperatureLevel / 100;
                 core.material.opacity = 0.5 + intensity * 0.3;
-                core.material.emissive.setRGB(intensity, intensity * 0.3, 0);
+                // Update color based on temperature (MeshBasicMaterial doesn't have emissive)
+                core.material.color.setRGB(1, 1 - intensity * 0.7, 0);
             }
             
             if (coreLight) {
@@ -828,9 +851,8 @@ export class ReactorLevel extends BaseLevel {
                 rod.position.y = 5; // Lower into reactor
             }
             
-            if (display) {
+            if (display && display.material) {
                 display.material.color.setHex(0x00ff00);
-                display.material.emissive.setHex(0x004400);
             }
             
             // Update objective
@@ -1079,8 +1101,7 @@ export class ReactorLevel extends BaseLevel {
             for (let i = 0; i < 6; i++) {
                 const lightGeometry = new THREE.SphereGeometry(0.05);
                 const lightMaterial = new THREE.MeshBasicMaterial({ 
-                    color: Math.random() > 0.5 ? 0x00ff00 : 0xff0000,
-                    emissive: Math.random() > 0.5 ? 0x004400 : 0x440000
+                    color: Math.random() > 0.5 ? 0x00ff00 : 0xff0000
                 });
                 const light = new THREE.Mesh(lightGeometry, lightMaterial);
                 light.position.set(
@@ -1200,6 +1221,31 @@ export class ReactorLevel extends BaseLevel {
                 // Apply damage to player (would integrate with health system)
             }
         }
+        
+        // Check for level completion and portal interaction
+        this.updateObjectives();
+        this.checkExitPortalInteraction();
+    }
+    
+    // Override to provide custom exit position
+    getExitPosition() {
+        // Position at entrance/safe zone
+        return new THREE.Vector3(35, 2, 0);
+    }
+    
+    // Override to customize portal creation
+    createExitPortal(position) {
+        // Call parent with custom options
+        super.createExitPortal(position || this.getExitPosition(), {
+            message: "Reactor stabilized! Exit portal activated!",
+            rotation: new THREE.Euler(0, Math.PI / 2, 0)
+        });
+    }
+    
+    // Override to provide custom completion message
+    completeLevel() {
+        this.name = "Reactor Level";
+        super.completeLevel();
     }
 
     getSpawnPosition() {

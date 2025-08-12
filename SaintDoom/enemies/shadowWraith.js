@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Shadow Wraith Enemy Type
 // Phase shift ability - vulnerable only during attack frames
 

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Martyrdom Mode System
 // When player dies, become invincible spirit form for revenge kills
 

@@ -287,6 +287,82 @@
             z-index: 1000;
         }
         
+        /* Loading Screen Styles */
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, #1a0000 0%, #000000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading-content {
+            text-align: center;
+            color: #fff;
+        }
+        
+        #loadingScreen h2 {
+            font-size: 48px;
+            color: #ff0000;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #880000;
+            margin-bottom: 30px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .loading-bar-container {
+            width: 400px;
+            height: 30px;
+            border: 2px solid #ff0000;
+            background: #1a0000;
+            margin: 0 auto 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff4444);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        #loadingText {
+            color: #ffaaaa;
+            font-size: 18px;
+            margin-bottom: 30px;
+            animation: fadeInOut 2s infinite;
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        .loading-tips {
+            margin-top: 40px;
+            padding: 20px;
+            border-top: 1px solid #440000;
+            max-width: 500px;
+        }
+        
+        #loadingTip {
+            color: #888;
+            font-size: 14px;
+            font-style: italic;
+        }
+        
         #creditsScreen h2 {
             font-size: 48px;
             color: #ff0000;
@@ -435,7 +511,7 @@
         <div id="kills" class="hud-bar" style="border-color: #ff8800; color: #ff8800;">KILLS: <span id="killsValue">0</span></div>
     </div>
     
-    <div id="instructions">
+    <div id="instructions" style="position: fixed; top: 170px; left: 10px;">
         WASD - Move<br>
         Mouse - Look<br>
         Left Click - Attack<br>
@@ -453,11 +529,31 @@
         Click to Resume
     </div>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" style="display:none;">
+        <div class="loading-content">
+            <h2>LOADING</h2>
+            <div class="loading-bar-container">
+                <div class="loading-bar"></div>
+            </div>
+            <p id="loadingText">Preparing holy weapons...</p>
+            <div class="loading-tips">
+                <p id="loadingTip">TIP: Use holy water grenades to create safe zones</p>
+            </div>
+        </div>
+    </div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
     <script type="module" src="main.js"></script>
     <script type="module">
         import { NarrativeSystem } from './narrative.js';
-        import { ChapelLevel } from './levels/chapelLevel.js';
         import { PossessedScientist } from './enemies/possessedScientist.js';
         import { Hellhound } from './enemies/hellhound.js';
         import { InputManager } from './modules/InputManager.js';
@@ -470,7 +566,6 @@
         import { Game } from './modules/Game.js';
         
         window.NarrativeSystem = NarrativeSystem;
-        window.ChapelLevel = ChapelLevel;
         window.PossessedScientist = PossessedScientist;
         window.Hellhound = Hellhound;
         window.InputManager = InputManager;
@@ -486,10 +581,7 @@
         window.VectorUtils = VectorUtils;
         window.Game = Game;
         
-        // Signal that modules are loaded
-        window.modulesLoaded = true;
-        // Dispatch event for any waiting code
-        window.dispatchEvent(new Event('modulesLoaded'));
+        // Don't signal modules loaded here - wait for the async module loading to complete
     </script>
     <script>
 // ============= Classes imported from modules =============
@@ -1270,6 +1362,9 @@ class Level {
 
 // ============= MAIN GAME CLASS MOVED TO modules/Game.js =============
 
+// Make Pickup class available globally
+window.Pickup = Pickup;
+
 // ============= START GAME =============
 window.addEventListener('DOMContentLoaded', () => {
     // Wait for modules to load
@@ -1305,7 +1400,11 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('levelSelectScreen').style.display = 'flex';
         
         // Check unlocked levels (stored in localStorage)
-        const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapter1"]');
+        // FOR TESTING: All levels unlocked
+        const unlockedLevels = ["tutorial", "chapter1", "chapter2", "laboratory", "containment", 
+                               "tunnels", "spawning", "observatory", "communications", 
+                               "reactor", "finalarena", "archive", "techfacility"];
+        // const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapter1"]');
         document.querySelectorAll('.level-select-btn').forEach(btn => {
             const level = btn.dataset.level;
             if (!unlockedLevels.includes(level)) {
@@ -1442,16 +1541,18 @@ window.addEventListener('DOMContentLoaded', () => {
 });
     </script>
     
-    <!-- Load level modules -->
+    <!-- Load essential modules only -->
     <script type="module">
-        import { ChapelLevel } from './levels/chapelLevel.js';
-        import { TutorialLevel } from './levels/tutorialLevel.js';
-        import { ArmoryLevel } from './levels/armoryLevel.js';
-        import { LaboratoryLevel } from './levels/laboratoryLevel.js';
-        import { NarrativeSystem } from './narrative.js';
-        import { PossessedScientist } from './enemies/possessedScientist.js';
-        import { Hellhound } from './enemies/hellhound.js';
-        import { AudioSystem } from './audio/audioSystem.js';
+        // Only load critical modules at startup, levels will be loaded on demand
+        async function loadModules() {
+            try {
+                // Load core systems
+                const { NarrativeSystem } = await import('./narrative.js');
+                const { AudioSystem } = await import('./audio/audioSystem.js');
+                
+                // Load common enemies (used in multiple levels)
+                const { PossessedScientist } = await import('./enemies/possessedScientist.js');
+                const { Hellhound } = await import('./enemies/hellhound.js');
         
         // Create global audio system instance
         const audioSystem = new AudioSystem();
@@ -1509,15 +1610,25 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        // Make them available globally
-        window.ChapelLevel = ChapelLevel;
-        window.TutorialLevel = TutorialLevel;
-        window.ArmoryLevel = ArmoryLevel;
-        window.LaboratoryLevel = LaboratoryLevel;
+        // Make core modules available globally
         window.NarrativeSystem = NarrativeSystem;
         window.PossessedScientist = PossessedScientist;
         window.Hellhound = Hellhound;
         window.AudioSystem = AudioSystem;
+        
+        console.log('Core modules loaded successfully');
+        console.log('Levels will be loaded on demand for faster startup');
+        
+        // Set flag to indicate modules are loaded
+        window.modulesLoaded = true;
+        window.dispatchEvent(new Event('modulesLoaded'));
+            } catch (error) {
+                console.error('Error loading modules:', error);
+            }
+        }
+        
+        // Call the async function and wait for it
+        loadModules();
     </script>
 </body>
 </html>

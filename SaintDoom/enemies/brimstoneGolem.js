@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Brimstone Golem Enemy Type
 // High health tank with area damage on death
 
@@ -56,8 +57,7 @@ export class BrimstoneGolem extends Enemy {
         const bodyMaterial = new THREE.MeshPhongMaterial({
             color: 0x222222,
             emissive: 0x441100,
-            emissiveIntensity: 0.3,
-            roughness: 0.9
+            emissiveIntensity: 0.3
         });
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
         this.bodyMesh.position.y = 1;
@@ -75,9 +75,7 @@ export class BrimstoneGolem extends Enemy {
         // Glowing core (visible through cracks)
         const coreGeometry = new THREE.SphereGeometry(0.4, 8, 6);
         const coreMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff3300,
-            emissive: 0xff3300,
-            emissiveIntensity: 2
+            color: 0xff3300
         });
         this.core = new THREE.Mesh(coreGeometry, coreMaterial);
         this.core.position.y = 1;
@@ -136,8 +134,6 @@ export class BrimstoneGolem extends Enemy {
             const crackGeometry = new THREE.PlaneGeometry(0.05, 0.8);
             const crackMaterial = new THREE.MeshBasicMaterial({
                 color: 0xff6600,
-                emissive: 0xff3300,
-                emissiveIntensity: 1,
                 side: THREE.DoubleSide
             });
             
@@ -267,8 +263,6 @@ export class BrimstoneGolem extends Enemy {
         const puddleGeometry = new THREE.CircleGeometry(0.5, 8);
         const puddleMaterial = new THREE.MeshBasicMaterial({
             color: 0xff3300,
-            emissive: 0xff3300,
-            emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.8
         });

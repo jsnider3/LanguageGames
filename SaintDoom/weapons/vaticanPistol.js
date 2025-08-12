@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 // Vatican Combat Pistol
 // Standard sidearm since 1950s with blessed silver bullets
 

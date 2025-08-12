@@ -1,18 +1,30 @@
-// Laboratory Complex Level - Simplified working version
+import * as THREE from 'three';
+import { BaseLevel } from './baseLevel.js';
+// Laboratory Complex Level - Fixed version with connected rooms
 // High-tech research facility with keycard access system
 
-export class LaboratoryLevel {
-    constructor(game) {
-        this.game = game;
-        this.scene = game.scene;
+export class LaboratoryLevel extends BaseLevel {
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         
         this.levelName = 'Laboratory Complex';
         this.levelNumber = 3;
         
-        // Storage arrays
-        this.walls = [];
-        this.enemies = [];
+        // Storage arrays are already initialized in BaseLevel
+        // walls, enemies, pickups, etc.
         this.pickups = [];
+        this.doors = [];
         
         // Keycard system
         this.keycards = {
@@ -55,13 +67,8 @@ export class LaboratoryLevel {
             roughness: 0.1
         });
         
-        // Create lab layout
-        this.createEntrance(concreteMaterial, glassMaterial);
-        this.createMainCorridor(concreteMaterial);
-        this.createTestingLab(concreteMaterial, glassMaterial);
-        this.createContainmentArea(concreteMaterial, metalMaterial);
-        this.createResearchWing(concreteMaterial, glassMaterial);
-        this.createExitArea(concreteMaterial);
+        // Create connected lab layout
+        this.createConnectedLayout(concreteMaterial, glassMaterial, metalMaterial);
         
         // Add keycards
         this.spawnKeycards();
@@ -78,112 +85,96 @@ export class LaboratoryLevel {
             this.game.narrativeSystem.displaySubtitle("Laboratory Complex - Find the research data");
         }
         
-        // Return level data
+        // Return level data for collision system
         return {
             walls: this.walls,
             enemies: this.enemies
         };
     }
     
-    createEntrance(concreteMaterial, glassMaterial) {
-        // Reception area floor
-        const floorGeometry = new THREE.PlaneGeometry(20, 20);
-        const floor = new THREE.Mesh(floorGeometry, concreteMaterial);
+    createConnectedLayout(concreteMaterial, glassMaterial, metalMaterial) {
+        // Create one large connected floor
+        const mainFloor = new THREE.PlaneGeometry(80, 100);
+        const floor = new THREE.Mesh(mainFloor, concreteMaterial);
         floor.rotation.x = -Math.PI / 2;
-        floor.position.set(0, 0, 0);
+        floor.position.set(0, 0, -30);
         floor.receiveShadow = true;
         this.scene.add(floor);
         
-        // Ceiling
-        const ceiling = new THREE.Mesh(floorGeometry, concreteMaterial);
+        // Create ceiling
+        const ceiling = new THREE.Mesh(mainFloor, concreteMaterial);
         ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(0, 4, 0);
+        ceiling.position.set(0, 4, -30);
         this.scene.add(ceiling);
         
-        // Walls
-        this.createWall(-10, 2, 0, 0.5, 4, 20, concreteMaterial); // Left
-        this.createWall(10, 2, 0, 0.5, 4, 20, concreteMaterial);  // Right
-        this.createWall(0, 2, 10, 20, 4, 0.5, concreteMaterial);  // Back
+        // Create outer walls
+        this.createWall(-40, 2, -30, 0.5, 4, 100, concreteMaterial); // Left outer wall
+        this.createWall(40, 2, -30, 0.5, 4, 100, concreteMaterial);  // Right outer wall
+        this.createWall(0, 2, 20, 80, 4, 0.5, concreteMaterial);     // Front wall
+        this.createWall(0, 2, -80, 80, 4, 0.5, concreteMaterial);    // Back wall
         
-        // Front wall with entrance
-        this.createWall(-7.5, 2, -10, 5, 4, 0.5, concreteMaterial);  // Left of entrance
-        this.createWall(7.5, 2, -10, 5, 4, 0.5, concreteMaterial);   // Right of entrance
-        this.createWall(0, 3.5, -10, 5, 1, 0.5, concreteMaterial);   // Above entrance
+        // Create entrance opening in front wall
+        this.createWall(-40, 2, 20, 35, 4, 0.5, concreteMaterial);   // Left of entrance
+        this.createWall(40, 2, 20, 35, 4, 0.5, concreteMaterial);    // Right of entrance
+        this.createWall(0, 3.5, 20, 10, 1, 0.5, concreteMaterial);   // Above entrance
         
-        // Reception desk
+        // Create main corridor down the middle with door openings (4 units wide)
+        // Wall segments: createWall(x, y, z_center, width, height, depth)
+        // Door positions: blue at z=-20, red at z=-30, yellow at z=-60
+        
+        // Left corridor wall with 4-unit gaps for doors
+        // Wall 1: from entrance to blue door gap
+        this.createWall(-5, 2, -1, 0.5, 4, 38, concreteMaterial);     // center at -1, extends from z=18 to z=-20
+        // Gap from z=-20 to z=-24 for blue door
+        // Wall 2: between blue and yellow doors  
+        this.createWall(-5, 2, -42, 0.5, 4, 36, concreteMaterial);    // center at -42, extends from z=-24 to z=-60
+        // Gap from z=-60 to z=-64 for yellow door
+        // Wall 3: after yellow door
+        this.createWall(-5, 2, -72, 0.5, 4, 16, concreteMaterial);    // center at -72, extends from z=-64 to z=-80
+        
+        // Right corridor wall with 4-unit gap for red door
+        // Wall 1: from entrance to red door gap
+        this.createWall(5, 2, -6, 0.5, 4, 48, concreteMaterial);      // center at -6, extends from z=18 to z=-30
+        // Gap from z=-30 to z=-34 for red door
+        // Wall 2: after red door
+        this.createWall(5, 2, -57, 0.5, 4, 46, concreteMaterial);     // center at -57, extends from z=-34 to z=-80
+        
+        // Testing Lab (left side, around z=-20)
+        this.createWall(-22.5, 2, -10, 35, 4, 0.5, concreteMaterial); // Testing lab front
+        this.createWall(-22.5, 2, -30, 35, 4, 0.5, concreteMaterial); // Testing lab back
+        
+        // Containment Area (right side, around z=-30)  
+        this.createWall(22.5, 2, -20, 35, 4, 0.5, concreteMaterial);  // Containment front
+        this.createWall(22.5, 2, -40, 35, 4, 0.5, concreteMaterial);  // Containment back
+        
+        // Research Wing (left side, around z=-60)
+        this.createWall(-22.5, 2, -50, 35, 4, 0.5, concreteMaterial); // Research front
+        this.createWall(-22.5, 2, -70, 35, 4, 0.5, concreteMaterial); // Research back
+        
+        // Add doors centered in the gaps
+        this.createVisualDoor(-5, 2, -22, 'blue', 'Testing Lab');     // Center of gap z=-20 to z=-24
+        this.createVisualDoor(5, 2, -32, 'red', 'Containment');       // Center of gap z=-30 to z=-34
+        this.createVisualDoor(-5, 2, -62, 'yellow', 'Research');      // Center of gap z=-60 to z=-64
+        
+        // Add room decorations
+        this.decorateTestingLab(-22.5, -20, glassMaterial);
+        this.decorateContainmentArea(22.5, -30, metalMaterial);
+        this.decorateResearchWing(-22.5, -60, glassMaterial, metalMaterial);
+        
+        // Add reception desk near entrance
         const deskGeometry = new THREE.BoxGeometry(6, 1.5, 3);
         const desk = new THREE.Mesh(deskGeometry, concreteMaterial);
-        desk.position.set(-5, 0.75, 0);
+        desk.position.set(-8, 0.75, 10);
         desk.castShadow = true;
         this.scene.add(desk);
-        
-        // Computer terminals - create a local metalMaterial
-        const metalMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,
-            roughness: 0.3,
-            metalness: 0.8
-        });
-        
-        for (let i = 0; i < 3; i++) {
-            const terminalGeometry = new THREE.BoxGeometry(0.8, 1, 0.6);
-            const terminal = new THREE.Mesh(terminalGeometry, metalMaterial);
-            terminal.position.set(-6 + i * 2, 1.75, 0);
-            terminal.castShadow = true;
-            this.scene.add(terminal);
-        }
     }
     
-    createMainCorridor(material) {
-        // Long hallway connecting all sections
-        const corridorFloor = new THREE.PlaneGeometry(8, 60);
-        const floor = new THREE.Mesh(corridorFloor, material);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(0, 0, -40);
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-        
-        // Ceiling
-        const ceiling = new THREE.Mesh(corridorFloor, material);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(0, 3, -40);
-        this.scene.add(ceiling);
-        
-        // Walls
-        this.createWall(-4, 1.5, -40, 0.5, 3, 60, material);  // Left wall
-        this.createWall(4, 1.5, -40, 0.5, 3, 60, material);   // Right wall
-        
-        // Doors to different sections (simplified - no actual keycard system for now)
-        this.createDoor(-4, 1.5, -20, 'blue', 'Testing Lab');
-        this.createDoor(4, 1.5, -30, 'red', 'Containment');
-        this.createDoor(-4, 1.5, -50, 'yellow', 'Research');
-    }
-    
-    createTestingLab(concreteMaterial, glassMaterial) {
-        // Testing chamber
-        const labFloor = new THREE.PlaneGeometry(20, 15);
-        const floor = new THREE.Mesh(labFloor, concreteMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(-15, 0, -20);
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-        
-        // Ceiling
-        const ceiling = new THREE.Mesh(labFloor, concreteMaterial);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(-15, 4, -20);
-        this.scene.add(ceiling);
-        
-        // Walls
-        this.createWall(-25, 2, -20, 0.5, 4, 15, concreteMaterial);  // Left
-        this.createWall(-15, 2, -27.5, 20, 4, 0.5, concreteMaterial); // Back
-        this.createWall(-15, 2, -12.5, 20, 4, 0.5, concreteMaterial); // Front
-        // Right wall has door opening
-        
-        // Test equipment - specimen tubes
+    decorateTestingLab(centerX, centerZ, glassMaterial) {
+        // Add specimen tubes
         for (let i = 0; i < 3; i++) {
             const tubeGeometry = new THREE.CylinderGeometry(1, 1, 3, 8);
             const tube = new THREE.Mesh(tubeGeometry, glassMaterial);
-            tube.position.set(-20 + i * 3, 1.5, -20);
+            tube.position.set(centerX - 5 + i * 3, 1.5, centerZ);
             tube.castShadow = true;
             this.scene.add(tube);
             
@@ -195,207 +186,146 @@ export class LaboratoryLevel {
                 emissiveIntensity: 0.2
             });
             const specimen = new THREE.Mesh(specimenGeometry, specimenMaterial);
-            specimen.position.set(-20 + i * 3, 1.5, -20);
+            specimen.position.set(centerX - 5 + i * 3, 1.5, centerZ);
             this.scene.add(specimen);
         }
     }
     
-    createContainmentArea(concreteMaterial, metalMaterial) {
-        // Containment cells
-        const containmentFloor = new THREE.PlaneGeometry(20, 20);
-        const floor = new THREE.Mesh(containmentFloor, concreteMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(15, 0, -30);
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-        
-        // Ceiling
-        const ceiling = new THREE.Mesh(containmentFloor, concreteMaterial);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(15, 4, -30);
-        this.scene.add(ceiling);
-        
-        // Walls
-        this.createWall(25, 2, -30, 0.5, 4, 20, concreteMaterial);   // Right
-        this.createWall(15, 2, -40, 20, 4, 0.5, concreteMaterial);   // Back
-        this.createWall(15, 2, -20, 20, 4, 0.5, concreteMaterial);   // Front
-        // Left wall has door opening
-        
-        // Containment cells
+    decorateContainmentArea(centerX, centerZ, metalMaterial) {
+        // Add containment cells
         for (let i = 0; i < 4; i++) {
-            const cellX = 10 + (i % 2) * 8;
-            const cellZ = -25 - Math.floor(i / 2) * 8;
+            const cellX = centerX - 8 + (i % 2) * 8;
+            const cellZ = centerZ - 3 + Math.floor(i / 2) * 6;
             
             // Cell bars
             for (let j = 0; j < 5; j++) {
                 const barGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3.5);
                 const bar = new THREE.Mesh(barGeometry, metalMaterial);
-                bar.position.set(cellX + j * 0.8, 1.75, cellZ);
+                bar.position.set(cellX + j * 0.8 - 1.6, 1.75, cellZ);
                 bar.castShadow = true;
                 this.scene.add(bar);
             }
         }
     }
     
-    createResearchWing(concreteMaterial, glassMaterial) {
-        // Research laboratory
-        const researchFloor = new THREE.PlaneGeometry(25, 20);
-        const floor = new THREE.Mesh(researchFloor, concreteMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(-17.5, 0, -50);
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-        
-        // Ceiling
-        const ceiling = new THREE.Mesh(researchFloor, concreteMaterial);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(-17.5, 4, -50);
-        this.scene.add(ceiling);
-        
-        // Walls
-        this.createWall(-30, 2, -50, 0.5, 4, 20, concreteMaterial);  // Left
-        this.createWall(-17.5, 2, -60, 25, 4, 0.5, concreteMaterial); // Back
-        this.createWall(-17.5, 2, -40, 25, 4, 0.5, concreteMaterial); // Front
-        // Right wall has door opening
-        
-        // Lab benches
-        const metalMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,
-            roughness: 0.3,
-            metalness: 0.8
-        });
-        
+    decorateResearchWing(centerX, centerZ, glassMaterial, metalMaterial) {
+        // Add lab benches
         for (let i = 0; i < 3; i++) {
             const benchGeometry = new THREE.BoxGeometry(8, 1, 2);
-            const bench = new THREE.Mesh(benchGeometry, concreteMaterial);
-            bench.position.set(-20, 0.5, -45 - i * 4);
+            const benchMaterial = new THREE.MeshStandardMaterial({
+                color: 0x606060,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            const bench = new THREE.Mesh(benchGeometry, benchMaterial);
+            bench.position.set(centerX, 0.5, centerZ - 5 + i * 4);
             bench.castShadow = true;
             this.scene.add(bench);
             
             // Equipment on benches
             const equipmentGeometry = new THREE.BoxGeometry(1, 0.8, 0.8);
             const equipment = new THREE.Mesh(equipmentGeometry, metalMaterial);
-            equipment.position.set(-20 + (i - 1) * 2, 1.4, -45 - i * 4);
+            equipment.position.set(centerX + (i - 1) * 2, 1.4, centerZ - 5 + i * 4);
             equipment.castShadow = true;
             this.scene.add(equipment);
         }
     }
     
-    createExitArea(material) {
-        // Exit corridor
-        const exitFloor = new THREE.PlaneGeometry(10, 10);
-        const floor = new THREE.Mesh(exitFloor, material);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(0, 0, -75);
-        floor.receiveShadow = true;
-        this.scene.add(floor);
-        
-        // Ceiling
-        const ceiling = new THREE.Mesh(exitFloor, material);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(0, 3, -75);
-        this.scene.add(ceiling);
-        
-        // Walls
-        this.createWall(-5, 1.5, -75, 0.5, 3, 10, material);  // Left
-        this.createWall(5, 1.5, -75, 0.5, 3, 10, material);   // Right
-        
-        // Exit door
-        this.createExitDoor(0, 1.5, -80);
-    }
+    // createWall method is now inherited from BaseLevel
     
-    createWall(x, y, z, width, height, depth, material) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const wall = new THREE.Mesh(geometry, material);
-        wall.position.set(x, y, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        this.scene.add(wall);
+    createVisualDoor(x, y, z, keycard, label) {
+        // Determine door orientation based on which wall it's in
+        const isLeftWall = x < 0;  // Doors at x=-5 are in left wall
+        const isRightWall = x > 0; // Doors at x=5 are in right wall
         
-        // Store wall bounds for collision
-        this.walls.push({
-            mesh: wall,
-            min: new THREE.Vector3(
-                x - width/2,
-                y - height/2,
-                z - depth/2
-            ),
-            max: new THREE.Vector3(
-                x + width/2,
-                y + height/2,
-                z + depth/2
-            )
-        });
-    }
-    
-    createDoor(x, y, z, keycard, label) {
-        const doorGeometry = new THREE.BoxGeometry(0.2, 3, 3);
+        // Create physical door that blocks access
+        // For corridor walls, door should be thin in X direction, wide in Z direction
+        const doorGeometry = new THREE.BoxGeometry(0.5, 4, 4);  // Swapped dimensions for proper orientation
         const doorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x444444,
+            metalness: 0.8,
+            roughness: 0.2,
+            emissive: keycard === 'blue' ? 0x003366 : 
+                     keycard === 'red' ? 0x660000 : 0x666600,
+            emissiveIntensity: 0.2
+        });
+        const door = new THREE.Mesh(doorGeometry, doorMaterial);
+        door.position.set(x, y, z);
+        door.castShadow = true;
+        door.receiveShadow = true;
+        this.scene.add(door);
+        
+        // Add door to walls array so it blocks movement (adjusted for new orientation)
+        this.walls.push({
+            mesh: door,
+            min: new THREE.Vector3(x - 0.25, y - 2, z - 2),
+            max: new THREE.Vector3(x + 0.25, y + 2, z + 2)
+        });
+        
+        // Create keycard panel (positioned on the side of the door facing the corridor)
+        const panelGeometry = new THREE.BoxGeometry(0.1, 0.5, 0.5);
+        const panelMaterial = new THREE.MeshStandardMaterial({
             color: keycard === 'blue' ? 0x0066cc : 
                    keycard === 'red' ? 0xcc0000 : 0xcccc00,
-            metalness: 0.7,
-            roughness: 0.3,
             emissive: keycard === 'blue' ? 0x0066cc : 
                      keycard === 'red' ? 0xcc0000 : 0xcccc00,
             emissiveIntensity: 0.3
         });
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+        // Position panel on corridor side of door
+        const panelX = isLeftWall ? x + 0.3 : x - 0.3;  // Right side for left wall, left side for right wall
+        panel.position.set(panelX, y, z + 2.3);
+        this.scene.add(panel);
         
-        const door = new THREE.Mesh(doorGeometry, doorMaterial);
-        door.position.set(x, y, z);
-        door.castShadow = true;
-        door.userData = {
-            isDoor: true,
+        // Store door info
+        this.doors.push({
+            mesh: door,
+            position: new THREE.Vector3(x, y, z),
             keycard: keycard,
             label: label,
-            locked: true
-        };
-        this.scene.add(door);
+            panel: panel,
+            locked: true,
+            wallIndex: this.walls.length - 1  // Track wall index for removal
+        });
         
-        // Add a light to make the door visible
+        // Add indicator light
         const doorLight = new THREE.PointLight(
             keycard === 'blue' ? 0x0066cc : 
             keycard === 'red' ? 0xcc0000 : 0xcccc00, 
-            0.5, 5
+            0.3, 5
         );
         doorLight.position.set(x, y + 1, z);
         this.scene.add(doorLight);
-    }
-    
-    createExitDoor(x, y, z) {
-        const doorGeometry = new THREE.BoxGeometry(4, 3, 0.5);
-        const doorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
-            metalness: 0.7,
-            roughness: 0.3,
-            emissive: 0x00ff00,
-            emissiveIntensity: 0.5
-        });
         
-        const door = new THREE.Mesh(doorGeometry, doorMaterial);
-        door.position.set(x, y, z);
-        door.castShadow = true;
-        door.userData = {
-            isExitDoor: true,
-            locked: false
-        };
-        this.scene.add(door);
-        this.exitDoor = door;
-        
-        // Add bright light
-        const exitLight = new THREE.PointLight(0x00ff00, 1, 10);
-        exitLight.position.set(x, y, z + 2);
-        this.scene.add(exitLight);
+        // Add "LOCKED" text indicator (on the corridor side)
+        const lockedText = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 0.5),
+            new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.8
+            })
+        );
+        // Position text facing the corridor
+        const textX = isLeftWall ? x + 0.3 : x - 0.3;
+        lockedText.position.set(textX, y + 2.3, z);
+        lockedText.rotation.y = isLeftWall ? Math.PI / 2 : -Math.PI / 2;  // Face the corridor
+        lockedText.userData.isLockedIndicator = true;
+        this.scene.add(lockedText);
+        door.userData.lockedText = lockedText;
     }
     
     spawnKeycards() {
-        // Blue keycard in testing lab
-        this.createKeycard(-15, 1, -25, 'blue');
+        // Place keycards in logical progression order without backtracking
         
-        // Red keycard in research wing
-        this.createKeycard(-25, 1, -55, 'red');
+        // Blue keycard first - in corridor before any doors
+        this.createKeycard(0, 0.5, -10, 'blue');  // In corridor center, easily found first
         
-        // Yellow keycard in containment
-        this.createKeycard(20, 1, -35, 'yellow');
+        // Yellow keycard second - accessible after blue door, before needing yellow door
+        this.createKeycard(-2, 0.5, -35, 'yellow');  // In corridor, between blue and yellow doors
+        
+        // Red keycard third - deeper in the facility
+        this.createKeycard(2, 0.5, -45, 'red');  // In corridor, accessible after getting yellow
     }
     
     createKeycard(x, y, z, color) {
@@ -407,52 +337,71 @@ export class LaboratoryLevel {
             roughness: 0.2,
             emissive: color === 'blue' ? 0x0066cc : 
                      color === 'red' ? 0xcc0000 : 0xcccc00,
-            emissiveIntensity: 0.5
+            emissiveIntensity: 0.8  // Increased glow
         });
         
         const card = new THREE.Mesh(cardGeometry, cardMaterial);
         card.position.set(x, y, z);
         card.castShadow = true;
-        card.userData = {
-            isKeycard: true,
-            color: color,
-            collected: false
-        };
-        this.scene.add(card);
-        this.pickups.push(card);
-        
-        // Add glow light
+        // Add brighter glow light
         const cardLight = new THREE.PointLight(
             color === 'blue' ? 0x0066cc : 
             color === 'red' ? 0xcc0000 : 0xcccc00,
-            0.5, 3
+            1.5, 10  // Much brighter and wider light
         );
         cardLight.position.set(x, y + 0.5, z);
         this.scene.add(cardLight);
+        
+        // Add a vertical beacon to make keycards easier to spot
+        const beaconGeometry = new THREE.CylinderGeometry(0.05, 0.2, 4, 8);
+        const beaconMaterial = new THREE.MeshBasicMaterial({
+            color: color === 'blue' ? 0x0099ff : 
+                   color === 'red' ? 0xff0000 : 0xffff00,
+            transparent: true,
+            opacity: 0.4
+        });
+        const beacon = new THREE.Mesh(beaconGeometry, beaconMaterial);
+        beacon.position.set(x, y + 2, z);
+        this.scene.add(beacon);
+        
+        // Store references to light and beacon for removal
+        card.userData = {
+            isKeycard: true,
+            color: color,
+            collected: false,
+            baseY: y,  // Store the base Y position for animation
+            light: cardLight,  // Store light reference
+            beacon: beacon     // Store beacon reference
+        };
+        this.scene.add(card);
+        this.pickups.push(card);
     }
     
     createLaboratoryLighting() {
-        // Main lights
-        const positions = [
-            { x: 0, z: 0 },       // Entrance
-            { x: 0, z: -20 },     // Corridor 1
-            { x: 0, z: -40 },     // Corridor 2
-            { x: 0, z: -60 },     // Corridor 3
-            { x: -15, z: -20 },   // Testing lab
-            { x: 15, z: -30 },    // Containment
-            { x: -17.5, z: -50 }, // Research
-            { x: 0, z: -75 }      // Exit
+        // Main corridor lights - reduced intensity
+        for (let z = 10; z >= -70; z -= 10) {
+            const light = new THREE.PointLight(0xffffff, 0.3, 15);
+            light.position.set(0, 3.5, z);
+            light.castShadow = true;
+            this.scene.add(light);
+        }
+        
+        // Room lights - reduced intensity
+        const roomLights = [
+            { x: -22.5, z: -20 },  // Testing lab
+            { x: 22.5, z: -30 },   // Containment
+            { x: -22.5, z: -60 }   // Research
         ];
         
-        positions.forEach(pos => {
-            const light = new THREE.PointLight(0xffffff, 0.8, 20);
+        roomLights.forEach(pos => {
+            const light = new THREE.PointLight(0xffffff, 0.4, 20);
             light.position.set(pos.x, 3.5, pos.z);
             light.castShadow = true;
             this.scene.add(light);
         });
         
-        // Ambient light
-        const ambient = new THREE.AmbientLight(0x404060, 0.3);
+        // Ambient light - reduced intensity
+        const ambient = new THREE.AmbientLight(0x404060, 0.2);
         this.scene.add(ambient);
         
         // Emergency red lights
@@ -466,26 +415,46 @@ export class LaboratoryLevel {
     }
     
     spawnInitialEnemies() {
-        if (this.game && this.game.spawnEnemy) {
-            // Entrance enemies
-            this.game.spawnEnemy(5, 0, 5, 'possessed_scientist');
-            
-            // Corridor patrol
-            this.game.spawnEnemy(0, 0, -20, 'possessed_scientist');
-            this.game.spawnEnemy(0, 0, -40, 'possessed_scientist');
-            
-            // Testing lab
-            this.game.spawnEnemy(-15, 0, -20, 'possessed_scientist');
-            this.game.spawnEnemy(-20, 0, -22, 'possessed_scientist');
-            
-            // Containment area - more dangerous
-            this.game.spawnEnemy(15, 0, -30, 'hellhound');
-            this.game.spawnEnemy(20, 0, -35, 'possessed_scientist');
-            
-            // Research wing
-            this.game.spawnEnemy(-20, 0, -50, 'possessed_scientist');
-            this.game.spawnEnemy(-25, 0, -52, 'hellhound');
+        if (!this.game || !this.game.spawnEnemy) {
+            console.warn('Cannot spawn enemies - game.spawnEnemy not available');
+            return;
         }
+        
+        // Store enemy references for later updates
+        // Player spawns at (0, 1.7, 0), so place enemies further into the facility
+        const enemySpawns = [
+            // Back of entrance area - give player space to orient
+            { x: 15, y: 0, z: -15, type: 'possessed_scientist' },
+            { x: -15, y: 0, z: -12, type: 'possessed_scientist' },
+            
+            // Main corridor - spread out through the facility
+            { x: 0, y: 0, z: -25, type: 'possessed_scientist' },
+            { x: 2, y: 0, z: -35, type: 'possessed_scientist' },  // Changed from hellhound
+            { x: -2, y: 0, z: -45, type: 'possessed_scientist' },
+            
+            // Testing lab (left side room at z=-20)
+            { x: -20, y: 0, z: -20, type: 'possessed_scientist' },
+            { x: -25, y: 0, z: -18, type: 'possessed_scientist' },
+            
+            // Containment area (right side room at z=-30)
+            { x: 20, y: 0, z: -30, type: 'hellhound' },  // Keep one hellhound here
+            { x: 25, y: 0, z: -28, type: 'possessed_scientist' },
+            
+            // Research wing (left side at z=-60, far back)
+            { x: -20, y: 0, z: -60, type: 'possessed_scientist' },
+            { x: -25, y: 0, z: -58, type: 'possessed_scientist' },  // Changed from hellhound
+            
+            // Additional corridor patrols in back areas
+            { x: 3, y: 0, z: -55, type: 'possessed_scientist' },
+            { x: -3, y: 0, z: -65, type: 'hellhound' }  // Keep one at the end
+        ];
+        
+        enemySpawns.forEach(spawn => {
+            this.game.spawnEnemy(spawn.x, spawn.y, spawn.z, spawn.type);
+        });
+        
+        // Store reference to game's enemy array for updates
+        this.enemies = this.game.enemies;
     }
     
     checkKeycardCollection(playerPosition) {
@@ -509,17 +478,25 @@ export class LaboratoryLevel {
                         // Update objective based on keycards collected
                         const collected = Object.values(this.keycards).filter(k => k).length;
                         if (collected === 3) {
-                            this.game.narrativeSystem.setObjective("All keycards collected! Head to the exit!");
+                            this.game.narrativeSystem.setObjective("All keycards collected! Exit portal activated at the end of the facility!");
+                            // Spawn exit portal
+                            this.createExitPortal();
                         } else {
                             this.game.narrativeSystem.setObjective(`Find keycards (${collected}/3 collected)`);
                         }
                     }
                     
-                    // Remove from scene
+                    // Remove keycard, light, and beacon from scene
                     this.scene.remove(pickup);
+                    if (pickup.userData.light) {
+                        this.scene.remove(pickup.userData.light);
+                    }
+                    if (pickup.userData.beacon) {
+                        this.scene.remove(pickup.userData.beacon);
+                    }
                     this.pickups.splice(i, 1);
                     
-                    // Unlock corresponding doors
+                    // Update door visuals
                     this.unlockDoors(color);
                 }
             }
@@ -527,36 +504,90 @@ export class LaboratoryLevel {
     }
     
     unlockDoors(keycardColor) {
-        // In a real implementation, this would unlock the appropriate doors
-        // For now, just log it
-        console.log(`Unlocked ${keycardColor} doors`);
+        // Open physical doors and update visual indicators
+        this.doors.forEach(door => {
+            if (door.keycard === keycardColor && door.locked) {
+                door.locked = false;
+                
+                // Remove door from scene (open it)
+                if (door.mesh) {
+                    // Animate door opening
+                    const openDoor = () => {
+                        if (door.mesh.position.y < door.position.y + 3) {
+                            door.mesh.position.y += 0.05;
+                            requestAnimationFrame(openDoor);
+                        } else {
+                            // Remove door completely
+                            this.scene.remove(door.mesh);
+                            // Remove from walls array to allow passage
+                            if (door.wallIndex !== undefined && this.walls[door.wallIndex]) {
+                                this.walls.splice(door.wallIndex, 1);
+                                // Update other door wall indices
+                                this.doors.forEach(d => {
+                                    if (d.wallIndex > door.wallIndex) {
+                                        d.wallIndex--;
+                                    }
+                                });
+                            }
+                        }
+                    };
+                    openDoor();
+                    
+                    // Remove locked text
+                    if (door.mesh.userData.lockedText) {
+                        this.scene.remove(door.mesh.userData.lockedText);
+                    }
+                }
+                
+                // Change panel color to green
+                if (door.panel) {
+                    door.panel.material.color.setHex(0x00ff00);
+                    door.panel.material.emissive.setHex(0x00ff00);
+                    door.panel.material.emissiveIntensity = 0.5;
+                }
+            }
+        });
         
         if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle(`${keycardColor} doors unlocked!`);
+            this.game.narrativeSystem.displaySubtitle(`${keycardColor} security door opened!`);
         }
     }
     
-    checkExitCollision(player) {
-        if (!player || !player.position || !this.exitDoor) return false;
+    createExitPortal() {
+        // Create a glowing exit portal at the end of the facility
+        const portalGeometry = new THREE.RingGeometry(1, 3, 8);
+        const portalMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            emissive: 0x00ff00,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
         
-        const playerZ = player.position.z;
-        const playerX = player.position.x;
+        this.exitPortal = new THREE.Mesh(portalGeometry, portalMaterial);
+        this.exitPortal.position.set(0, 2, -75); // At the far end of the facility
+        this.exitPortal.rotation.x = Math.PI / 2;
+        this.scene.add(this.exitPortal);
         
-        // Check if player has reached the exit
-        if (playerZ < -78 && Math.abs(playerX) < 3) {
-            // Check if all keycards are collected
-            const allKeycards = Object.values(this.keycards).every(k => k);
-            if (allKeycards) {
-                console.log('Laboratory level complete!');
-                return true;
-            } else {
-                if (this.game.narrativeSystem) {
-                    this.game.narrativeSystem.displaySubtitle("Need all keycards to exit!");
-                }
-            }
+        // Add a bright light
+        const portalLight = new THREE.PointLight(0x00ff00, 2, 20);
+        portalLight.position.set(0, 2, -75);
+        this.scene.add(portalLight);
+        
+        // Add inner glow
+        const innerGeometry = new THREE.CircleGeometry(1, 8);
+        const innerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.5
+        });
+        const innerGlow = new THREE.Mesh(innerGeometry, innerMaterial);
+        innerGlow.position.set(0, 2, -74.9);
+        this.scene.add(innerGlow);
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("EXIT PORTAL ACTIVATED!");
         }
-        
-        return false;
     }
     
     update(deltaTime) {
@@ -564,7 +595,8 @@ export class LaboratoryLevel {
         const time = Date.now() * 0.002;
         this.pickups.forEach(pickup => {
             if (pickup && !pickup.userData.collected) {
-                pickup.position.y = 1 + Math.sin(time) * 0.2;
+                const baseY = pickup.userData.baseY || 0.5;
+                pickup.position.y = baseY + Math.sin(time) * 0.2;
                 pickup.rotation.y += 0.02;
             }
         });
@@ -572,23 +604,71 @@ export class LaboratoryLevel {
         // Check keycard collection
         if (this.game && this.game.player) {
             this.checkKeycardCollection(this.game.player.position);
+            
+            // Check if player reached exit portal
+            if (this.exitPortal) {
+                const distance = this.game.player.position.distanceTo(this.exitPortal.position);
+                if (distance < 3) {
+                    // Level complete!
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.displaySubtitle("LEVEL COMPLETE!");
+                        this.game.narrativeSystem.setObjective("Victory! Laboratory secured!");
+                    }
+                    
+                    // Trigger level completion
+                    if (this.game.completeLevel) {
+                        this.game.completeLevel();
+                    } else {
+                        // Fallback: load next level
+                        console.log('Laboratory level completed!');
+                        setTimeout(() => {
+                            if (this.game.loadLevel) {
+                                this.game.loadLevel('containment'); // Load next level
+                            }
+                        }, 2000);
+                    }
+                    
+                    // Remove portal to prevent multiple triggers
+                    this.scene.remove(this.exitPortal);
+                    this.exitPortal = null;
+                }
+            }
         }
+        
+        // Animate exit portal if it exists
+        if (this.exitPortal) {
+            this.exitPortal.rotation.z = time;
+            // Pulse the portal
+            const scale = 1 + Math.sin(time * 2) * 0.1;
+            this.exitPortal.scale.set(scale, scale, 1);
+        }
+        
+        // The enemies are updated by the game's main update loop
+        // No need to update them here
     }
     
     clearLevel() {
-        // Remove all level geometry
-        this.walls.forEach(wall => {
-            if (wall.mesh) {
-                this.scene.remove(wall.mesh);
-            }
-        });
-        this.walls = [];
+        // Call parent cleanup to handle intervals, timeouts, walls, etc.
+        if (super.cleanup) {
+            super.cleanup();
+        }
+        
+        // Additional laboratory-specific cleanup below
         
         // Clear pickups
         this.pickups.forEach(pickup => {
             this.scene.remove(pickup);
         });
         this.pickups = [];
+        
+        // Clear doors
+        this.doors = [];
+        
+        // Clear exit portal if it exists
+        if (this.exitPortal) {
+            this.scene.remove(this.exitPortal);
+            this.exitPortal = null;
+        }
         
         // Reset keycards
         this.keycards = {

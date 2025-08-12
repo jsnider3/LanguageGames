@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 // Holy Lance Weapon
 // Medieval reach weapon with charging attack that pierces multiple enemies
 

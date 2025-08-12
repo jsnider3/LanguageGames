@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Relic Collection System
 // Sacred artifacts that modify abilities and unlock new powers
 

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Demon Knight Enemy Type
 // Heavy armored demon with shield that must be broken
 
@@ -59,8 +60,6 @@ export class DemonKnight extends Enemy {
         const bodyGeometry = new THREE.BoxGeometry(0.8, 1.8, 0.6);
         const armorMaterial = new THREE.MeshPhongMaterial({
             color: 0x330000,
-            metalness: 0.8,
-            roughness: 0.3,
             emissive: 0x110000,
             emissiveIntensity: 0.2
         });
@@ -98,9 +97,7 @@ export class DemonKnight extends Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 2
+            color: 0xff0000
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -143,9 +140,7 @@ export class DemonKnight extends Enemy {
         const spikeCount = 6;
         const spikeGeometry = new THREE.ConeGeometry(0.05, 0.2, 4);
         const spikeMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000,
-            metalness: 0.9,
-            roughness: 0.2
+            color: 0x000000
         });
         
         for (let i = 0; i < spikeCount; i++) {
@@ -167,8 +162,6 @@ export class DemonKnight extends Enemy {
         const bladeGeometry = new THREE.BoxGeometry(0.1, 1.5, 0.02);
         const bladeMaterial = new THREE.MeshPhongMaterial({
             color: 0x660000,
-            metalness: 0.9,
-            roughness: 0.2,
             emissive: 0xff0000,
             emissiveIntensity: 0.3
         });
@@ -193,9 +186,7 @@ export class DemonKnight extends Enemy {
         // Hilt
         const hiltGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.3, 6);
         const hiltMaterial = new THREE.MeshPhongMaterial({
-            color: 0x333333,
-            metalness: 0.7,
-            roughness: 0.4
+            color: 0x333333
         });
         const hilt = new THREE.Mesh(hiltGeometry, hiltMaterial);
         hilt.position.y = -0.15;
@@ -223,8 +214,6 @@ export class DemonKnight extends Enemy {
         const shieldGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.1);
         const shieldMaterial = new THREE.MeshPhongMaterial({
             color: 0x222222,
-            metalness: 0.9,
-            roughness: 0.3,
             emissive: 0x440000,
             emissiveIntensity: 0.2
         });

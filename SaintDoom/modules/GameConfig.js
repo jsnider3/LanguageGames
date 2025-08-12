@@ -51,12 +51,12 @@ export const GAME_CONFIG = {
         },
         HELLHOUND: {
             HEALTH: 30,
-            DAMAGE: 15,
-            MOVE_SPEED: 6,
+            DAMAGE: 8,  // Reduced from 15 for testing
+            MOVE_SPEED: 4,  // Reduced from 6 - less overwhelming
             SCORE_VALUE: 150,
             ATTACK_RANGE: 1.5,
-            ATTACK_COOLDOWN: 0.8,
-            SIGHT_RANGE: 20,
+            ATTACK_COOLDOWN: 1.2,  // Increased from 0.8 - attacks less frequently
+            SIGHT_RANGE: 15,  // Reduced from 20 - won't detect you as far away
             MESH_COLOR: 0x990000,
             EYE_COLOR: 0xffff00,
             SIZE: { WIDTH: 1.2, HEIGHT: 0.8, DEPTH: 0.6 }

@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+import { resourcePool } from '../modules/ResourcePool.js';
 // Visual Effects System for SaintDoom
 // Holy light, demonic corruption, and particle effects
 
@@ -23,8 +25,8 @@ export class VisualEffects {
         // Holy particles
         for (let i = 0; i < poolSize; i++) {
             const particle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.1, 4, 4),
-                new THREE.MeshBasicMaterial({
+                resourcePool.getGeometry('sphere', 0.1, 4, 4),
+                resourcePool.getMaterial('basic', {
                     color: 0xffffaa,
                     transparent: true,
                     opacity: 0
@@ -43,8 +45,8 @@ export class VisualEffects {
         // Demonic particles
         for (let i = 0; i < poolSize; i++) {
             const particle = new THREE.Mesh(
-                new THREE.BoxGeometry(0.15, 0.15, 0.15),
-                new THREE.MeshBasicMaterial({
+                resourcePool.getGeometry('box', 0.15, 0.15, 0.15),
+                resourcePool.getMaterial('basic', {
                     color: 0xff0000,
                     transparent: true,
                     opacity: 0
@@ -113,7 +115,11 @@ export class VisualEffects {
             opacity -= 0.02;
             flash.intensity *= 0.9;
             
-            ring.geometry = new THREE.RingGeometry(radius - 0.2, radius, 32);
+            // Dispose old geometry before creating new one
+            if (ring.geometry && ring.geometry.dispose) {
+                ring.geometry.dispose();
+            }
+            ring.geometry = resourcePool.getGeometry('ring', radius - 0.2, radius, 32);
             ring.material.opacity = opacity;
             
             if (opacity <= 0) {
@@ -256,8 +262,8 @@ export class VisualEffects {
         
         // Inner vortex
         const vortex = new THREE.Mesh(
-            new THREE.ConeGeometry(radius * 0.5, 2, 8),
-            new THREE.MeshBasicMaterial({
+            resourcePool.getGeometry('cone', radius * 0.5, 2, 8),
+            resourcePool.getMaterial('basic', {
                 color: 0x000000,
                 transparent: true,
                 opacity: 0.8

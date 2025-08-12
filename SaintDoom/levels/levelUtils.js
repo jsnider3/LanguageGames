@@ -47,7 +47,7 @@ export const COLORS = {
 export const MATERIALS = {
     // Basic materials
     STONE: new THREE.MeshLambertMaterial({ color: COLORS.STONE }),
-    METAL: new THREE.MeshLambertMaterial({ color: COLORS.METAL, metalness: 0.8, roughness: 0.3 }),
+    METAL: new THREE.MeshLambertMaterial({ color: COLORS.METAL }),
     CONCRETE: new THREE.MeshLambertMaterial({ color: COLORS.CONCRETE }),
     WOOD: new THREE.MeshLambertMaterial({ color: COLORS.WOOD }),
     
@@ -66,8 +66,7 @@ export const MATERIALS = {
     
     // Emissive materials
     LAVA: new THREE.MeshBasicMaterial({ 
-        color: COLORS.FIRE, 
-        emissive: 0x442200 
+        color: COLORS.FIRE
     }),
     ENERGY: new THREE.MeshBasicMaterial({ 
         color: COLORS.ELECTRICITY, 
@@ -75,9 +74,7 @@ export const MATERIALS = {
         opacity: 0.6 
     }),
     HOLY_GLOW: new THREE.MeshBasicMaterial({
-        color: COLORS.HOLY_LIGHT,
-        emissive: COLORS.HOLY_LIGHT,
-        emissiveIntensity: 0.5
+        color: COLORS.HOLY_LIGHT
     })
 };
 

@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export class Level {
     constructor(scene) {
         this.scene = scene;

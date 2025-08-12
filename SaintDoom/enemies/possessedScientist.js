@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Possessed Scientist Enemy Type
 // Former MIB researchers corrupted by demonic influence
 

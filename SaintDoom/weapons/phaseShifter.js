@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BaseWeapon } from './baseWeapon.js';
+import { BaseWeapon } from '../core/BaseWeapon.js';
 
 export class PhaseShifter extends BaseWeapon {
     constructor() {

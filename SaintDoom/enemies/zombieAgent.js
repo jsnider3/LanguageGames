@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Enemy } from './enemy.js';
+import { Enemy } from '../enemy.js';
 
 export class ZombieAgent extends Enemy {
     constructor(scene, position) {
@@ -51,12 +51,10 @@ export class ZombieAgent extends Enemy {
         head.position.y = 2.2;
         agentGroup.add(head);
 
-        // Glowing eyes
+        // Glowing eyes - MeshBasicMaterial doesn't support emissive
         const eyeGeometry = new THREE.SphereGeometry(0.08, 6, 6);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00ff00,
-            emissive: 0x004400,
-            emissiveIntensity: 0.8
+            color: 0x00ff00
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);

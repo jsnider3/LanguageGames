@@ -2,8 +2,19 @@ import { BaseLevel } from './baseLevel.js';
 import * as THREE from 'three';
 
 export class FinalArenaLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         this.name = "Final Arena";
         this.description = "Face the ultimate evil in the depths of Hell itself";
         this.backgroundColor = new THREE.Color(0x1a0000);
@@ -46,6 +57,15 @@ export class FinalArenaLevel extends BaseLevel {
         
         this.init();
     }
+    
+    create() {
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
+    }
+
 
     init() {
         this.createGeometry();
@@ -172,7 +192,7 @@ export class FinalArenaLevel extends BaseLevel {
 
     animateHellfire(light) {
         const originalIntensity = light.intensity;
-        setInterval(() => {
+        const animInterval = setInterval(() => {
             light.intensity = originalIntensity + Math.sin(Date.now() * 0.01) * 0.5 + Math.random() * 0.3;
             light.color.setRGB(
                 1.0,
@@ -180,6 +200,9 @@ export class FinalArenaLevel extends BaseLevel {
                 Math.random() * 0.1
             );
         }, 100);
+        
+        // Track interval for cleanup
+        this.addInterval(animInterval);
     }
 
     animatePerimeterFire(light) {
@@ -395,7 +418,6 @@ export class FinalArenaLevel extends BaseLevel {
         const lavaGeometry = new THREE.CircleGeometry(radius, 16);
         const lavaMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xff4400,
-            emissive: 0xff2200,
             transparent: true,
             opacity: 0.9
         });
@@ -467,11 +489,14 @@ export class FinalArenaLevel extends BaseLevel {
         const originalIntensity = light.intensity;
         setInterval(() => {
             surface.rotation.z += 0.005;
-            surface.material.emissive.setRGB(
-                1.0,
-                0.2 + Math.sin(Date.now() * 0.003) * 0.1,
-                Math.sin(Date.now() * 0.007) * 0.1
-            );
+            // Animate color for MeshBasicMaterial (no emissive property)
+            if (surface.material && surface.material.color) {
+                surface.material.color.setRGB(
+                    1.0,
+                    0.4 + Math.sin(Date.now() * 0.003) * 0.2,
+                    Math.sin(Date.now() * 0.007) * 0.1
+                );
+            }
             light.intensity = originalIntensity + Math.sin(Date.now() * 0.004) * 0.5;
         }, 50);
     }
@@ -1480,7 +1505,10 @@ export class FinalArenaLevel extends BaseLevel {
             const light = lava.userData.light;
             const surface = lava.userData.surface;
             if (light) light.intensity *= 1.5;
-            if (surface) surface.material.emissive.multiplyScalar(1.2);
+            // Brighten color for MeshBasicMaterial (no emissive)
+            if (surface && surface.material && surface.material.color) {
+                surface.material.color.multiplyScalar(1.2);
+            }
         });
     }
 

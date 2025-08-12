@@ -1,9 +1,16 @@
-import * * THREE from 'three';
-import { BaseLevel } from './BaseLevel.js';
+import * as THREE from 'three';
+import { BaseLevel } from './baseLevel.js';
 
 export class SecretTechFacility extends BaseLevel {
-    constructor(scene, camera, player) {
-        super(scene, camera, player);
+    constructor(game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 3) {
+            // Old signature: (scene, camera, player)
+            super(arguments[0], arguments[1], arguments[2]);
+        } else {
+            // New signature: (game)
+            super(game);
+        }
         
         this.name = 'Black Site Omega';
         this.description = 'Ultra-classified MIB research facility conducting alien-human hybrid experiments';
@@ -54,6 +61,24 @@ export class SecretTechFacility extends BaseLevel {
         
         this.alertLevel = 0; // 0-5
         this.lockdownActive = false;
+        
+        // Initialize arrays that were missing
+        this.rooms = [];
+        this.doors = [];
+        this.items = [];
+        this.enemies = [];
+        this.walls = [];
+    }
+    
+    create() {
+        // Call generate to build the level
+        this.generate();
+        
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
     }
 
     generate() {
@@ -554,14 +579,71 @@ export class SecretTechFacility extends BaseLevel {
             );
             this.scene.add(alien);
             
-            this.alienSpecimens.push({
+            const alienEnemy = {
                 mesh: alien,
+                position: alien.position,
+                velocity: new THREE.Vector3(0, 0, 0),
                 data: specimen,
                 state: 'roaming',
-                target: null
-            });
+                target: null,
+                health: specimen.health || 50,
+                maxHealth: specimen.health || 50,
+                damage: specimen.damage || 15,
+                speed: specimen.speed || 1,
+                radius: 1,
+                update: function(deltaTime, playerPosition) {
+                    if (!this.mesh) return;
+                    
+                    this.velocity.set(0, 0, 0);
+                    
+                    if (playerPosition) {
+                        const dx = playerPosition.x - this.position.x;
+                        const dz = playerPosition.z - this.position.z;
+                        const distance = Math.sqrt(dx * dx + dz * dz);
+                        
+                        if (distance < 20) {
+                            this.state = 'hunting';
+                            if (distance > 2) {
+                                this.velocity.x = (dx / distance) * this.speed;
+                                this.velocity.z = (dz / distance) * this.speed;
+                            }
+                            this.mesh.rotation.y = Math.atan2(dx, dz);
+                        } else {
+                            this.state = 'roaming';
+                        }
+                    }
+                    
+                    this.position.x += this.velocity.x * deltaTime;
+                    this.position.z += this.velocity.z * deltaTime;
+                },
+                takeDamage: function(amount) {
+                    this.health -= amount;
+                    if (this.health <= 0 && this.mesh) {
+                        if (this.mesh.parent) {
+                            this.mesh.parent.remove(this.mesh);
+                        }
+                        this.mesh = null;
+                        return true;
+                    }
+                    return false;
+                },
+                applyKnockback: function(force) {
+                    if (this.velocity && force) {
+                        this.velocity.x += force.x;
+                        this.velocity.z += force.z;
+                    }
+                },
+                onDeath: function() {
+                    this.isDead = true;
+                    if (this.mesh && this.mesh.parent) {
+                        this.mesh.parent.remove(this.mesh);
+                    }
+                    this.mesh = null;
+                }
+            };
             
-            this.enemies.push(alien);
+            this.alienSpecimens.push(alienEnemy);
+            this.enemies.push(alienEnemy);
         });
         
         // Security bots
@@ -573,8 +655,75 @@ export class SecretTechFacility extends BaseLevel {
                 (Math.random() - 0.5) * 120
             );
             this.scene.add(bot);
-            this.securityBots.push(bot);
-            this.enemies.push(bot);
+            
+            const botEnemy = {
+                mesh: bot,
+                position: bot.position,
+                velocity: new THREE.Vector3(0, 0, 0),
+                health: 40,
+                maxHealth: 40,
+                damage: 10,
+                speed: 2,
+                radius: 0.8,
+                state: 'patrol',
+                update: function(deltaTime, playerPosition) {
+                    if (!this.mesh) return;
+                    
+                    this.velocity.set(0, 0, 0);
+                    
+                    if (playerPosition) {
+                        const dx = playerPosition.x - this.position.x;
+                        const dz = playerPosition.z - this.position.z;
+                        const distance = Math.sqrt(dx * dx + dz * dz);
+                        
+                        if (distance < 15) {
+                            this.state = 'attack';
+                            if (distance > 3) {
+                                this.velocity.x = (dx / distance) * this.speed;
+                                this.velocity.z = (dz / distance) * this.speed;
+                            }
+                            this.mesh.rotation.y = Math.atan2(dx, dz);
+                        } else {
+                            this.state = 'patrol';
+                        }
+                    }
+                    
+                    this.position.x += this.velocity.x * deltaTime;
+                    this.position.z += this.velocity.z * deltaTime;
+                    
+                    // Animate hover effect
+                    if (this.mesh) {
+                        this.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.002) * 0.1;
+                    }
+                },
+                takeDamage: function(amount) {
+                    this.health -= amount;
+                    if (this.health <= 0 && this.mesh) {
+                        if (this.mesh.parent) {
+                            this.mesh.parent.remove(this.mesh);
+                        }
+                        this.mesh = null;
+                        return true;
+                    }
+                    return false;
+                },
+                applyKnockback: function(force) {
+                    if (this.velocity && force) {
+                        this.velocity.x += force.x * 0.5; // Bots are heavier
+                        this.velocity.z += force.z * 0.5;
+                    }
+                },
+                onDeath: function() {
+                    this.isDead = true;
+                    if (this.mesh && this.mesh.parent) {
+                        this.mesh.parent.remove(this.mesh);
+                    }
+                    this.mesh = null;
+                }
+            };
+            
+            this.securityBots.push(botEnemy);
+            this.enemies.push(botEnemy);
         }
     }
 

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Tunnel Network Level
 // Narrow passages designed for intense close-quarters combat
 
@@ -8,8 +9,19 @@ import { Imp } from '../enemies/imp.js';
 import { PossessedScientist } from '../enemies/possessedScientist.js';
 
 export class TunnelLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         
         this.levelName = 'Tunnel Network';
         this.levelNumber = 5;
@@ -38,7 +50,8 @@ export class TunnelLevel extends BaseLevel {
     }
     
     create() {
-        super.create();
+        // Initialize base level properties
+        this.init();
         
         // Build tunnel network
         this.createMainTunnelSystem();
@@ -64,6 +77,12 @@ export class TunnelLevel extends BaseLevel {
         
         // Objectives
         this.setupTunnelObjectives();
+        
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
     }
     
     createMainTunnelSystem() {
@@ -1090,8 +1109,67 @@ export class TunnelLevel extends BaseLevel {
         this.objectives = [
             { id: 'navigate_tunnels', text: 'Navigate the tunnel network', completed: false },
             { id: 'find_exit', text: 'Find the surface access', completed: false },
-            { id: 'survive_ambushes', text: 'Survive enemy ambushes', completed: false }
+            { id: 'survive_ambushes', text: 'Survive enemy ambushes (0/3)', completed: false }
         ];
+        
+        this.ambushesCleared = 0;
+        this.exitFound = false;
+        this.createSurfaceAccessPoint();
+    }
+    
+    createSurfaceAccessPoint() {
+        // Create the exit at the end of the main tunnel
+        const exitPosition = new THREE.Vector3(0, 0, 150);
+        
+        // Exit ladder/stairs
+        const ladderGeometry = new THREE.BoxGeometry(2, 10, 0.5);
+        const ladderMaterial = new THREE.MeshPhongMaterial({
+            color: 0x444444
+        });
+        const ladder = new THREE.Mesh(ladderGeometry, ladderMaterial);
+        ladder.position.copy(exitPosition);
+        ladder.position.y = 5;
+        ladder.rotation.x = Math.PI * 0.1;
+        this.scene.add(ladder);
+        
+        // Exit light shaft
+        const lightShaftGeometry = new THREE.CylinderGeometry(3, 3, 20, 16, 1, true);
+        const lightShaftMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffaa,
+            transparent: true,
+            opacity: 0.2,
+            side: THREE.DoubleSide
+        });
+        const lightShaft = new THREE.Mesh(lightShaftGeometry, lightShaftMaterial);
+        lightShaft.position.copy(exitPosition);
+        lightShaft.position.y = 10;
+        this.scene.add(lightShaft);
+        
+        // Surface light
+        const surfaceLight = new THREE.PointLight(0xffffaa, 2, 30);
+        surfaceLight.position.copy(exitPosition);
+        surfaceLight.position.y = 15;
+        this.scene.add(surfaceLight);
+        
+        // Exit trigger zone
+        this.exitZone = {
+            position: exitPosition,
+            radius: 5,
+            active: false
+        };
+        
+        // Add sign
+        const signGeometry = new THREE.PlaneGeometry(3, 1);
+        const signMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ff00,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.3
+        });
+        const sign = new THREE.Mesh(signGeometry, signMaterial);
+        sign.position.copy(exitPosition);
+        sign.position.y = 3;
+        sign.position.z -= 5;
+        this.scene.add(sign);
     }
     
     update(deltaTime) {
@@ -1105,6 +1183,131 @@ export class TunnelLevel extends BaseLevel {
         
         // Check secret passages
         this.checkSecretPassages();
+        
+        // Check ambush completion
+        this.checkAmbushCompletion();
+        
+        // Check exit zone
+        this.checkExitZone();
+        
+        // Update objectives
+        this.updateObjectives();
+    }
+    
+    checkAmbushCompletion() {
+        this.ambushPoints.forEach(ambush => {
+            if (ambush.triggered && !ambush.cleared && ambush.spawnedEnemies) {
+                // Check if all enemies from this ambush are defeated
+                const allDefeated = ambush.spawnedEnemies.every(enemy => 
+                    !enemy || enemy.health <= 0 || enemy.isDead
+                );
+                
+                if (allDefeated) {
+                    ambush.cleared = true;
+                    this.ambushesCleared++;
+                    
+                    // Update objective text
+                    const ambushObj = this.objectives.find(o => o.id === 'survive_ambushes');
+                    if (ambushObj) {
+                        ambushObj.text = `Survive enemy ambushes (${this.ambushesCleared}/3)`;
+                        if (this.ambushesCleared >= 3) {
+                            ambushObj.completed = true;
+                        }
+                    }
+                    
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.displaySubtitle(`Ambush cleared! (${this.ambushesCleared}/3)`);
+                    }
+                }
+            }
+        });
+    }
+    
+    checkExitZone() {
+        if (!this.exitZone || !this.game.player) return;
+        
+        const distance = this.game.player.position.distanceTo(this.exitZone.position);
+        
+        // Check if player found the exit
+        if (distance < 30 && !this.exitFound) {
+            this.exitFound = true;
+            const findExitObj = this.objectives.find(o => o.id === 'find_exit');
+            if (findExitObj) {
+                findExitObj.completed = true;
+            }
+            
+            if (this.game.narrativeSystem) {
+                this.game.narrativeSystem.displaySubtitle("Surface access found!");
+            }
+        }
+        
+        // Check if player can use the exit
+        if (distance < this.exitZone.radius && this.exitZone.active) {
+            this.completeLevel();
+        }
+    }
+    
+    updateObjectives() {
+        // Navigation objective completes when player reaches certain depth
+        if (this.game.player && this.game.player.position.z > 100) {
+            const navObj = this.objectives.find(o => o.id === 'navigate_tunnels');
+            if (navObj && !navObj.completed) {
+                navObj.completed = true;
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Tunnel network navigated!");
+                }
+            }
+        }
+        
+        // Check if all objectives are complete
+        const allComplete = this.objectives.every(o => o.completed);
+        if (allComplete && !this.exitZone.active) {
+            this.activateExit();
+        }
+    }
+    
+    activateExit() {
+        this.exitZone.active = true;
+        
+        // Create exit portal effect
+        const portalGeometry = new THREE.TorusGeometry(3, 0.5, 16, 32);
+        const portalMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ff00,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.8
+        });
+        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+        portal.position.copy(this.exitZone.position);
+        portal.position.y = 2;
+        this.scene.add(portal);
+        
+        // Animate portal
+        this.addInterval(setInterval(() => {
+            if (portal) {
+                portal.rotation.z += 0.02;
+            }
+        }, 16));
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("All objectives complete! Surface exit activated!");
+        }
+    }
+    
+    completeLevel() {
+        if (this.completed) return;
+        
+        this.completed = true;
+        
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle("Tunnel Level Complete! Reaching surface...");
+        }
+        
+        // Load next level
+        setTimeout(() => {
+            if (this.game.loadNextLevel) {
+                this.game.loadNextLevel();
+            }
+        }, 2000);
     }
     
     checkAmbushTriggers() {
@@ -1127,6 +1330,9 @@ export class TunnelLevel extends BaseLevel {
         // Flash sensor red
         ambush.sensor.material.emissiveIntensity = 1;
         
+        // Track spawned enemies for this ambush
+        ambush.spawnedEnemies = [];
+        
         // Spawn enemies
         for (let i = 0; i < ambush.enemyData.count; i++) {
             const spawnPos = ambush.position.clone();
@@ -1135,6 +1341,7 @@ export class TunnelLevel extends BaseLevel {
             
             const enemy = new ambush.enemyData.type(this.scene, spawnPos);
             this.game.enemies.push(enemy);
+            ambush.spawnedEnemies.push(enemy);
         }
         
         // Alarm sound effect would play here
@@ -1226,5 +1433,216 @@ export class TunnelLevel extends BaseLevel {
     
     createAmbientSources() {
         // Ambient sound source positions
+    }
+    
+    createUtilityTunnels() {
+        // Create utility tunnels with pipes and conduits
+        const utilityPositions = [
+            { pos: new THREE.Vector3(-25, -2, 0), length: 20 },
+            { pos: new THREE.Vector3(25, -2, 0), length: 20 },
+            { pos: new THREE.Vector3(0, -2, -25), length: 15 },
+            { pos: new THREE.Vector3(0, -2, 25), length: 15 }
+        ];
+        
+        utilityPositions.forEach(util => {
+            // Utility tunnel structure
+            const tunnelGeometry = new THREE.BoxGeometry(2, 2, util.length);
+            const tunnelMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x333333 
+            });
+            const tunnel = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+            tunnel.position.copy(util.pos);
+            this.scene.add(tunnel);
+            
+            // Add pipes
+            const pipeGeometry = new THREE.CylinderGeometry(0.15, 0.15, util.length);
+            const pipeMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x444444 
+            });
+            
+            for (let i = 0; i < 3; i++) {
+                const pipe = new THREE.Mesh(pipeGeometry, pipeMaterial);
+                pipe.position.copy(util.pos);
+                pipe.position.x += (i - 1) * 0.5;
+                pipe.position.y += 0.7;
+                pipe.rotation.z = Math.PI / 2;
+                this.scene.add(pipe);
+            }
+        });
+    }
+    
+    createTunnelInfrastructure() {
+        // Add infrastructure elements to tunnels
+        const infrastructurePoints = [
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(-15, 0, 0),
+            new THREE.Vector3(15, 0, 0),
+            new THREE.Vector3(0, 0, -15),
+            new THREE.Vector3(0, 0, 15)
+        ];
+        
+        infrastructurePoints.forEach(point => {
+            // Junction boxes
+            const boxGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.3);
+            const boxMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x555555 
+            });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+            box.position.copy(point);
+            box.position.y = 2;
+            box.position.x += (Math.random() - 0.5) * 2;
+            this.scene.add(box);
+            
+            // Warning signs
+            const signGeometry = new THREE.PlaneGeometry(0.6, 0.4);
+            const signMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffff00 
+            });
+            const sign = new THREE.Mesh(signGeometry, signMaterial);
+            sign.position.copy(box.position);
+            sign.position.z += 0.2;
+            this.scene.add(sign);
+        });
+    }
+    
+    createVentilationSystem() {
+        // Create ventilation shafts and grates
+        const ventPositions = [
+            new THREE.Vector3(-10, 3, -10),
+            new THREE.Vector3(10, 3, -10),
+            new THREE.Vector3(-10, 3, 10),
+            new THREE.Vector3(10, 3, 10),
+            new THREE.Vector3(0, 3, 0)
+        ];
+        
+        ventPositions.forEach(pos => {
+            // Ventilation grate
+            const grateGeometry = new THREE.BoxGeometry(2, 0.3, 2);
+            const grateMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x444444,
+                transparent: true,
+                opacity: 0.8
+            });
+            const grate = new THREE.Mesh(grateGeometry, grateMaterial);
+            grate.position.copy(pos);
+            this.scene.add(grate);
+            
+            // Ventilation shaft above
+            const shaftGeometry = new THREE.BoxGeometry(1.8, 2, 1.8);
+            const shaftMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x222222 
+            });
+            const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+            shaft.position.copy(pos);
+            shaft.position.y += 1.5;
+            this.scene.add(shaft);
+            
+            this.ventilationShafts.push(shaft);
+        });
+    }
+    
+    createEmergencyLighting() {
+        // Create emergency lights along tunnels
+        const lightPositions = [
+            // Main corridor lights
+            ...Array(6).fill(0).map((_, i) => new THREE.Vector3(0, 3, -25 + i * 10)),
+            // Cross corridor lights
+            ...Array(6).fill(0).map((_, i) => new THREE.Vector3(-25 + i * 10, 3, 0))
+        ];
+        
+        lightPositions.forEach((pos, index) => {
+            // Light fixture
+            const fixtureGeometry = new THREE.BoxGeometry(0.6, 0.2, 0.6);
+            const fixtureMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x666666 
+            });
+            const fixture = new THREE.Mesh(fixtureGeometry, fixtureMaterial);
+            fixture.position.copy(pos);
+            this.scene.add(fixture);
+            
+            // Emergency light (red)
+            const light = new THREE.PointLight(0xff0000, 0.5, 5);
+            light.position.copy(pos);
+            light.position.y -= 0.3;
+            this.scene.add(light);
+            
+            // Flicker some lights
+            if (Math.random() > 0.7) {
+                this.emergencyLights.push({
+                    light: light,
+                    fixture: fixture,
+                    flickerRate: Math.random() * 0.5 + 0.1
+                });
+            }
+        });
+    }
+    
+    setupFlankingRoutes() {
+        // Create alternative paths for flanking maneuvers
+        const flankingRoutes = [
+            {
+                start: new THREE.Vector3(-20, 0, -20),
+                end: new THREE.Vector3(-20, 0, 20),
+                width: 2
+            },
+            {
+                start: new THREE.Vector3(20, 0, -20),
+                end: new THREE.Vector3(20, 0, 20),
+                width: 2
+            },
+            {
+                start: new THREE.Vector3(-20, 0, 0),
+                end: new THREE.Vector3(-10, 0, 0),
+                width: 2
+            },
+            {
+                start: new THREE.Vector3(20, 0, 0),
+                end: new THREE.Vector3(10, 0, 0),
+                width: 2
+            }
+        ];
+        
+        flankingRoutes.forEach(route => {
+            const direction = new THREE.Vector3().subVectors(route.end, route.start);
+            const length = direction.length();
+            direction.normalize();
+            
+            // Create narrow flanking tunnel
+            const tunnelGeometry = new THREE.BoxGeometry(route.width, 3, length);
+            const tunnelMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x2a2a2a 
+            });
+            const tunnel = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+            
+            // Position and orient tunnel
+            const midpoint = new THREE.Vector3().addVectors(route.start, route.end).multiplyScalar(0.5);
+            tunnel.position.copy(midpoint);
+            tunnel.position.y = 1.5;
+            
+            // Rotate to align with direction
+            if (Math.abs(direction.x) > Math.abs(direction.z)) {
+                tunnel.rotation.y = 0;
+            } else {
+                tunnel.rotation.y = Math.PI / 2;
+            }
+            
+            this.scene.add(tunnel);
+            
+            // Add cover points along the route
+            const coverCount = Math.floor(length / 5);
+            for (let i = 1; i < coverCount; i++) {
+                const t = i / coverCount;
+                const coverPos = new THREE.Vector3().lerpVectors(route.start, route.end, t);
+                
+                const coverGeometry = new THREE.BoxGeometry(0.8, 2, 0.8);
+                const coverMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x444444 
+                });
+                const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+                cover.position.copy(coverPos);
+                cover.position.y = 1;
+                this.scene.add(cover);
+            }
+        });
     }
 }

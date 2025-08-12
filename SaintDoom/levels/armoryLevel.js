@@ -1,17 +1,29 @@
+import * as THREE from 'three';
+import { BaseLevel } from './baseLevel.js';
 // Chapter 2 - The Armory
 // Deep underground weapons cache with demonic infestation
 
-export class ArmoryLevel {
+export class ArmoryLevel extends BaseLevel {
     constructor(scene, game) {
-        this.scene = scene;
-        this.game = game;
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.scene = arguments[0].scene;
+            this.game = arguments[0];
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
+        
         this.levelNumber = 2;  // Chapter 2
         this.levelName = "The Armory";
-        this.walls = [];
         this.armoryReached = false;
         this.weaponsCollected = 0;
         this.doorOpened = false;
-        this.pickups = []; // Track pickups directly for better performance
+        // pickups and walls are already initialized in BaseLevel
     }
     
     create() {
@@ -428,29 +440,7 @@ export class ArmoryLevel {
         this.sealedDoor = door;
     }
     
-    createWall(x, y, z, width, height, depth, material) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const wall = new THREE.Mesh(geometry, material);
-        wall.position.set(x, y, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        this.scene.add(wall);
-        
-        // Store wall bounds for collision
-        this.walls.push({
-            mesh: wall,
-            min: new THREE.Vector3(
-                x - width/2,
-                y - height/2,
-                z - depth/2
-            ),
-            max: new THREE.Vector3(
-                x + width/2,
-                y + height/2,
-                z + depth/2
-            )
-        });
-    }
+    // createWall method is now inherited from BaseLevel
     
     addLighting() {
         // Flickering fluorescent lights throughout the facility
@@ -464,17 +454,20 @@ export class ArmoryLevel {
             { x: 0, z: -47 }     // Exit area
         ];
         
-        positions.forEach(pos => {
+        positions.forEach((pos, index) => {
             const light = new THREE.PointLight(0xccccff, 0.8, 15);
             light.position.set(pos.x, 4, pos.z);
-            light.castShadow = true;
+            // Only enable shadows for first 2 lights to improve performance
+            if (index < 2) {
+                light.castShadow = true;
+            }
             this.scene.add(light);
             
-            // Flicker effect for some lights
-            if (Math.random() > 0.5) {
-                setInterval(() => {
-                    light.intensity = light.intensity === 0.8 ? 0.3 : 0.8;
-                }, 100 + Math.random() * 500);
+            // Store flickering lights for animation in update loop instead of setInterval
+            if (Math.random() > 0.7) {  // Reduce number of flickering lights
+                light.userData.flicker = true;
+                light.userData.flickerSpeed = 100 + Math.random() * 500;
+                light.userData.lastFlicker = Date.now();
             }
         });
         
@@ -543,17 +536,16 @@ export class ArmoryLevel {
     
     spawnArmoryEnemies() {
         if (this.game && this.game.spawnEnemy) {
-            // Possessed scientists in entry area - spawn at floor level
+            // Reduce enemy count and spread them out better for performance
+            // Entry area - one enemy
             this.game.spawnEnemy(0, 0, -5, 'possessed_scientist');
             
-            // More in main armory
-            this.game.spawnEnemy(-8, 0, -20, 'possessed_scientist');
-            this.game.spawnEnemy(8, 0, -20, 'possessed_scientist');
-            this.game.spawnEnemy(0, 0, -25, 'possessed_scientist');
+            // Main armory - two enemies with better spacing
+            this.game.spawnEnemy(-10, 0, -20, 'possessed_scientist');
+            this.game.spawnEnemy(10, 0, -22, 'possessed_scientist');
             
-            // Add more possessed scientists instead of hellhounds for now
-            this.game.spawnEnemy(-3, 0, -35, 'possessed_scientist');
-            this.game.spawnEnemy(3, 0, -35, 'possessed_scientist');
+            // Exit corridor - one enemy
+            this.game.spawnEnemy(0, 0, -35, 'possessed_scientist');
         }
     }
     
@@ -718,6 +710,9 @@ export class ArmoryLevel {
         // Check if player has reached the exit door
         if (!player || !player.position) return false;
         
+        // Prevent multiple triggers
+        if (this.levelCompleted) return false;
+        
         // Check if door is unlocked first
         if (this.sealedDoor && !this.sealedDoor.userData.locked) {
             // Exit door is at z = -51.5, check if player is near it
@@ -727,7 +722,7 @@ export class ArmoryLevel {
             // Check if player has passed through the door area
             // Made the detection area larger and more forgiving
             if (playerZ < -48 && Math.abs(playerX) < 4) {
-                console.log('Player reached exit! Position:', player.position);
+                this.levelCompleted = true; // Set flag to prevent multiple triggers
                 return true;
             }
         }
@@ -736,13 +731,12 @@ export class ArmoryLevel {
     }
     
     clearLevel() {
-        // Remove all level geometry
-        this.walls.forEach(wall => {
-            if (wall.mesh) {
-                this.scene.remove(wall.mesh);
-            }
-        });
-        this.walls = [];
+        // Call parent cleanup to handle intervals, timeouts, walls, etc.
+        if (super.cleanup) {
+            super.cleanup();
+        }
+        
+        // Additional armory-specific cleanup below
         
         // Clear pickups array
         this.pickups = [];

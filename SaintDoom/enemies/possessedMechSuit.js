@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Enemy } from './enemy.js';
+import { Enemy } from '../enemy.js';
 
 export class PossessedMechSuit extends Enemy {
     constructor(scene, position) {

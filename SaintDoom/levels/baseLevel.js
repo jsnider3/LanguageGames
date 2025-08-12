@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-
 /**
  * Base class for all levels in SaintDoom
  * Provides common functionality and structure for level creation
@@ -66,6 +65,64 @@ export class BaseLevel {
         directionalLight.position.set(1, 1, 0);
         this.scene.add(directionalLight);
         this.lights.push(directionalLight);
+    }
+    
+    /**
+     * Create emergency lighting setup
+     * @param {number} ambientColor - Ambient light color
+     * @param {number} intensity - Light intensity
+     */
+    createEmergencyLighting(ambientColor = 0x4a1100, intensity = 0.5) {
+        const ambientLight = new THREE.AmbientLight(ambientColor, intensity);
+        this.scene.add(ambientLight);
+        this.lights.push(ambientLight);
+        return ambientLight;
+    }
+    
+    /**
+     * Create warning lights at specified positions
+     * @param {Array} positions - Array of {x, y, z} positions
+     * @param {Object} options - Light options
+     */
+    createWarningLights(positions, options = {}) {
+        const {
+            color = 0xff4400,
+            intensity = 1,
+            distance = 20,
+            blinking = true,
+            blinkSpeed = 800
+        } = options;
+        
+        const warningLights = [];
+        
+        positions.forEach(pos => {
+            const warningLight = new THREE.PointLight(color, intensity, distance);
+            warningLight.position.set(pos.x, pos.y, pos.z);
+            this.scene.add(warningLight);
+            this.lights.push(warningLight);
+            warningLights.push(warningLight);
+            
+            if (blinking) {
+                this.addBlinkingEffect(warningLight, blinkSpeed);
+            }
+        });
+        
+        return warningLights;
+    }
+    
+    /**
+     * Add blinking effect to a light
+     * @param {THREE.Light} light - Light to animate
+     * @param {number} speed - Blink speed in milliseconds
+     */
+    addBlinkingEffect(light, speed = 1000) {
+        const originalIntensity = light.intensity;
+        const variation = speed * 0.5;
+        const actualSpeed = speed + (Math.random() - 0.5) * variation;
+        
+        this.addInterval(() => {
+            light.intensity = light.intensity === 0 ? originalIntensity : 0;
+        }, actualSpeed);
     }
 
     /**
@@ -157,6 +214,28 @@ export class BaseLevel {
         const timeoutId = setTimeout(callback, delay);
         this.timeouts.push(timeoutId);
         return timeoutId;
+    }
+
+    /**
+     * Clear managed interval
+     */
+    clearInterval(intervalId) {
+        clearInterval(intervalId);
+        const index = this.intervals.indexOf(intervalId);
+        if (index > -1) {
+            this.intervals.splice(index, 1);
+        }
+    }
+
+    /**
+     * Clear managed timeout
+     */
+    clearTimeout(timeoutId) {
+        clearTimeout(timeoutId);
+        const index = this.timeouts.indexOf(timeoutId);
+        if (index > -1) {
+            this.timeouts.splice(index, 1);
+        }
     }
 
     /**
@@ -410,6 +489,181 @@ export class BaseLevel {
         }, 16);
 
         return { explosion, light };
+    }
+
+    /**
+     * Create a wall with collision bounds
+     * Common method used across all levels
+     */
+    createWall(x, y, z, width, height, depth, material) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const wall = new THREE.Mesh(geometry, material);
+        wall.position.set(x, y, z);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        this.scene.add(wall);
+        
+        // Store wall bounds for collision
+        this.walls.push({
+            mesh: wall,
+            min: new THREE.Vector3(
+                x - width/2,
+                y - height/2,
+                z - depth/2
+            ),
+            max: new THREE.Vector3(
+                x + width/2,
+                y + height/2,
+                z + depth/2
+            )
+        });
+        
+        return wall;
+    }
+    
+    /**
+     * Create standard exit portal for level completion
+     * @param {THREE.Vector3} position - Position for the portal
+     * @param {Object} options - Optional customization
+     */
+    createExitPortal(position = new THREE.Vector3(0, 2, 0), options = {}) {
+        // Prevent duplicate portals
+        if (this.exitPortalCreated) return;
+        this.exitPortalCreated = true;
+        
+        const {
+            color = 0x00ff00,
+            emissiveColor = 0x00ff00,
+            portalColor = 0x00ffff,
+            scale = 1,
+            message = "Exit portal activated!",
+            rotation = null
+        } = options;
+        
+        // Create portal group
+        const portalGroup = new THREE.Group();
+        
+        // Portal ring
+        const ringGeometry = new THREE.TorusGeometry(3 * scale, 0.5 * scale, 16, 32);
+        const ringMaterial = new THREE.MeshPhongMaterial({
+            color: color,
+            emissive: emissiveColor,
+            emissiveIntensity: 0.5
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        portalGroup.add(ring);
+        
+        // Portal surface
+        const portalGeometry = new THREE.CircleGeometry(3 * scale, 32);
+        const portalMaterial = new THREE.MeshBasicMaterial({
+            color: portalColor,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+        portalGroup.add(portal);
+        
+        // Position and rotation
+        portalGroup.position.copy(position);
+        if (rotation) {
+            portalGroup.rotation.copy(rotation);
+        }
+        this.scene.add(portalGroup);
+        
+        // Add portal light
+        const portalLight = new THREE.PointLight(color, 2, 10 * scale);
+        portalLight.position.copy(position);
+        this.scene.add(portalLight);
+        this.lights.push(portalLight);
+        
+        // Store for interaction checking
+        this.exitPortal = portalGroup;
+        
+        // Animate portal
+        const animationInterval = setInterval(() => {
+            if (ring && portal) {
+                ring.rotation.z += 0.02;
+                portal.rotation.z -= 0.01;
+                // Pulse effect
+                const pulseScale = scale * (1 + Math.sin(Date.now() * 0.003) * 0.1);
+                portalGroup.scale.set(pulseScale, pulseScale, pulseScale);
+            }
+        }, 16);
+        this.intervals.push(animationInterval);
+        
+        // Display message
+        if (this.game && this.game.narrativeSystem && message) {
+            this.game.narrativeSystem.displaySubtitle(message);
+        }
+        
+        return portalGroup;
+    }
+    
+    /**
+     * Check if player is near exit portal and handle level completion
+     */
+    checkExitPortalInteraction() {
+        if (!this.exitPortal || !this.game || !this.game.player) return false;
+        
+        const distance = this.game.player.position.distanceTo(this.exitPortal.position);
+        if (distance < 4) {
+            this.completeLevel();
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Standard level completion handler
+     */
+    completeLevel() {
+        // Prevent double completion
+        if (this.completed) return;
+        this.completed = true;
+        
+        // Display completion message
+        const levelName = this.name || "Level";
+        if (this.game && this.game.narrativeSystem) {
+            this.game.narrativeSystem.displaySubtitle(`${levelName} Complete!`);
+        }
+        
+        // Load next level after delay
+        setTimeout(() => {
+            if (this.game && this.game.loadNextLevel) {
+                this.game.loadNextLevel();
+            }
+        }, 2000);
+    }
+    
+    /**
+     * Check if all objectives are complete
+     * Override this for custom completion logic
+     */
+    isComplete() {
+        if (!this.objectives || this.objectives.length === 0) {
+            return false;
+        }
+        return this.objectives.every(obj => obj.completed);
+    }
+    
+    /**
+     * Update objective progress and check for completion
+     */
+    updateObjectives() {
+        // Check for level completion
+        if (this.isComplete() && !this.exitPortalCreated) {
+            // Get exit position - override in subclasses
+            const exitPosition = this.getExitPosition();
+            this.createExitPortal(exitPosition);
+        }
+    }
+    
+    /**
+     * Get position for exit portal - override in subclasses
+     */
+    getExitPosition() {
+        return new THREE.Vector3(0, 2, 0);
     }
 
     /**

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Player Module
 // Handles player state, movement, health, weapons, and abilities
 

@@ -1,5 +1,5 @@
 import { BaseLevel } from './baseLevel.js';
-import { COLORS, MATERIALS, createLightingSetup, createCircularPlatform, createWall } from './levelUtils.js';
+import { COLORS, MATERIALS, Geometry, Lighting } from './levelUtils.js';
 import { EnemySpawner } from './enemySpawner.js';
 import * as THREE from 'three';
 
@@ -8,8 +8,19 @@ import * as THREE from 'three';
  * Refactored to use utilities and configuration-driven approach
  */
 export class SpawningGroundsLevel extends BaseLevel {
-    constructor(game) {
-        super(game);
+    constructor(scene, game) {
+        // Handle both old and new constructor signatures
+        if (arguments.length === 1 && arguments[0].scene) {
+            // New signature: (game)
+            super(arguments[0]);
+            this.game = arguments[0];
+            this.scene = arguments[0].scene;
+        } else {
+            // Old signature: (scene, game)
+            super(game);
+            this.scene = scene;
+            this.game = game;
+        }
         this.name = "Spawning Grounds";
         this.description = "The epicenter of the demonic invasion - endless waves of enemies emerge from hell portals";
         this.backgroundColor = new THREE.Color(COLORS.HELL_AMBIENT);
@@ -56,6 +67,14 @@ export class SpawningGroundsLevel extends BaseLevel {
         this.altarDestroyed = false;
         
         this.init();
+    }
+    
+    create() {
+        // Return required data structure for Game.js
+        return {
+            walls: this.walls,
+            enemies: this.enemies
+        };
     }
 
     init() {
@@ -111,7 +130,14 @@ export class SpawningGroundsLevel extends BaseLevel {
             wall.position.set(x, height/2, z);
             wall.lookAt(new THREE.Vector3(0, height/2, 0));
             this.scene.add(wall);
-            this.walls.push(wall);
+            
+            // Add proper collision bounds for the wall
+            const box = new THREE.Box3().setFromObject(wall);
+            this.walls.push({
+                mesh: wall,
+                min: box.min,
+                max: box.max
+            });
         }
     }
 
@@ -167,9 +193,7 @@ export class SpawningGroundsLevel extends BaseLevel {
         // Portal ring
         const ringGeometry = new THREE.TorusGeometry(3, 0.5, 8, 16);
         const ringMaterial = new THREE.MeshBasicMaterial({ 
-            color: this.config.visuals.portalColor,
-            emissive: this.config.visuals.portalColor,
-            emissiveIntensity: 1
+            color: this.config.visuals.portalColor
         });
         const ring = new THREE.Mesh(ringGeometry, ringMaterial);
         ring.rotation.x = Math.PI / 2;
@@ -233,8 +257,6 @@ export class SpawningGroundsLevel extends BaseLevel {
         const crystalGeometry = new THREE.OctahedronGeometry(1, 0);
         const crystalMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 2,
             transparent: true,
             opacity: 0.8
         });
@@ -509,6 +531,104 @@ export class SpawningGroundsLevel extends BaseLevel {
 
         if (this.game && this.game.narrativeSystem) {
             this.game.narrativeSystem.setObjective("Destroy the central altar to stop the invasion");
+        }
+    }
+
+    /**
+     * Create lighting for the arena
+     */
+    createLighting() {
+        // Hellish red ambient light
+        const ambientLight = new THREE.AmbientLight(this.config.visuals.portalColor, 0.3);
+        this.scene.add(ambientLight);
+        
+        // Main directional light
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        this.scene.add(directionalLight);
+        
+        // Add fog for atmosphere
+        this.scene.fog = new THREE.Fog(0x220000, 10, 100);
+    }
+    
+    /**
+     * Create environmental details
+     */
+    createEnvironmentalDetails() {
+        // Blood pools
+        const bloodPoolCount = 10;
+        for (let i = 0; i < bloodPoolCount; i++) {
+            const poolGeometry = new THREE.CircleGeometry(Math.random() * 2 + 1, 8);
+            const poolMaterial = new THREE.MeshLambertMaterial({
+                color: 0x440000,
+                transparent: true,
+                opacity: 0.8
+            });
+            const pool = new THREE.Mesh(poolGeometry, poolMaterial);
+            pool.rotation.x = -Math.PI / 2;
+            pool.position.set(
+                (Math.random() - 0.5) * 40,
+                0.01,
+                (Math.random() - 0.5) * 40
+            );
+            this.scene.add(pool);
+        }
+        
+        // Bone piles
+        const bonePileCount = 5;
+        for (let i = 0; i < bonePileCount; i++) {
+            const pileGroup = new THREE.Group();
+            
+            // Create random bones
+            for (let j = 0; j < 5; j++) {
+                const boneGeometry = new THREE.CylinderGeometry(0.05, 0.08, 0.5 + Math.random() * 0.5, 4);
+                const boneMaterial = new THREE.MeshLambertMaterial({ color: 0xccccaa });
+                const bone = new THREE.Mesh(boneGeometry, boneMaterial);
+                bone.position.set(
+                    (Math.random() - 0.5) * 0.5,
+                    Math.random() * 0.3,
+                    (Math.random() - 0.5) * 0.5
+                );
+                bone.rotation.set(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                );
+                pileGroup.add(bone);
+            }
+            
+            pileGroup.position.set(
+                (Math.random() - 0.5) * 30,
+                0,
+                (Math.random() - 0.5) * 30
+            );
+            this.scene.add(pileGroup);
+        }
+        
+        // Demonic runes on floor
+        const runeCount = 8;
+        for (let i = 0; i < runeCount; i++) {
+            const angle = (i / runeCount) * Math.PI * 2;
+            const radius = 20;
+            
+            const runeGeometry = new THREE.RingGeometry(1, 1.5, 6);
+            const runeMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.5
+            });
+            const rune = new THREE.Mesh(runeGeometry, runeMaterial);
+            rune.rotation.x = -Math.PI / 2;
+            rune.position.set(
+                Math.cos(angle) * radius,
+                0.02,
+                Math.sin(angle) * radius
+            );
+            this.scene.add(rune);
         }
     }
 
