@@ -1,24 +1,124 @@
 {
   "ideas": [
-    "A website that generates random facts about potatoes.",
-    "A CLI tool to organize your desktop background images by color.",
-    "A mobile app that suggests a random recipe based on ingredients you have.",
-    "A browser extension that replaces all images on a webpage with pictures of cats.",
-    "A Twitter bot that tweets inspiring quotes from ancient philosophers.",
-    "A web app that visualizes your music library as a constellation map.",
-    "A Python script that automatically generates commit messages based on the diff.",
-    "A game where you have to sort falling objects into the correct bins based on their type.",
-    "A tool that sends you a daily email with a new word and its definition.",
-    "A web-based collaborative story editor where each user can only add one sentence at a time.",
-    "An AI that writes overly dramatic soap opera scripts.",
-    "A program that turns your code comments into a narrative documentation story.",
-    "A fitness app that gives you points for high-fiving strangers.",
-    "A virtual reality experience where you can explore famous paintings in 3D.",
-    "A service that mails you a physical postcard with a random fact every week.",
-    "A chatbot that only responds in the style of a pirate.",
-    "A plugin for your IDE that highlights variables with funny names.",
-    "A website that tracks the migratory patterns of local pigeons using community reports.",
-    "An app that generates a personalized haiku based on your current weather.",
-    "A dashboard that visualizes your social media usage as a dystopian cityscape."
+    {
+      "title": "Vocabulary Charades",
+      "description": "Players act out vocabulary words or phrases without speaking, while others guess in the target language. Great for kinesthetic learners and reinforcing new terms."
+    },
+    {
+      "title": "Story Cubes",
+      "description": "Use printable story cubes with verbs, nouns, and adjectives. Roll them and create a sentence or short story using the results in the target language."
+    },
+    {
+      "title": "Cultural Cuisine Challenge",
+      "description": "Learn vocabulary related to food and cooking by preparing a dish from a culture that speaks your target language. Describe the process in the language as you cook."
+    },
+    {
+      "title": "Grammar Mad Libs",
+      "description": "Create fill-in-the-blank stories that require specific grammatical structures to complete. Players fill in parts of speech, then read the hilarious results aloud."
+    },
+    {
+      "title": "Language Exchange Scavenger Hunt",
+      "description": "Partner with a native speaker for a scavenger hunt where clues are in their language and responses must be in yours. Encourages real interaction and practical usage."
+    },
+    {
+      "title": "Minimal Pairs Bingo",
+      "description": "Create bingo cards with minimal pairs (like 'ship' vs 'sheep' in English). The caller pronounces words, and players mark their cards. Improves listening skills and pronunciation."
+    },
+    {
+      "title": "Role Reversal Interviews",
+      "description": "One player is a famous person from the target culture, the other is a reporter. They interview each other, switching roles halfway. Enhances speaking and cultural knowledge."
+    },
+    {
+      "title": "Translation Telephone",
+      "description": "Start with a phrase in your native language, translate it to the target language, then to another language, and so on. Finally, translate back and compare to the original."
+    },
+    {
+      "title": "Verb Conjugation Dance",
+      "description": "Call out a verb and tense. Players must physically act out the meaning while correctly conjugating it. Combines movement with memorization for active learning."
+    },
+    {
+      "title": "Taboo Vocabulary",
+      "description": "Describe a vocabulary word without using a list of 'taboo' related words. Others must guess the target word in the target language. Expands descriptive abilities."
+    },
+    {
+      "title": "Timeline Storytelling",
+      "description": "Create a timeline of historical events or a fictional character's life. Narrate it in the target language, using appropriate past tenses and chronological vocabulary."
+    },
+    {
+      "title": "Debate Speed Round",
+      "description": "Quick-fire debates on silly topics with a timer. Players get 30 seconds to prepare and 1 minute to argue their stance in the target language. Builds fluency under pressure."
+    },
+    {
+      "title": "Song Lyrics Reconstruction",
+      "description": "Provide jumbled lines from a song in the target language. Players work together to reorder them correctly. Then discuss the meaning and cultural context of the lyrics."
+    },
+    {
+      "title": "Alphabet Adventure",
+      "description": "For each letter of the alphabet, find a word related to a theme (like 'food' or 'travel') in the target language. Time players to make it competitive. Great for vocabulary expansion."
+    },
+    {
+      "title": "Mystery Word Cloud",
+      "description": "Generate a word cloud from a text in the target language. Players ask yes/no questions to deduce a specific word you've selected from the cloud. Enhances text analysis."
+    },
+    {
+      "title": "Idiom Illustrated",
+      "description": "Draw or act out idioms from the target language while others guess the meaning and provide their own language equivalents. Deepens cultural understanding."
+    },
+    {
+      "title": "News Reporter Roleplay",
+      "description": "Players take turns presenting fictional news reports in the target language, complete with weather, sports, and quirky local stories. Develops formal speaking skills."
+    },
+    {
+      "title": "Grammar Auction",
+      "description": "Bid on sentences (using play money) that are either grammatically correct or incorrect in the target language. Loses points/money for incorrect bids. Reinforces grammar rules."
+    },
+    {
+      "title": "Escape Room Puzzles",
+      "description": "Design puzzles where solving them requires understanding vocabulary, grammar, or cultural clues in the target language to 'escape'. Immersive and challenging."
+    },
+    {
+      "title": "Dialect Detective",
+      "description": "Listen to audio clips of the same language spoken in different regions. Identify the differences and discuss regional vocabulary and pronunciation variations."
+    },
+    {
+      "title": "Back-to-Back Drawing",
+      "description": "One player describes a simple image without naming it, the other draws it - all in the target language. Switch roles. Excellent for practicing descriptive language and prepositions."
+    },
+    {
+      "title": "Word Association Chain",
+      "description": "Start with a word, and each player must say a word associated with the previous one. For example: 'Apple' -> 'Red' -> 'Fire' -> 'Heat'. Great for vocabulary building!"
+    },
+    {
+      "title": "Sentence Building Relay",
+      "description": "Players take turns adding one word to build a sentence. The challenge is to create a coherent sentence without planning ahead. Enhances grammar and creativity."
+    },
+    {
+      "title": "Picture Description Race",
+      "description": "Show a complex picture. Players have 30 seconds to memorize it, then describe as much as they can in the target language. Encourages detailed vocabulary usage."
+    },
+    {
+      "title": "Flashcard Frenzy",
+      "description": "Create flashcards with vocabulary or grammar rules. Players take turns drawing cards and must use the word/grammar correctly in a sentence. Can be timed for added pressure."
+    },
+    {
+      "title": "Cultural Show and Tell",
+      "description": "Bring an item related to the target culture and describe it in the target language. Others ask questions about it. Great for cultural vocabulary and speaking practice."
+    },
+    {
+      "title": "Two Truths and a Lie",
+      "description": "Each player states three facts about themselves in the target language - two true and one false. Others guess which is the lie. Encourages personal expression and listening skills."
+    },
+    {
+      "title": "Speed Grammar",
+      "description": "Similar to speed dating, players rotate through different grammar stations. At each station, they complete a quick exercise or game focused on a specific grammar point."
+    },
+    {
+      "title": "Movie Quote Match",
+      "description": "Play clips from movies in the target language. Players must identify the movie and context of the quote. Great for listening comprehension and cultural exposure."
+    },
+    {
+      "title": "Word Scavenger Hunt",
+      "description": "Create a list of specific vocabulary words for players to find in newspapers, magazines, or online articles in the target language. Encourages reading and text analysis."
+    }
   ]
 }

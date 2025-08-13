@@ -3,17 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Idea Generator</title>
+    <title>Language Learning Game Idea Generator</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <h1>Random Idea Generator</h1>
-        <div id="idea-display" class="idea-box">
-            <!-- Idea will be displayed here -->
+        <div class="header">
+            <h1>Language Learning Game Idea Generator</h1>
+            <div class="theme-toggle">
+                <input type="checkbox" id="dark-mode-toggle">
+                <label for="dark-mode-toggle" class="toggle-label">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </label>
+            </div>
         </div>
-        <button id="new-idea-btn">Generate New Idea</button>
+        
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search ideas...">
+            <button id="search-btn"><i class="fas fa-search"></i></button>
+        </div>
+        
+        <div class="controls">
+            <label for="idea-count">Number of ideas:</label>
+            <select id="idea-count">
+                <option value="1">1</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+            </select>
+            <button id="generate-btn">Generate Ideas</button>
+        </div>
+        
+        <div class="actions">
+            <button id="export-btn" class="action-btn"><i class="fas fa-download"></i> Export Ideas</button>
+            <button id="favorites-btn" class="action-btn"><i class="fas fa-heart"></i> View Favorites (<span id="favorites-count">0</span>)</button>
+        </div>
+        
+        <div id="idea-container">
+            <p id="idea-placeholder">Your ideas will appear here...</p>
+            <div id="loading" class="hidden">
+                <div class="spinner"></div>
+                <p>Generating ideas...</p>
+            </div>
+        </div>
+        
+        <div id="history-container">
+            <h2>Recent Ideas</h2>
+            <ul id="history-list"></ul>
+        </div>
+        
+        <div id="favorites-container" class="hidden">
+            <h2>Favorite Ideas</h2>
+            <ul id="favorites-list"></ul>
+            <button id="clear-favorites-btn">Clear All Favorites</button>
+        </div>
+        
+        <div id="error-message" class="hidden"></div>
     </div>
+    
+    <div id="language-selector">
+        <select id="language-select">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+        </select>
+    </div>
+    
     <script src="script.js"></script>
 </body>
 </html>
