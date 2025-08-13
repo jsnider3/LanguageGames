@@ -2,20 +2,12 @@ import * as THREE from 'three';
 // Imp Enemy Type
 // Small, agile demons with fireball projectile attacks
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class Imp extends Enemy {
+export class Imp extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        // Override stats for imp
-        this.health = 20;
-        this.maxHealth = 20;
-        this.moveSpeed = 4;
-        this.damage = 8;
-        this.attackRange = 15; // Ranged attacker
-        this.sightRange = 25;
-        this.type = 'imp';
         
         // Smaller size
         this.radius = 0.2;
@@ -43,8 +35,8 @@ export class Imp extends Enemy {
         // Small body
         const bodyGeometry = new THREE.SphereGeometry(0.25, 8, 6);
         const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: 0x660000,
-            emissive: 0x330000,
+            color: THEME.enemies.demonic.skin,
+            emissive: THEME.enemies.demonic.glow,
             emissiveIntensity: 0.2
         });
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
@@ -76,7 +68,7 @@ export class Imp extends Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.03, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffaa00
+            color: THEME.items.weapons.legendary
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -90,7 +82,7 @@ export class Imp extends Enemy {
         // Wings (small bat-like)
         const wingGeometry = new THREE.PlaneGeometry(0.4, 0.3);
         const wingMaterial = new THREE.MeshPhongMaterial({
-            color: 0x440000,
+            color: THEME.materials.robeEmissive,
             side: THREE.DoubleSide,
             transparent: true,
             opacity: 0.8
@@ -225,7 +217,7 @@ export class Imp extends Enemy {
     createFireball() {
         const fireballGeometry = new THREE.SphereGeometry(0.15, 8, 6);
         const fireballMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600
+            color: THEME.effects.explosion.fire
         });
         
         const fireball = new THREE.Mesh(fireballGeometry, fireballMaterial);
@@ -306,7 +298,7 @@ export class Imp extends Enemy {
                 const distance = projectile.mesh.position.distanceTo(this.target.position);
                 if (distance < 1) {
                     // Hit player
-                    this.target.takeDamage(projectile.damage);
+                    this.target.takeDamage(projectile.damage, "Imp Fireball");
                     this.explodeFireball(projectile);
                     this.removeProjectile(i);
                     continue;

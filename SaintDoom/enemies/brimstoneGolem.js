@@ -2,20 +2,12 @@ import * as THREE from 'three';
 // Brimstone Golem Enemy Type
 // High health tank with area damage on death
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class BrimstoneGolem extends Enemy {
+export class BrimstoneGolem extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        // Override stats - tanky enemy
-        this.health = 150;
-        this.maxHealth = 150;
-        this.moveSpeed = 1.5; // Very slow
-        this.damage = 30;
-        this.attackRange = 3;
-        this.sightRange = 20;
-        this.type = 'brimstone_golem';
         
         // Large size
         this.radius = 0.8;
@@ -133,7 +125,7 @@ export class BrimstoneGolem extends Enemy {
         for (let i = 0; i < crackCount; i++) {
             const crackGeometry = new THREE.PlaneGeometry(0.05, 0.8);
             const crackMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff6600,
+                color: THEME.effects.explosion.fire,
                 side: THREE.DoubleSide
             });
             
@@ -310,7 +302,7 @@ export class BrimstoneGolem extends Enemy {
                 ).length();
                 
                 if (distance < 0.5 && now - trail.lastDamageTime > 500) {
-                    this.target.takeDamage(trail.damage);
+                    this.target.takeDamage(trail.damage, "Brimstone Golem Lava Trail");
                     trail.lastDamageTime = now;
                 }
             }
@@ -367,7 +359,7 @@ export class BrimstoneGolem extends Enemy {
         // Create shockwave
         const shockwaveGeometry = new THREE.RingGeometry(0.5, 1, 32);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: THEME.effects.explosion.fire,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -401,7 +393,7 @@ export class BrimstoneGolem extends Enemy {
                 const ringRadius = shockwave.scale.x;
                 if (Math.abs(distance - ringRadius) < 1 && shockwave.material.opacity > 0.3) {
                     // Damage and knockback
-                    this.target.takeDamage(this.slamDamage);
+                    this.target.takeDamage(this.slamDamage, "Brimstone Golem Slam");
                     
                     const knockbackDir = new THREE.Vector3()
                         .subVectors(this.target.position, this.position)
@@ -478,7 +470,7 @@ export class BrimstoneGolem extends Enemy {
                         // Destroy vent
                         vent.userData.destroyed = true;
                         vent.material.color.setHex(0x333333);
-                        vent.material.emissive.setHex(0x000000);
+                        vent.material.emissive.setHex(THEME.materials.black);
                         
                         // Steam burst
                         this.createSteamBurst(ventWorldPos);
@@ -516,7 +508,7 @@ export class BrimstoneGolem extends Enemy {
             const steam = new THREE.Mesh(
                 new THREE.SphereGeometry(0.1 + Math.random() * 0.1, 4, 4),
                 new THREE.MeshBasicMaterial({
-                    color: 0xffffff,
+                    color: THEME.lights.spot.white,
                     transparent: true,
                     opacity: 0.6
                 })
@@ -579,7 +571,7 @@ export class BrimstoneGolem extends Enemy {
         // Warning indicator
         const warningGeometry = new THREE.RingGeometry(this.deathExplosionRadius - 1, this.deathExplosionRadius, 32);
         const warningMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.5,
             side: THREE.DoubleSide
@@ -611,7 +603,7 @@ export class BrimstoneGolem extends Enemy {
         // Create massive explosion
         const explosionGeometry = new THREE.SphereGeometry(1, 16, 16);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: THEME.effects.explosion.fire,
             transparent: true,
             opacity: 1
         });
@@ -638,7 +630,7 @@ export class BrimstoneGolem extends Enemy {
                     const damageFactor = 1 - (distance / this.deathExplosionRadius);
                     const damage = this.deathExplosionDamage * damageFactor;
                     
-                    this.target.takeDamage(damage);
+                    this.target.takeDamage(damage, "Brimstone Golem Death Explosion");
                     
                     // Knockback
                     const knockback = new THREE.Vector3()

@@ -9,65 +9,10 @@ import * as THREE from 'three';
  */
 export class SpawningGroundsLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        this.name = "Spawning Grounds";
-        this.description = "The epicenter of the demonic invasion - endless waves of enemies emerge from hell portals";
-        this.backgroundColor = new THREE.Color(COLORS.HELL_AMBIENT);
-        
-        // Centralized configuration
-        this.config = {
-            arena: {
-                radius: 50,
-                wallHeight: 15,
-                wallCount: 16,
-                ringCount: 3,
-                ringSpacing: 15
-            },
-            waves: {
-                initialIntensity: 1,
-                maxIntensity: 5,
-                intensityGrowth: 0.5,
-                spawnInterval: 15000,
-                breakDuration: 10000,
-                maxEnemiesPerWave: 20,
-                portalCooldown: 5000
-            },
-            visuals: {
-                portalColor: 0xff0000,
-                altarColor: 0x8b0000,
-                fleshColor: 0x4a2a1a,
-                wallColor: 0x5a1a1a,
-                ringColor: 0x8b0000,
-                ringOpacity: 0.3
-            }
-        };
-        
-        // Initialize spawner
-        this.enemySpawner = new EnemySpawner(this.scene);
-        
-        // State tracking
-        this.spawnPortals = [];
-        this.portalCooldowns = new Map();
-        this.swarmIntensity = this.config.waves.initialIntensity;
-        this.waveNumber = 1;
-        this.enemiesSpawnedThisWave = 0;
-        this.waveBreakTimer = 0;
-        this.centralAltar = null;
-        this.altarDestroyed = false;
-        
-        this.init();
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Return required data structure for Game.js

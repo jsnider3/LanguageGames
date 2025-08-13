@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { THEME } from '../modules/config/theme.js';
 
 // Vatican Combat Pistol
 // Standard sidearm since 1950s with blessed silver bullets
@@ -59,7 +60,7 @@ export class VaticanPistol {
         // Slide
         const slideGeometry = new THREE.BoxGeometry(0.12, 0.05, 0.03);
         const slideMaterial = new THREE.MeshPhongMaterial({
-            color: 0x444444,
+            color: THEME.materials.metal.dark,
             metalness: 0.8,
             roughness: 0.3
         });
@@ -93,8 +94,8 @@ export class VaticanPistol {
         // Sights
         const frontSightGeometry = new THREE.BoxGeometry(0.005, 0.01, 0.005);
         const sightMaterial = new THREE.MeshPhongMaterial({
-            color: 0xaaaaaa,
-            emissive: 0x00ff00,
+            color: THEME.materials.metal.light,
+            emissive: THEME.ui.health.full,
             emissiveIntensity: 0.2
         });
         const frontSight = new THREE.Mesh(frontSightGeometry, sightMaterial);
@@ -281,7 +282,7 @@ export class VaticanPistol {
         // Create new flash
         const flashGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             transparent: true,
             opacity: 1
         });
@@ -314,7 +315,7 @@ export class VaticanPistol {
         const points = [start.clone(), end.clone()];
         const trailGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const trailMaterial = new THREE.LineBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             transparent: true,
             opacity: 0.6
         });
@@ -341,7 +342,7 @@ export class VaticanPistol {
             const spark = new THREE.Mesh(
                 new THREE.SphereGeometry(0.02, 4, 4),
                 new THREE.MeshBasicMaterial({
-                    color: 0xffaa00,
+                    color: THEME.items.weapons.legendary,
                     transparent: true,
                     opacity: 1
                 })
@@ -376,7 +377,7 @@ export class VaticanPistol {
         const impact = new THREE.Mesh(
             new THREE.SphereGeometry(0.2, 8, 6),
             new THREE.MeshBasicMaterial({
-                color: 0xffffaa,
+                color: THEME.lights.point.holy,
                 transparent: true,
                 opacity: 0.4
             })
@@ -403,7 +404,7 @@ export class VaticanPistol {
         // Special effect for headshots
         const hsGeometry = new THREE.RingGeometry(0.1, 0.3, 16);
         const hsMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide

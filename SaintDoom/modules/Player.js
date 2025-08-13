@@ -3,12 +3,30 @@ import * as THREE from 'three';
 // Handles player state, movement, health, weapons, and abilities
 
 import { GAME_CONFIG } from './GameConfig.js';
-import { GeometryCache } from './Utils.js';
+import { GeometryCache, AudioManager } from './Utils.js';
+import logger, { LogCategory, logPlayerAction } from './Logger.js';
+import { VectorMath } from './VectorPool.js';
 
 export class Player {
     constructor(camera) {
         this.camera = camera;
         this.position = new THREE.Vector3(0, GAME_CONFIG.PLAYER.MOVEMENT.BASE_HEIGHT, 0);
+        
+        // Add getter/setter to track position changes
+        this._positionX = this.position.x;
+        Object.defineProperty(this.position, 'x', {
+            get: () => this._positionX,
+            set: (value) => {
+                if (Math.abs(value - this._positionX) > 5) {
+                    logger.warn(LogCategory.PLAYER, 'Large X position change detected', {
+                        previous: this._positionX,
+                        current: value,
+                        delta: value - this._positionX
+                    });
+                }
+                this._positionX = value;
+            }
+        });
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.isPlayer = true;  // Flag for enemy attack detection
         
@@ -87,11 +105,25 @@ export class Player {
         this.shadowMesh.position.copy(this.position);
         this.shadowMesh.position.y = 0.8; // Center the cylinder
         this.shadowMesh.castShadow = true;
-        this.shadowMesh.visible = false; // Don't render, just cast shadows
+        // Keep visible so it can cast shadows, but fully transparent
+        this.shadowMesh.visible = true;
     }
     
     update(deltaTime, input) {
+        // Debug: Track position changes
+        const oldX = this.position.x;
+        
         this.updateMovement(input, deltaTime);
+        
+        // Check if updateMovement changed position significantly
+        if (Math.abs(this.position.x - oldX) > 5) {
+            logger.warn(LogCategory.PLAYER, 'Position changed significantly in updateMovement', {
+                previousX: oldX,
+                currentX: this.position.x,
+                delta: this.position.x - oldX
+            });
+        }
+        
         this.updateRage(deltaTime, input);
         this.camera.position.copy(this.position);
         
@@ -162,13 +194,15 @@ export class Player {
     }
     
     playRageSound() {
-        // Placeholder for audio implementation
-        if (window.AudioManager && window.AudioManager.playRageSound) {
-            window.AudioManager.playRageSound();
+        if (AudioManager && AudioManager.playRageSound) {
+            AudioManager.playRageSound();
         }
     }
     
     updateMovement(input, deltaTime) {
+        // Debug: Track if this method changes position
+        const startX = this.position.x;
+        
         const moveVector = new THREE.Vector3();
         
         // Get forward and right vectors based on camera yaw
@@ -217,7 +251,7 @@ export class Player {
         this.pitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.pitch));
     }
     
-    takeDamage(amount) {
+    takeDamage(amount, source = "Unknown") {
         if (this.armor > 0) {
             const armorAbsorb = Math.min(this.armor, amount * 0.5);
             this.armor -= armorAbsorb;
@@ -226,6 +260,26 @@ export class Player {
         
         this.health -= amount;
         this.health = Math.max(0, this.health);
+        
+        logPlayerAction('Took damage', {
+            amount: amount.toFixed(1),
+            source,
+            health: this.health.toFixed(1),
+            maxHealth: this.maxHealth
+        });
+        
+        // If player died, log what killed them
+        if (this.health <= 0) {
+            logger.critical(LogCategory.PLAYER, `Player killed by ${source}`, {
+                finalDamage: amount.toFixed(1),
+                source
+            });
+        }
+        
+        // Notify game for UI/FX
+        if (this.game && typeof this.game.queuePlayerDamage === 'function') {
+            this.game.queuePlayerDamage(amount);
+        }
         
         // Trigger low health narrative
         if (this.health < 30 && this.health > 0) {

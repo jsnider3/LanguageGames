@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BaseWeapon } from '../core/BaseWeapon.js';
+import { THEME } from '../modules/config/theme.js';
+
 
 export class PlasmaDisintegrator extends BaseWeapon {
     constructor() {
@@ -22,6 +24,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         this.maxHeat = 100;
         this.coolingRate = 20; // heat units per second
         this.heatPerShot = 15;
+        this.activeEffects = [];
     }
 
     createWeaponModel() {
@@ -67,7 +70,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         for (let i = 0; i < 3; i++) {
             const coilGeometry = new THREE.TorusGeometry(0.35, 0.05, 4, 8);
             const coilMaterial = new THREE.MeshStandardMaterial({
-                color: 0x00aaff,
+                color: THEME.effects.explosion.plasma,
                 emissive: 0x003366,
                 emissiveIntensity: 0.5
             });
@@ -90,7 +93,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         // Charge indicator
         const indicatorGeometry = new THREE.SphereGeometry(0.1, 8, 8);
         const indicatorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             emissive: 0x004400,
             emissiveIntensity: 0.8,
             transparent: true,
@@ -112,7 +115,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         
         // Visual charging effect
         if (this.chargeIndicator) {
-            this.chargeIndicator.material.color.setHex(0xffaa00);
+            this.chargeIndicator.material.color.setHex(THEME.items.weapons.legendary);
             this.chargeIndicator.material.emissiveIntensity = 1.0;
         }
     }
@@ -122,7 +125,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         
         // Reset indicator
         if (this.chargeIndicator) {
-            this.chargeIndicator.material.color.setHex(0x00ff00);
+            this.chargeIndicator.material.color.setHex(THEME.ui.health.full);
             this.chargeIndicator.material.emissiveIntensity = 0.3;
         }
     }
@@ -166,7 +169,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         const size = 0.3 + (chargeMultiplier - 1) * 0.2;
         const coreGeometry = new THREE.SphereGeometry(size, 8, 8);
         const coreMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             emissive: 0x0077cc,
             emissiveIntensity: 1.0,
             transparent: true,
@@ -227,20 +230,12 @@ export class PlasmaDisintegrator extends BaseWeapon {
         flash.position.copy(position);
         scene.add(flash);
 
-        // Animate flash
-        let scale = 1;
-        let opacity = 0.8;
-        const flashInterval = setInterval(() => {
-            scale += 0.5;
-            opacity -= 0.15;
-            flash.scale.setScalar(scale);
-            flash.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                scene.remove(flash);
-                clearInterval(flashInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: flash,
+            type: 'muzzle_flash',
+            duration: 500,
+            currentTime: 0
+        });
 
         // Electric arcs
         for (let i = 0; i < 3; i++) {
@@ -279,7 +274,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
 
     update(deltaTime) {
         if (this.charging && this.currentCharge < 100) {
-            this.currentCharge += (deltaTime / this.chargeTime) * 100;
+            this.currentCharge += (100 / this.chargeTime) * deltaTime * 1000;
             this.currentCharge = Math.min(100, this.currentCharge);
 
             // Update charge indicator
@@ -288,15 +283,38 @@ export class PlasmaDisintegrator extends BaseWeapon {
                 this.chargeIndicator.material.emissiveIntensity = intensity;
                 
                 if (this.currentCharge >= 100) {
-                    this.chargeIndicator.material.color.setHex(0xff0000);
+                    this.chargeIndicator.material.color.setHex(THEME.ui.health.low);
                 }
             }
         }
 
         // Heat dissipation when not cooling
         if (!this.overheated && !this.coolingInterval && this.heatLevel > 0) {
-            this.heatLevel = Math.max(0, this.heatLevel - (this.coolingRate * deltaTime / 1000));
+            this.heatLevel = Math.max(0, this.heatLevel - (this.coolingRate * deltaTime));
         }
+
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'muzzle_flash':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + 5 * deltaTime);
+                    effect.mesh.material.opacity -= 1.5 * deltaTime;
+                    break;
+            }
+
+            return true;
+        });
     }
 
     updateProjectile(projectile, deltaTime, scene) {
@@ -310,12 +328,12 @@ export class PlasmaDisintegrator extends BaseWeapon {
         }
 
         // Move projectile
-        const movement = userData.velocity.clone().multiplyScalar(deltaTime / 1000);
+        const movement = userData.velocity.clone().multiplyScalar(deltaTime);
         projectile.position.add(movement);
 
         // Animate plasma effect
-        projectile.children[0].rotation.x += deltaTime * 0.01;
-        projectile.children[0].rotation.y += deltaTime * 0.02;
+        projectile.children[0].rotation.x += 10 * deltaTime;
+        projectile.children[0].rotation.y += 20 * deltaTime;
 
         // Pulsing effect
         const pulseIntensity = 0.8 + Math.sin(age * 0.01) * 0.2;

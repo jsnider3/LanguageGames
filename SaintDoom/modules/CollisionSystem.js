@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { PHYSICS, LEVEL_BOUNDS, ENEMY_AI } from './Constants.js';
+import { Config } from './config/index.js';
 // CollisionSystem Module
 // Handles collision detection between players, enemies, walls, and pickups
 
 export class CollisionSystem {
     constructor() {
-        this.margin = PHYSICS.PLAYER_RADIUS;
+        this.margin = Config.engine.PHYSICS.PLAYER_RADIUS;
     }
     
     checkPlayerWallCollisions(player, walls, deltaTime, level, enemies) {
@@ -19,6 +19,13 @@ export class CollisionSystem {
         
         // Store original position for rollback if needed
         const originalPosition = player.position.clone();
+        
+        // Debug: Log if we're about to process a large position difference
+        if (Math.abs(player.position.x - 10) < 0.1 && Math.abs(player.position.z + 20) < 0.1) {
+            console.log('[CollisionSystem] Processing player at expected corridor position x=10');
+            console.log('  Velocity:', player.velocity.x, player.velocity.y, player.velocity.z);
+            console.log('  Walls count:', walls.length);
+        }
         
         // For large movements, use continuous collision detection
         const moveDistance = velocityStep.length();
@@ -75,6 +82,10 @@ export class CollisionSystem {
         // Final position validation - if somehow we're still in a wall, rollback
         const finalCollisionCheck = this.checkWallCollision(player.position, walls, this.margin);
         if (finalCollisionCheck) {
+            console.log('[CollisionSystem] Player in wall! Current pos:', player.position.x, player.position.y, player.position.z);
+            console.log('[CollisionSystem] Original pos:', originalPosition.x, originalPosition.y, originalPosition.z);
+            console.log('[CollisionSystem] Wall count:', walls.length);
+            
             // Try to push player out of wall
             const pushDirection = player.position.clone().sub(originalPosition).normalize();
             let pushed = false;
@@ -85,12 +96,14 @@ export class CollisionSystem {
                 if (!this.checkWallCollision(testPos, walls, this.margin)) {
                     player.position.copy(testPos);
                     pushed = true;
+                    console.log('[CollisionSystem] Pushed player to:', testPos.x, testPos.y, testPos.z);
                     break;
                 }
             }
             
             // If still stuck, return to original position
             if (!pushed) {
+                console.log('[CollisionSystem] Could not push out, rolling back to original position');
                 player.position.copy(originalPosition);
             }
             
@@ -98,16 +111,8 @@ export class CollisionSystem {
             player.velocity.multiplyScalar(0);
         }
         
-        // Apply level-specific bounds
-        if (this.game && this.game.chapelLevel) {
-            // Extended bounds for chapel
-            player.position.x = Math.max(-9.5, Math.min(9.5, player.position.x));
-            player.position.z = Math.max(-49, Math.min(11.5, player.position.z));
-        } else if (this.game && this.game.armoryLevel) {
-            // Armory level bounds
-            player.position.x = Math.max(-19.5, Math.min(19.5, player.position.x));
-            player.position.z = Math.max(-49, Math.min(19.5, player.position.z));
-        }
+        // Removed hardcoded level bounds - let actual walls handle boundaries
+        // These hardcoded bounds were causing invisible barriers and bugs
     }
     
     checkWallCollision(pos, walls, margin) {
@@ -169,7 +174,7 @@ export class CollisionSystem {
         const nextPos = enemy.position.clone().add(velocityStep);
         
         // Check if next position would collide
-        const collision = this.checkWallCollision(nextPos, walls, enemy.radius || PHYSICS.DEFAULT_ENEMY_RADIUS);
+        const collision = this.checkWallCollision(nextPos, walls, enemy.radius || Config.engine.PHYSICS.DEFAULT_ENEMY_RADIUS);
         
         if (collision) {
             // Try sliding along walls
@@ -192,7 +197,7 @@ export class CollisionSystem {
                 enemy.velocity.set(0, 0, 0);
                 
                 // Add random direction change to help escape corners
-                if (Math.random() < ENEMY_AI.IDLE_TURN_CHANCE * 15) {
+                if (Math.random() < Config.engine.ENEMY_AI.IDLE_TURN_CHANCE * 15) {
                     const angle = Math.random() * Math.PI * 2;
                     enemy.velocity.x = Math.cos(angle) * enemy.moveSpeed * 0.5;
                     enemy.velocity.z = Math.sin(angle) * enemy.moveSpeed * 0.5;
@@ -203,26 +208,8 @@ export class CollisionSystem {
             enemy.position.copy(nextPos);
         }
         
-        // Keep enemies in bounds based on level size
-        // For chapel level, use extended bounds
-        if (this.game && this.game.chapelLevel) {
-            const boundMargin = enemy.radius + LEVEL_BOUNDS.BOUND_MARGIN;
-            enemy.position.x = Math.max(-LEVEL_BOUNDS.CHAPEL_X, Math.min(LEVEL_BOUNDS.CHAPEL_X, enemy.position.x));
-            enemy.position.z = Math.max(LEVEL_BOUNDS.CHAPEL_Z_MIN, Math.min(LEVEL_BOUNDS.CHAPEL_Z_MAX, enemy.position.z));
-        } else {
-            let levelSize = LEVEL_BOUNDS.DEFAULT_SIZE;
-            if (level) {
-                const actualLevel = ((level.levelNumber - 1) % 3) + 1;  // Loops levels 1-3
-                if (actualLevel === 2) {
-                    levelSize = LEVEL_BOUNDS.LEVEL_2_SIZE;
-                } else if (actualLevel === 3) {
-                    levelSize = LEVEL_BOUNDS.LEVEL_3_SIZE;
-                }
-            }
-            const boundMargin = enemy.radius + LEVEL_BOUNDS.BOUND_MARGIN;
-            enemy.position.x = Math.max(-levelSize + boundMargin, Math.min(levelSize - boundMargin, enemy.position.x));
-            enemy.position.z = Math.max(-levelSize + boundMargin, Math.min(levelSize - boundMargin, enemy.position.z));
-        }
+        // Removed hardcoded enemy bounds - let actual walls contain enemies
+        // The wall collision detection above already prevents enemies from going through walls
     }
     
     checkEnemyPlayerCollisions(enemies, player) {

@@ -2,6 +2,7 @@
 // Manages level creation and configuration to reduce complex conditional logic
 
 import * as THREE from 'three';
+import { Level as FallbackLevel } from '../level.js';
 
 export class LevelFactory {
     constructor(game) {
@@ -20,21 +21,19 @@ export class LevelFactory {
             className: 'TutorialLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: [], // Tutorial starts with no weapons
-            fallbackLevel: null,
             setup: (level) => {
                 // Tutorial-specific setup
                 this.game.tutorialLevel = level;
             }
         });
         
-        this.registerLevel('chapter1', {
+        this.registerLevel('chapel', {
             className: 'ChapelLevel', 
             playerStartPosition: new THREE.Vector3(0, 1.7, 8),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: null,
             setup: (level) => {
                 this.game.chapelLevel = level;
-                // Restore all weapons for Chapter 1
+                // Restore all weapons for Chapel
                 this.game.player.weapons = ['sword', 'shotgun', 'holywater', 'crucifix'];
                 this.game.player.currentWeaponIndex = 0;
                 this.game.player.currentWeapon = 'sword';
@@ -42,11 +41,10 @@ export class LevelFactory {
             }
         });
         
-        this.registerLevel('chapter2', {
+        this.registerLevel('armory', {
             className: 'ArmoryLevel',
-            playerStartPosition: new THREE.Vector3(0, 1.7, -45),
+            playerStartPosition: new THREE.Vector3(0, 1.7, 8), // Start at entrance from chapel
             weapons: ['sword'], // Start with basic weapon only
-            fallbackLevel: 'chapter1',
             setup: (level) => {
                 this.game.armoryLevel = level;
                 // Limit weapons for armory exploration
@@ -57,11 +55,12 @@ export class LevelFactory {
             }
         });
         
+        
+        
         this.registerLevel('laboratory', {
             className: 'LaboratoryLevel',
-            playerStartPosition: new THREE.Vector3(0, 1.7, 0),
+            playerStartPosition: new THREE.Vector3(0, 1.7, 18),  // At elevator exit
             weapons: ['sword', 'shotgun'],
-            fallbackLevel: 'chapter2',
             setup: (level) => {
                 // No special reference needed for laboratory
                 level.levelName = 'Laboratory Complex';
@@ -72,7 +71,6 @@ export class LevelFactory {
             className: 'ContainmentLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 15), // Safe spawn position south of hub
             weapons: ['sword', 'shotgun', 'holywater'],
-            fallbackLevel: 'laboratory',
             setup: (level) => {
                 // Containment-specific setup can go here
                 level.levelName = 'Containment Area';
@@ -83,7 +81,6 @@ export class LevelFactory {
             className: 'TunnelLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater'],
-            fallbackLevel: 'containment',
             setup: (level) => {
                 level.levelName = 'Tunnel Network';
             }
@@ -93,7 +90,6 @@ export class LevelFactory {
             className: 'CommunicationsLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater'],
-            fallbackLevel: 'tunnels',
             setup: (level) => {
                 level.levelName = 'Communications Tower';
             }
@@ -103,7 +99,6 @@ export class LevelFactory {
             className: 'ObservatoryLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater'],
-            fallbackLevel: 'communications',
             setup: (level) => {
                 level.levelName = 'Observatory';
             }
@@ -113,7 +108,6 @@ export class LevelFactory {
             className: 'ReactorLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: 'observatory',
             setup: (level) => {
                 level.levelName = 'Reactor Core';
             }
@@ -123,7 +117,6 @@ export class LevelFactory {
             className: 'SpawningGroundsLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: 'reactor',
             setup: (level) => {
                 level.levelName = 'Spawning Grounds';
             }
@@ -133,7 +126,6 @@ export class LevelFactory {
             className: 'SecretArchive',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: 'spawning',
             setup: (level) => {
                 level.levelName = 'Secret Archives';
             }
@@ -143,7 +135,6 @@ export class LevelFactory {
             className: 'SecretTechFacility',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: 'archive',
             setup: (level) => {
                 level.levelName = 'Secret Technology Facility';
             }
@@ -153,7 +144,6 @@ export class LevelFactory {
             className: 'FinalArenaLevel',
             playerStartPosition: new THREE.Vector3(0, 1.7, 0),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
-            fallbackLevel: 'techfacility',
             setup: (level) => {
                 level.levelName = 'Final Arena';
             }
@@ -189,14 +179,8 @@ export class LevelFactory {
             const LevelClass = await this.loadLevelClass(config.className, levelKey);
             
             if (!LevelClass) {
-                // Try fallback
-                if (config.fallbackLevel) {
-                    console.log(`[LevelFactory] Attempting fallback to ${config.fallbackLevel}`);
-                    this.hideLoadingIndicator();
-                    return this.createLevel(config.fallbackLevel);
-                }
                 this.hideLoadingIndicator();
-                return null;
+                throw new Error(`Failed to load level class ${config.className} for level ${levelKey}`);
             }
             
             // Create level instance
@@ -211,7 +195,7 @@ export class LevelFactory {
             const levelData = level.create ? level.create() : null;
             
             // Setup game level reference
-            this.game.level = new window.Level(this.game.scene);
+            this.game.level = new FallbackLevel(this.game.scene);
             if (levelData && levelData.walls) {
                 this.game.level.walls = levelData.walls;
             }
@@ -236,16 +220,9 @@ export class LevelFactory {
             return level;
             
         } catch (error) {
-            console.error(`[LevelFactory] Error creating level ${levelKey}:`, error);
-            
-            // Try fallback
-            if (config.fallbackLevel) {
-                console.log(`[LevelFactory] Attempting fallback to ${config.fallbackLevel}`);
-                this.hideLoadingIndicator();
-                return this.createLevel(config.fallbackLevel);
-            }
+            console.error(`[LevelFactory] Failed to create level ${levelKey}:`, error);
             this.hideLoadingIndicator();
-            return null;
+            throw error; // Let it fail properly for debugging
         }
     }
     
@@ -311,6 +288,11 @@ export class LevelFactory {
      * @param {string} levelKey - Level being loaded
      */
     showLoadingIndicator(levelKey) {
+        // Don't show loading screen during zone transitions
+        if (this.game && this.game.zoneManager && this.game.zoneManager.activeTransition) {
+            return;
+        }
+        
         const loadingScreen = document.getElementById('loadingScreen');
         const loadingText = document.getElementById('loadingText');
         
@@ -326,6 +308,11 @@ export class LevelFactory {
      * Hide loading indicator
      */
     hideLoadingIndicator() {
+        // Don't hide during transitions - let ZoneManager handle it
+        if (this.game && this.game.zoneManager && this.game.zoneManager.activeTransition) {
+            return;
+        }
+        
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) {
             setTimeout(() => {

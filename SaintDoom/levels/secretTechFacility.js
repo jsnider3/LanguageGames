@@ -2,15 +2,11 @@ import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
 
 export class SecretTechFacility extends BaseLevel {
-    constructor(game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 3) {
-            // Old signature: (scene, camera, player)
-            super(arguments[0], arguments[1], arguments[2]);
-        } else {
-            // New signature: (game)
-            super(game);
-        }
+    constructor(scene, game) {
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
         
         this.name = 'Black Site Omega';
         this.description = 'Ultra-classified MIB research facility conducting alien-human hybrid experiments';
@@ -1345,7 +1341,7 @@ export class SecretTechFacility extends BaseLevel {
                     // Attack if close
                     if (distance < 3) {
                         if (this.player.takeDamage) {
-                            this.player.takeDamage(30);
+                            this.player.takeDamage(30, "Security System");
                         }
                     }
                     
@@ -1406,7 +1402,7 @@ export class SecretTechFacility extends BaseLevel {
         
         // Damage player
         if (this.player && this.player.takeDamage) {
-            this.player.takeDamage(15);
+            this.player.takeDamage(15, "Laser Grid");
         }
     }
 
@@ -1422,7 +1418,7 @@ export class SecretTechFacility extends BaseLevel {
                 const damage = zone.userData.intensity === 'high' ? 10 :
                               zone.userData.intensity === 'medium' ? 5 : 2;
                 if (this.player.takeDamage) {
-                    this.player.takeDamage(damage);
+                    this.player.takeDamage(damage, "Radiation Zone");
                 }
             }
         });

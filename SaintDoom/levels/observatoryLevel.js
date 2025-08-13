@@ -5,38 +5,10 @@ import * as THREE from 'three';
 
 export class ObservatoryLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        this.name = "Observatory Tower";
-        this.description = "Ascend the corrupted observatory where reality bends and gravity fails";
-        this.backgroundColor = new THREE.Color(0x0a0a2a);
-        
-        this.floors = [];
-        this.currentFloor = 0;
-        this.maxFloors = 8;
-        this.zeroGravityZones = [];
-        this.gravityFields = [];
-        this.telescope = null;
-        this.elevators = [];
-        this.observationDeck = null;
-        
-        this.gravityEnabled = true;
-        this.originalGravity = -9.81;
-        this.floatingObjects = [];
-        this.starMap = null;
-        
-        this.init();
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Return required data structure for Game.js

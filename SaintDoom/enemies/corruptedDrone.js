@@ -1,16 +1,10 @@
 import * as THREE from 'three';
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class CorruptedDrone extends Enemy {
+export class CorruptedDrone extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'Corrupted Drone';
-        this.health = 60;
-        this.maxHealth = 60;
-        this.speed = 3.5; // Fast and agile
-        this.damage = 20;
-        this.attackRange = 12; // Flying ranged attacker
-        this.detectionRange = 30;
         
         // Drone specific properties
         this.flightHeight = 3 + Math.random() * 4; // Flies at varying heights
@@ -73,7 +67,7 @@ export class CorruptedDrone extends Enemy {
             for (let i = 0; i < 3; i++) {
                 const bladeGeometry = new THREE.BoxGeometry(0.8, 0.02, 0.08);
                 const bladeMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0x444444,
+                    color: THEME.materials.metal.dark,
                     transparent: true,
                     opacity: 0.7
                 });
@@ -90,8 +84,8 @@ export class CorruptedDrone extends Enemy {
         // Camera/sensor array (corrupted)
         const cameraGeometry = new THREE.SphereGeometry(0.2, 8, 8);
         const cameraMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0x440000,
+            color: THEME.ui.health.low,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 0.8,
             transparent: true,
             opacity: 0.9
@@ -138,7 +132,7 @@ export class CorruptedDrone extends Enemy {
 
         // Communication array
         const antennaGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 6);
-        const antennaMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+        const antennaMaterial = new THREE.MeshLambertMaterial({ color: THEME.materials.wall.armory });
         const antenna = new THREE.Mesh(antennaGeometry, antennaMaterial);
         antenna.position.y = 0.6;
         droneGroup.add(antenna);
@@ -384,8 +378,8 @@ export class CorruptedDrone extends Enemy {
         const distance = startPos.distanceTo(playerPosition);
         const beamGeometry = new THREE.CylinderGeometry(0.02, 0.02, distance, 6);
         const beamMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0x440000,
+            color: THEME.ui.health.low,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 1.0
         });
         const beam = new THREE.Mesh(beamGeometry, beamMaterial);
@@ -406,7 +400,7 @@ export class CorruptedDrone extends Enemy {
 
         // Damage player
         if (player.takeDamage) {
-            player.takeDamage(this.energyWeapons.laser.damage);
+            player.takeDamage(this.energyWeapons.laser.damage, "Corrupted Drone Laser");
         }
 
         // Muzzle flash
@@ -421,7 +415,7 @@ export class CorruptedDrone extends Enemy {
         // Create plasma bolt
         const boltGeometry = new THREE.SphereGeometry(0.3, 8, 8);
         const boltMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             emissive: 0x004488,
             emissiveIntensity: 0.8
         });
@@ -746,7 +740,7 @@ export class CorruptedDrone extends Enemy {
     createPlasmaExplosion(position) {
         const explosionGeometry = new THREE.SphereGeometry(2, 12, 12);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.8
         });
@@ -811,7 +805,7 @@ export class CorruptedDrone extends Enemy {
     createMuzzleFlash(position) {
         const flashGeometry = new THREE.SphereGeometry(0.2, 6, 6);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             transparent: true,
             opacity: 0.9
         });
@@ -869,8 +863,8 @@ export class CorruptedDrone extends Enemy {
         for (let i = 0; i < sparkCount; i++) {
             const sparkGeometry = new THREE.SphereGeometry(0.03, 4, 4);
             const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
-                emissive: 0xffaa00,
+                color: THEME.items.weapons.legendary,
+                emissive: THEME.items.weapons.legendary,
                 emissiveIntensity: 1.0
             });
             const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);

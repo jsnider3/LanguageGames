@@ -1,29 +1,21 @@
 import * as THREE from 'three';
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 import { GAME_CONFIG } from '../modules/GameConfig.js';
 import { AudioManager } from '../modules/Utils.js';
 import { ANIMATION, ENEMY_AI, COMBAT } from '../modules/Constants.js';
+import logger, { LogCategory, logEnemyAction } from '../modules/Logger.js';
+import vectorPool, { VectorMath } from '../modules/VectorPool.js';
 
-export class Hellhound extends Enemy {
+export class Hellhound extends BaseEnemy {
     constructor(scene, position, pack = null) {
         // Call parent constructor first
-        super(scene, position);
-        
-        // Override with Hellhound-specific stats
-        const config = GAME_CONFIG.ENEMIES.HELLHOUND;
-        this.health = config.HEALTH;
-        this.maxHealth = config.HEALTH;
-        this.damage = config.DAMAGE;
-        this.moveSpeed = config.MOVE_SPEED;
-        this.scoreValue = config.SCORE_VALUE;
-        this.attackRange = config.ATTACK_RANGE;
-        this.attackCooldown = config.ATTACK_COOLDOWN;
-        this.sightRange = config.SIGHT_RANGE;
+        super(scene, position, pack);
         
         // Hellhound-specific properties
         this.type = 'HELLHOUND';
         this.radius = 0.4;
-        this.height = config.SIZE.HEIGHT;
+        this.height = 0.8; // Default height, will be updated in create()
         
         // Pack behavior
         this.pack = pack || [];
@@ -59,9 +51,9 @@ export class Hellhound extends Enemy {
         // Body - lower to ground
         const bodyGeometry = new THREE.BoxGeometry(1.2, 0.6, 0.5);
         const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0x220000,  // Dark red
+            color: THEME.enemies.demonic.skin,
             roughness: 0.9,
-            emissive: 0x440000,
+            emissive: THEME.enemies.demonic.glow,
             emissiveIntensity: 0.3
         });
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
@@ -72,7 +64,7 @@ export class Hellhound extends Enemy {
         // Head
         const headGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.5);
         const headMaterial = new THREE.MeshStandardMaterial({
-            color: 0x330000,
+            color: THEME.enemies.demonic.skin,
             roughness: 0.8
         });
         this.headMesh = new THREE.Mesh(headGeometry, headMaterial);
@@ -82,7 +74,7 @@ export class Hellhound extends Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000
+            color: THEME.enemies.demonic.eyes
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -116,7 +108,7 @@ export class Hellhound extends Enemy {
         this.updatePackBehavior(player);
         
         // Check for leap attack
-        const distanceToPlayer = this.position.distanceTo(player.position);
+        const distanceToPlayer = VectorMath.distance(this.position, player.position);
         if (distanceToPlayer > this.attackRange && distanceToPlayer <= this.leapRange && !this.isLeaping) {
             this.attemptLeapAttack(player);
         }
@@ -213,7 +205,7 @@ export class Hellhound extends Enemy {
         // Create expanding ring to show howl
         const ringGeometry = new THREE.RingGeometry(0.5, 1, 16);
         const ringMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.5,
             side: THREE.DoubleSide
@@ -286,7 +278,7 @@ export class Hellhound extends Enemy {
             
             // Damage on landing
             if (this.target) {
-                const distance = this.position.distanceTo(this.target.position);
+                const distance = VectorMath.distance(this.position, this.target.position);
                 if (distance <= this.attackRange) {
                     this.performAttack();
                 }
@@ -306,8 +298,8 @@ export class Hellhound extends Enemy {
         
         // Use flanking position if available
         const targetPos = this.flankTarget || this.target.position;
-        const distance = this.position.distanceTo(this.target.position);
-        const targetDistance = this.position.distanceTo(targetPos);
+        const distance = VectorMath.distance(this.position, this.target.position);
+        const targetDistance = VectorMath.distance(this.position, targetPos);
         
         if (distance <= this.attackRange && !this.flankTarget) {
             this.state = 'attacking';
@@ -320,11 +312,7 @@ export class Hellhound extends Enemy {
         }
         
         // Calculate base direction toward target (player or flank position)
-        let direction = new THREE.Vector3()
-            .subVectors(targetPos, this.position)
-            .normalize();
-        
-        direction.y = 0;
+        let direction = VectorMath.direction2D(this.position, targetPos);
         
         // Store the facing direction for proper rotation (before modifications)
         this.facingDirection = direction.clone();
@@ -391,7 +379,7 @@ export class Hellhound extends Enemy {
         }
         
         // Check if stuck
-        const moved = this.position.distanceTo(this.lastPosition);
+        const moved = VectorMath.distance(this.position, this.lastPosition);
         if (moved < ENEMY_AI.MIN_MOVEMENT_THRESHOLD) {
             this.stuckCounter++;
             if (this.stuckCounter > ENEMY_AI.STUCK_THRESHOLD) {
@@ -422,17 +410,16 @@ export class Hellhound extends Enemy {
     performAttack() {
         if (!this.target) return;
         
-        const distance = this.position.distanceTo(this.target.position);
+        const distance = VectorMath.distance(this.position, this.target.position);
         const heightDifference = Math.abs(this.position.y - this.target.position.y);
         
         // Only attack if within range AND at similar height (within 1 meter)
         if (distance <= this.attackRange && heightDifference < 1.0) {
-            this.target.takeDamage(this.damage);
+            this.target.takeDamage(this.damage, "Hellhound Bite");
+            logEnemyAction('Hellhound', 'Bite attack', { damage: this.damage });
             
             // Lunge animation
-            const lungeDirection = new THREE.Vector3()
-                .subVectors(this.target.position, this.position)
-                .normalize();
+            const lungeDirection = VectorMath.direction(this.position, this.target.position);
             this.position.add(lungeDirection.multiplyScalar(0.3));
         }
     }
@@ -441,12 +428,14 @@ export class Hellhound extends Enemy {
     takeDamage(amount) {
         super.takeDamage(amount);
         this.playPainSound();
+        logEnemyAction('Hellhound', 'Took damage', { amount, health: this.health });
     }
     
     // Override parent's onDeath method to ensure proper death handling
     onDeath() {
         this.state = 'dead';
         this.isDead = true;  // Ensure isDead is set for kill counting
+        logEnemyAction('Hellhound', 'Died', { position: this.position });
         
         if (this.mesh) {
             const fallAnimation = () => {

@@ -1,18 +1,13 @@
+
 import * as THREE from 'three';
-import { Enemy } from '../enemies/enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 import { Imp } from '../enemies/imp.js';
 import { ShadowWraith } from '../enemies/shadowWraith.js';
 
-export class TheDefiler extends Enemy {
+export class TheDefiler extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'The Defiler';
-        this.health = 800;
-        this.maxHealth = 800;
-        this.speed = 1.5;
-        this.damage = 60;
-        this.attackRange = 8;
-        this.detectionRange = 50;
         
         // Boss specific properties
         this.phase = 1;
@@ -47,6 +42,7 @@ export class TheDefiler extends Enemy {
         this.corruptionField = null;
         this.bossAura = null;
         this.tentacles = [];
+        this.activeEffects = [];
         
         this.createMesh();
         this.setupSummonPoints();
@@ -89,8 +85,8 @@ export class TheDefiler extends Enemy {
             // Glowing eyes for each head
             const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
             const eyeMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0xff0000,
-                emissive: 0x440000,
+                color: THEME.ui.health.low,
+                emissive: THEME.materials.robeEmissive,
                 emissiveIntensity: 1.2
             });
             
@@ -206,7 +202,7 @@ export class TheDefiler extends Enemy {
             this.corruptionAura, this.corruptionAura, 0.5, 32, 1, true
         );
         const auraMaterial = new THREE.MeshBasicMaterial({
-            color: 0x660000,
+            color: THEME.bosses.belial.primary,
             transparent: true,
             opacity: 0.2,
             side: THREE.DoubleSide
@@ -219,7 +215,7 @@ export class TheDefiler extends Enemy {
         // Boss intimidation aura
         const bossAuraGeometry = new THREE.SphereGeometry(8, 32, 32);
         const bossAuraMaterial = new THREE.MeshBasicMaterial({
-            color: 0x440000,
+            color: THEME.materials.robeEmissive,
             transparent: true,
             opacity: 0.1,
             wireframe: true
@@ -264,6 +260,67 @@ export class TheDefiler extends Enemy {
         if (this.mesh) {
             this.mesh.position.copy(this.position);
         }
+        
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'shockwave':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'corruption_blast':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.mesh.rotation.x += 0.05;
+                    effect.mesh.rotation.y += 0.08;
+                    break;
+                case 'corruption_explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'spawn_effect':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    effect.mesh.rotation.z += 0.1;
+                    break;
+                case 'scream':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'corruption_wave':
+                    effect.innerRadius += effect.radiusRate * deltaTime;
+                    effect.outerRadius += effect.radiusRate * deltaTime;
+                    effect.mesh.geometry.dispose();
+                    effect.mesh.geometry = new THREE.RingGeometry(effect.innerRadius, effect.outerRadius, 32);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'corruption_effect':
+                    effect.mesh.position.y += 0.1;
+                    effect.mesh.material.opacity -= 0.05;
+                    effect.mesh.scale.multiplyScalar(1.05);
+                    break;
+                case 'damage_spark':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.velocity.y -= 9.8 * deltaTime;
+                    effect.mesh.scale.multiplyScalar(0.95);
+                    break;
+            }
+            return true;
+        });
     }
 
     updatePhase() {
@@ -317,6 +374,15 @@ export class TheDefiler extends Enemy {
         explosion.position.y = 3;
         this.scene.add(explosion);
 
+        this.activeEffects.push({
+            mesh: explosion,
+            type: 'explosion',
+            duration: 1250,
+            currentTime: 0,
+            scaleRate: 0.2 / 0.05,
+            opacityRate: 0.04 / 0.05
+        });
+
         // Shockwave rings
         for (let i = 0; i < 5; i++) {
             setTimeout(() => {
@@ -333,37 +399,16 @@ export class TheDefiler extends Enemy {
                 shockwave.rotation.x = -Math.PI / 2;
                 this.scene.add(shockwave);
 
-                // Animate shockwave
-                let scale = 1;
-                let opacity = 0.6;
-                const shockInterval = setInterval(() => {
-                    scale += 0.5;
-                    opacity -= 0.05;
-                    shockwave.scale.setScalar(scale);
-                    shockwave.material.opacity = opacity;
-
-                    if (opacity <= 0) {
-                        this.scene.remove(shockwave);
-                        clearInterval(shockInterval);
-                    }
-                }, 50);
+                this.activeEffects.push({
+                    mesh: shockwave,
+                    type: 'shockwave',
+                    duration: 1200,
+                    currentTime: 0,
+                    scaleRate: 0.5 / 0.05,
+                    opacityRate: 0.05 / 0.05
+                });
             }, i * 200);
         }
-
-        // Animate main explosion
-        let scale = 0.1;
-        let opacity = 0.8;
-        const explosionInterval = setInterval(() => {
-            scale += 0.2;
-            opacity -= 0.04;
-            explosion.scale.setScalar(scale);
-            explosion.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(explosion);
-                clearInterval(explosionInterval);
-            }
-        }, 50);
     }
 
     applyPhaseChanges(phase) {
@@ -396,7 +441,7 @@ export class TheDefiler extends Enemy {
                 // Visual changes - burning with corruption
                 if (this.body) {
                     this.body.material.color.setHex(0x8a0a0a);
-                    this.body.material.emissive.setHex(0x440000);
+                    this.body.material.emissive.setHex(THEME.materials.robeEmissive);
                     this.body.material.emissiveIntensity = 0.8;
                 }
                 
@@ -519,8 +564,8 @@ export class TheDefiler extends Enemy {
         // Create corruption projectile
         const blastGeometry = new THREE.SphereGeometry(0.8, 12, 12);
         const blastMaterial = new THREE.MeshBasicMaterial({
-            color: 0x880000,
-            emissive: 0x440000,
+            color: THEME.effects.blood.demon,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 0.8,
             transparent: true,
             opacity: 0.9
@@ -532,7 +577,7 @@ export class TheDefiler extends Enemy {
         // Corruption trail
         const trailGeometry = new THREE.CylinderGeometry(0.3, 0.6, 2, 8);
         const trailMaterial = new THREE.MeshBasicMaterial({
-            color: 0x440000,
+            color: THEME.materials.robeEmissive,
             transparent: true,
             opacity: 0.6
         });
@@ -543,45 +588,25 @@ export class TheDefiler extends Enemy {
         const speed = 15;
         const velocity = direction.multiplyScalar(speed);
 
-        blast.userData = {
-            type: 'corruption_blast',
-            velocity: velocity,
-            damage: this.defilerAbilities.corruption_blast.damage,
-            life: 4000,
-            birthTime: Date.now()
-        };
-
         this.scene.add(blast);
-        this.animateCorruptionBlast(blast);
+        this.activeEffects.push({
+            mesh: blast,
+            type: 'corruption_blast',
+            duration: 4000,
+            currentTime: 0,
+            velocity: velocity,
+            onEnd: () => this.createCorruptionExplosion(blast.position)
+        });
         
         // Animate boss attack
         this.animateAttack();
-    }
-
-    animateCorruptionBlast(blast) {
-        const blastInterval = setInterval(() => {
-            const age = Date.now() - blast.userData.birthTime;
-            if (age > blast.userData.life) {
-                this.createCorruptionExplosion(blast.position);
-                this.scene.remove(blast);
-                clearInterval(blastInterval);
-                return;
-            }
-
-            const movement = blast.userData.velocity.clone().multiplyScalar(16 / 1000);
-            blast.position.add(movement);
-            
-            // Rotate corruption blast
-            blast.rotation.x += 0.05;
-            blast.rotation.y += 0.08;
-        }, 16);
     }
 
     createCorruptionExplosion(position) {
         // Main explosion
         const explosionGeometry = new THREE.SphereGeometry(3, 16, 16);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x880000,
+            color: THEME.effects.blood.demon,
             transparent: true,
             opacity: 0.9
         });
@@ -589,23 +614,17 @@ export class TheDefiler extends Enemy {
         explosion.position.copy(position);
         this.scene.add(explosion);
 
+        this.activeEffects.push({
+            mesh: explosion,
+            type: 'corruption_explosion',
+            duration: 1250,
+            currentTime: 0,
+            scaleRate: 0.4 / 0.05,
+            opacityRate: 0.08 / 0.05
+        });
+
         // Corruption particles
         this.createCorruptionParticles(position);
-
-        // Animate explosion
-        let scale = 0.1;
-        let opacity = 0.9;
-        const explosionInterval = setInterval(() => {
-            scale += 0.4;
-            opacity -= 0.08;
-            explosion.scale.setScalar(scale);
-            explosion.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(explosion);
-                clearInterval(explosionInterval);
-            }
-        }, 50);
     }
 
     createCorruptionParticles(position) {
@@ -697,8 +716,8 @@ export class TheDefiler extends Enemy {
         // Hell portal effect
         const portalGeometry = new THREE.RingGeometry(1, 2, 16);
         const portalMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0x440000,
+            color: THEME.ui.health.low,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 1.0,
             transparent: true,
             opacity: 0.8,
@@ -710,21 +729,14 @@ export class TheDefiler extends Enemy {
         portal.rotation.x = -Math.PI / 2;
         this.scene.add(portal);
 
-        // Animate portal
-        let scale = 0.1;
-        let opacity = 0.8;
-        const portalInterval = setInterval(() => {
-            scale += 0.3;
-            opacity -= 0.08;
-            portal.scale.setScalar(scale);
-            portal.material.opacity = opacity;
-            portal.rotation.z += 0.1;
-
-            if (opacity <= 0) {
-                this.scene.remove(portal);
-                clearInterval(portalInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: portal,
+            type: 'spawn_effect',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.3 / 0.05,
+            opacityRate: 0.08 / 0.05
+        });
     }
 
     createSummoningEffect() {
@@ -744,7 +756,7 @@ export class TheDefiler extends Enemy {
         // Energy buildup effect
         const energyGeometry = new THREE.SphereGeometry(6, 16, 16);
         const energyMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.3,
             wireframe: true
@@ -783,12 +795,21 @@ export class TheDefiler extends Enemy {
         scream.position.y = 4;
         this.scene.add(scream);
 
+        this.activeEffects.push({
+            mesh: scream,
+            type: 'scream',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.5 / 0.05,
+            opacityRate: 0.04 / 0.05
+        });
+
         // Apply fear effect to player
         const distance = this.position.distanceTo(player.position || player.mesh.position);
         if (distance <= this.defilerAbilities.unholy_scream.range) {
             // Damage
             if (player.takeDamage) {
-                player.takeDamage(this.defilerAbilities.unholy_scream.damage);
+                player.takeDamage(this.defilerAbilities.unholy_scream.damage, "The Defiler Unholy Scream");
             }
             
             // Fear effect
@@ -801,21 +822,6 @@ export class TheDefiler extends Enemy {
                 });
             }
         }
-
-        // Animate scream
-        let scale = 0.1;
-        let opacity = 0.4;
-        const screamInterval = setInterval(() => {
-            scale += 0.5;
-            opacity -= 0.04;
-            scream.scale.setScalar(scale);
-            scream.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(scream);
-                clearInterval(screamInterval);
-            }
-        }, 50);
 
         // Animate boss heads during scream
         if (this.heads) {
@@ -837,7 +843,7 @@ export class TheDefiler extends Enemy {
         // Create expanding corruption wave
         const waveGeometry = new THREE.RingGeometry(2, 4, 32);
         const waveMaterial = new THREE.MeshBasicMaterial({
-            color: 0x660000,
+            color: THEME.bosses.belial.primary,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -848,48 +854,37 @@ export class TheDefiler extends Enemy {
         wave.rotation.x = -Math.PI / 2;
         this.scene.add(wave);
 
-        // Damage tracking
-        let waveHitPlayer = false;
-        const playerPosition = player.position || player.mesh.position;
-
-        // Animate wave expansion
-        let innerRadius = 2;
-        let outerRadius = 4;
-        let opacity = 0.8;
-        const waveInterval = setInterval(() => {
-            innerRadius += 1;
-            outerRadius += 1;
-            opacity -= 0.03;
-
-            // Update wave geometry
-            wave.geometry.dispose();
-            wave.geometry = new THREE.RingGeometry(innerRadius, outerRadius, 32);
-            wave.material.opacity = opacity;
-
-            // Check collision with player
-            const distance = this.position.distanceTo(playerPosition);
-            if (!waveHitPlayer && distance >= innerRadius && distance <= outerRadius) {
-                waveHitPlayer = true;
-                if (player.takeDamage) {
-                    player.takeDamage(this.defilerAbilities.corruption_wave.damage);
-                }
-                
-                // Knockback effect
-                const knockbackDirection = new THREE.Vector3()
-                    .subVectors(playerPosition, this.position)
-                    .normalize()
-                    .multiplyScalar(5);
-                
-                if (player.position) {
-                    player.position.add(knockbackDirection);
+        this.activeEffects.push({
+            mesh: wave,
+            type: 'corruption_wave',
+            duration: 2666,
+            currentTime: 0,
+            innerRadius: 2,
+            outerRadius: 4,
+            radiusRate: 1 / 0.1,
+            opacityRate: 0.03 / 0.1,
+            hitPlayer: false,
+            update: (effect, deltaTime) => {
+                const playerPosition = player.position || player.mesh.position;
+                const distance = effect.mesh.position.distanceTo(playerPosition);
+                if (!effect.hitPlayer && distance >= effect.innerRadius && distance <= effect.outerRadius) {
+                    effect.hitPlayer = true;
+                    if (player.takeDamage) {
+                        player.takeDamage(this.defilerAbilities.corruption_wave.damage, "The Defiler Corruption Wave");
+                    }
+                    
+                    // Knockback effect
+                    const knockbackDirection = new THREE.Vector3()
+                        .subVectors(playerPosition, this.position)
+                        .normalize()
+                        .multiplyScalar(5);
+                    
+                    if (player.position) {
+                        player.position.add(knockbackDirection);
+                    }
                 }
             }
-
-            if (opacity <= 0 || outerRadius > 30) {
-                this.scene.remove(wave);
-                clearInterval(waveInterval);
-            }
-        }, 100);
+        });
     }
 
     updateMinions(deltaTime) {
@@ -912,7 +907,7 @@ export class TheDefiler extends Enemy {
             // Gradual corruption damage
             if (Math.random() < 0.02) { // 2% chance per frame when in aura
                 if (player.takeDamage) {
-                    player.takeDamage(5); // Small but constant damage
+                    player.takeDamage(5, "The Defiler Corruption Aura"); // Small but constant damage
                 }
                 
                 // Visual corruption effect on player
@@ -924,7 +919,7 @@ export class TheDefiler extends Enemy {
     createCorruptionEffect(position) {
         const effectGeometry = new THREE.SphereGeometry(0.5, 8, 8);
         const effectMaterial = new THREE.MeshBasicMaterial({
-            color: 0x440000,
+            color: THEME.materials.robeEmissive,
             transparent: true,
             opacity: 0.6
         });
@@ -933,17 +928,12 @@ export class TheDefiler extends Enemy {
         effect.position.y += Math.random() * 2;
         this.scene.add(effect);
 
-        // Float upward and fade
-        const effectInterval = setInterval(() => {
-            effect.position.y += 0.1;
-            effect.material.opacity -= 0.05;
-            effect.scale.multiplyScalar(1.05);
-
-            if (effect.material.opacity <= 0) {
-                this.scene.remove(effect);
-                clearInterval(effectInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: effect,
+            type: 'corruption_effect',
+            duration: 1000,
+            currentTime: 0
+        });
     }
 
     animateAttack() {
@@ -988,12 +978,12 @@ export class TheDefiler extends Enemy {
         if (this.corruptionField) {
             const pulse = Math.sin(Date.now() * 0.005) * 0.1 + 1;
             this.corruptionField.scale.setScalar(pulse);
-            this.corruptionField.rotation.y += deltaTime * 0.001;
+            this.corruptionField.rotation.y += deltaTime * 0.1;
         }
 
         // Boss aura rotation
         if (this.bossAura) {
-            this.bossAura.rotation.y += deltaTime * 0.002;
+            this.bossAura.rotation.y += deltaTime * 0.2;
             const auraPulse = Math.sin(Date.now() * 0.003) * 0.05 + 0.1;
             this.bossAura.material.opacity = auraPulse;
         }
@@ -1049,23 +1039,17 @@ export class TheDefiler extends Enemy {
             ));
             this.scene.add(spark);
 
-            // Animate sparks
-            const sparkVelocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 3,
-                Math.random() * 3 + 1,
-                (Math.random() - 0.5) * 3
-            );
-
-            const sparkInterval = setInterval(() => {
-                spark.position.add(sparkVelocity.multiplyScalar(0.1));
-                sparkVelocity.y -= 0.05; // Gravity
-                spark.scale.multiplyScalar(0.95);
-
-                if (spark.scale.x < 0.1) {
-                    this.scene.remove(spark);
-                    clearInterval(sparkInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: spark,
+                type: 'damage_spark',
+                duration: 1000,
+                currentTime: 0,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 3,
+                    Math.random() * 3 + 1,
+                    (Math.random() - 0.5) * 3
+                )
+            });
         }
     }
 
@@ -1114,20 +1098,14 @@ export class TheDefiler extends Enemy {
                 explosion.position.copy(explosionPos);
                 this.scene.add(explosion);
 
-                // Animate explosion
-                let scale = 0.1;
-                let opacity = 0.9;
-                const explosionInterval = setInterval(() => {
-                    scale += 0.3;
-                    opacity -= 0.06;
-                    explosion.scale.setScalar(scale);
-                    explosion.material.opacity = opacity;
-
-                    if (opacity <= 0) {
-                        this.scene.remove(explosion);
-                        clearInterval(explosionInterval);
-                    }
-                }, 50);
+                this.activeEffects.push({
+                    mesh: explosion,
+                    type: 'explosion',
+                    duration: 1500,
+                    currentTime: 0,
+                    scaleRate: 0.3 / 0.05,
+                    opacityRate: 0.06 / 0.05
+                });
             }, i * 300);
         }
     }

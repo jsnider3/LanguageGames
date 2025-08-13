@@ -1,16 +1,10 @@
 import * as THREE from 'three';
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class AlienHybrid extends Enemy {
+export class AlienHybrid extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'Alien Hybrid';
-        this.health = 120;
-        this.maxHealth = 120;
-        this.speed = 2.0;
-        this.damage = 30;
-        this.attackRange = 3;
-        this.detectionRange = 20;
         
         // Alien hybrid specific properties
         this.alienTech = this.generateAlienTech();
@@ -62,7 +56,7 @@ export class AlienHybrid extends Enemy {
         // Large alien eyes
         const eyeGeometry = new THREE.SphereGeometry(0.2, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             emissive: 0x004488,
             emissiveIntensity: 0.8,
             transparent: true,
@@ -174,7 +168,7 @@ export class AlienHybrid extends Enemy {
         for (let i = 0; i < 3; i++) {
             const conduitGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6);
             const conduitMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00aaff,
+                color: THEME.effects.explosion.plasma,
                 emissive: 0x002244,
                 emissiveIntensity: 0.6
             });
@@ -297,7 +291,7 @@ export class AlienHybrid extends Enemy {
     createPhaseShiftEffect() {
         const effectGeometry = new THREE.SphereGeometry(3, 16, 16);
         const effectMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.8,
             wireframe: true
@@ -383,7 +377,7 @@ export class AlienHybrid extends Enemy {
 
         // Damage player
         if (player.takeDamage) {
-            player.takeDamage(35);
+            player.takeDamage(35, "Alien Hybrid Mind Blast");
         }
 
         // Remove blast effect
@@ -417,7 +411,7 @@ export class AlienHybrid extends Enemy {
                 0.3 + Math.random() * 0.4
             );
             const debrisMaterial = new THREE.MeshLambertMaterial({
-                color: 0x666666,
+                color: THEME.materials.wall.armory,
                 emissive: 0x002244,
                 emissiveIntensity: 0.3
             });
@@ -469,7 +463,7 @@ export class AlienHybrid extends Enemy {
             if (distance < 1.5) {
                 // Hit player
                 if (player.takeDamage) {
-                    player.takeDamage(15);
+                    player.takeDamage(15, "Alien Hybrid Debris");
                 }
                 this.createDebrisImpact(debris.position);
                 this.scene.remove(debris);
@@ -519,7 +513,7 @@ export class AlienHybrid extends Enemy {
 
         // Deal damage
         if (player.takeDamage) {
-            player.takeDamage(this.damage);
+            player.takeDamage(this.damage, "Alien Hybrid Claw");
         }
 
         // Create psychic feedback
@@ -757,7 +751,7 @@ export class AlienHybrid extends Enemy {
         // Alien death explosion
         const deathGeometry = new THREE.SphereGeometry(3, 16, 16);
         const deathMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.9
         });

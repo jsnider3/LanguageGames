@@ -1,16 +1,10 @@
 import * as THREE from 'three';
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class PossessedMechSuit extends Enemy {
+export class PossessedMechSuit extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'Possessed Mech Suit';
-        this.health = 250;
-        this.maxHealth = 250;
-        this.speed = 0.8; // Slower but heavily armored
-        this.damage = 50;
-        this.attackRange = 4;
-        this.detectionRange = 25;
         
         // Mech suit specific properties
         this.armorPlating = 0.4; // 60% damage reduction
@@ -64,8 +58,8 @@ export class PossessedMechSuit extends Enemy {
         // Demonic eyes in cockpit
         const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            emissive: 0x440000,
+            color: THEME.ui.health.low,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 1.0
         });
         
@@ -80,7 +74,7 @@ export class PossessedMechSuit extends Enemy {
         // Massive mechanical arms
         const armGeometry = new THREE.BoxGeometry(0.6, 2.5, 0.6);
         const armMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0x404040,
+            color: THEME.materials.floor.metal,
             metalness: 0.7,
             roughness: 0.4
         });
@@ -181,7 +175,7 @@ export class PossessedMechSuit extends Enemy {
         for (let i = 0; i < 8; i++) {
             const runeGeometry = new THREE.PlaneGeometry(0.3, 0.3);
             const runeMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
+                color: THEME.ui.health.low,
                 emissive: 0x220000,
                 emissiveIntensity: 0.6,
                 transparent: true,
@@ -422,7 +416,7 @@ export class PossessedMechSuit extends Enemy {
     createChaingunRound(player) {
         const bulletGeometry = new THREE.SphereGeometry(0.08, 6, 6);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             emissive: 0x444400,
             emissiveIntensity: 0.8
         });
@@ -477,7 +471,7 @@ export class PossessedMechSuit extends Enemy {
     createRocket(player) {
         const rocketGeometry = new THREE.CylinderGeometry(0.1, 0.15, 1, 8);
         const rocketMaterial = new THREE.MeshLambertMaterial({
-            color: 0x666666,
+            color: THEME.materials.wall.armory,
             metalness: 0.7
         });
         const rocket = new THREE.Mesh(rocketGeometry, rocketMaterial);
@@ -565,14 +559,14 @@ export class PossessedMechSuit extends Enemy {
 
         // Damage player
         if (player.takeDamage) {
-            player.takeDamage(this.weaponSystems.laser.damage);
+            player.takeDamage(this.weaponSystems.laser.damage, "Possessed Mech Suit Laser");
         }
     }
 
     createLaserImpact(position) {
         const impactGeometry = new THREE.SphereGeometry(0.5, 8, 8);
         const impactMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.8
         });
@@ -720,7 +714,7 @@ export class PossessedMechSuit extends Enemy {
         
         // Visual emergency state
         if (this.powerCoreVisual) {
-            this.powerCoreVisual.material.color.setHex(0xff0000);
+            this.powerCoreVisual.material.color.setHex(THEME.ui.health.low);
             this.powerCoreVisual.material.emissiveIntensity = 1.2;
         }
 
@@ -760,7 +754,7 @@ export class PossessedMechSuit extends Enemy {
         // Visual countdown effect
         const countdownGeometry = new THREE.SphereGeometry(3, 16, 16);
         const countdownMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.3,
             wireframe: true
@@ -827,7 +821,7 @@ export class PossessedMechSuit extends Enemy {
     createShockwave(radius) {
         const shockwaveGeometry = new THREE.RingGeometry(radius, radius + 2, 32);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: THEME.effects.explosion.fire,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -903,7 +897,7 @@ export class PossessedMechSuit extends Enemy {
     createSmokeParticle(position) {
         const smokeGeometry = new THREE.SphereGeometry(0.1, 4, 4);
         const smokeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x444444,
+            color: THEME.materials.metal.dark,
             transparent: true,
             opacity: 0.6
         });
@@ -999,8 +993,8 @@ export class PossessedMechSuit extends Enemy {
         for (let i = 0; i < sparkCount; i++) {
             const sparkGeometry = new THREE.SphereGeometry(0.05, 4, 4);
             const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
-                emissive: 0xffaa00,
+                color: THEME.items.weapons.legendary,
+                emissive: THEME.items.weapons.legendary,
                 emissiveIntensity: 1.0
             });
             const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
@@ -1092,7 +1086,7 @@ export class PossessedMechSuit extends Enemy {
     createRocketExplosion(position) {
         const explosionGeometry = new THREE.SphereGeometry(5, 16, 16);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: THEME.effects.explosion.fire,
             transparent: true,
             opacity: 1.0
         });

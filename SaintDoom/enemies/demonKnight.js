@@ -2,20 +2,12 @@ import * as THREE from 'three';
 // Demon Knight Enemy Type
 // Heavy armored demon with shield that must be broken
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class DemonKnight extends Enemy {
+export class DemonKnight extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        // Override stats - heavily armored
-        this.health = 120;
-        this.maxHealth = 120;
-        this.moveSpeed = 2;
-        this.damage = 35;
-        this.attackRange = 4;
-        this.sightRange = 25;
-        this.type = 'demon_knight';
         
         // Shield mechanics
         this.hasShield = true;
@@ -59,8 +51,8 @@ export class DemonKnight extends Enemy {
         // Armored body
         const bodyGeometry = new THREE.BoxGeometry(0.8, 1.8, 0.6);
         const armorMaterial = new THREE.MeshPhongMaterial({
-            color: 0x330000,
-            emissive: 0x110000,
+            color: THEME.enemies.demonic.skin,
+            emissive: THEME.enemies.demonic.glow,
             emissiveIntensity: 0.2
         });
         this.bodyMesh = new THREE.Mesh(bodyGeometry, armorMaterial);
@@ -79,8 +71,8 @@ export class DemonKnight extends Enemy {
         // Demon horns
         const hornGeometry = new THREE.ConeGeometry(0.08, 0.4, 4);
         const hornMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000,
-            emissive: 0x440000,
+            color: THEME.materials.metal.dark,
+            emissive: THEME.enemies.demonic.glow,
             emissiveIntensity: 0.3
         });
         
@@ -97,7 +89,7 @@ export class DemonKnight extends Enemy {
         // Glowing eyes
         const eyeGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000
+            color: THEME.enemies.demonic.eyes
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -140,7 +132,7 @@ export class DemonKnight extends Enemy {
         const spikeCount = 6;
         const spikeGeometry = new THREE.ConeGeometry(0.05, 0.2, 4);
         const spikeMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000
+            color: THEME.materials.black
         });
         
         for (let i = 0; i < spikeCount; i++) {
@@ -161,8 +153,8 @@ export class DemonKnight extends Enemy {
         // Blade
         const bladeGeometry = new THREE.BoxGeometry(0.1, 1.5, 0.02);
         const bladeMaterial = new THREE.MeshPhongMaterial({
-            color: 0x660000,
-            emissive: 0xff0000,
+            color: THEME.bosses.belial.primary,
+            emissive: THEME.ui.health.low,
             emissiveIntensity: 0.3
         });
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
@@ -214,7 +206,7 @@ export class DemonKnight extends Enemy {
         const shieldGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.1);
         const shieldMaterial = new THREE.MeshPhongMaterial({
             color: 0x222222,
-            emissive: 0x440000,
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 0.2
         });
         const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
@@ -223,8 +215,8 @@ export class DemonKnight extends Enemy {
         // Demon face emblem
         const emblemGeometry = new THREE.SphereGeometry(0.15, 8, 6);
         const emblemMaterial = new THREE.MeshPhongMaterial({
-            color: 0x880000,
-            emissive: 0xff0000,
+            color: THEME.effects.blood.demon,
+            emissive: THEME.ui.health.low,
             emissiveIntensity: 0.4
         });
         const emblem = new THREE.Mesh(emblemGeometry, emblemMaterial);
@@ -252,7 +244,7 @@ export class DemonKnight extends Enemy {
         // Energy barrier effect (when shield is active)
         const barrierGeometry = new THREE.PlaneGeometry(0.8, 1, 10, 10);
         const barrierMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.enemies.demonic.eyes,
             transparent: true,
             opacity: 0.2,
             side: THREE.DoubleSide
@@ -304,7 +296,7 @@ export class DemonKnight extends Enemy {
         // Dark mist around the knight
         const auraGeometry = new THREE.SphereGeometry(1.5, 8, 6);
         const auraMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.15,
             side: THREE.BackSide
@@ -518,7 +510,7 @@ export class DemonKnight extends Enemy {
         // Check hit
         const distance = this.position.distanceTo(player.position);
         if (distance < 3) {
-            player.takeDamage(20);
+            player.takeDamage(20, "Demon Knight Sword");
             
             // Knockback
             const knockback = new THREE.Vector3()
@@ -586,7 +578,7 @@ export class DemonKnight extends Enemy {
                 const distance = this.position.distanceTo(this.target.position);
                 if (distance < 2) {
                     // Hit player
-                    this.target.takeDamage(this.chargeDamage);
+                    this.target.takeDamage(this.chargeDamage, "Demon Knight Charge");
                     
                     // Massive knockback
                     const knockback = direction.clone().multiplyScalar(15);
@@ -650,7 +642,7 @@ export class DemonKnight extends Enemy {
         // Create shockwave
         const shockwaveGeometry = new THREE.RingGeometry(0.5, 1, 32);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.enemies.demonic.eyes,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -681,7 +673,7 @@ export class DemonKnight extends Enemy {
                 const ringRadius = shockwave.scale.x;
                 if (Math.abs(distance - ringRadius) < 1 && shockwave.material.opacity > 0.3) {
                     // Damage player
-                    this.target.takeDamage(this.slamDamage);
+                    this.target.takeDamage(this.slamDamage, "Demon Knight Ground Slam");
                     
                     // Upward knockback
                     const knockback = new THREE.Vector3(0, 10, 0);
@@ -735,7 +727,7 @@ export class DemonKnight extends Enemy {
         const ripple = new THREE.Mesh(
             new THREE.RingGeometry(0.1, 0.3, 16),
             new THREE.MeshBasicMaterial({
-                color: 0xff0000,
+                color: THEME.enemies.demonic.eyes,
                 transparent: true,
                 opacity: 0.8
             })
@@ -806,7 +798,7 @@ export class DemonKnight extends Enemy {
             const particle = new THREE.Mesh(
                 new THREE.SphereGeometry(0.05, 4, 4),
                 new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
+                    color: THEME.enemies.demonic.eyes,
                     transparent: true,
                     opacity: 1
                 })
@@ -847,7 +839,7 @@ export class DemonKnight extends Enemy {
         
         const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const lineMaterial = new THREE.LineBasicMaterial({
-            color: 0xff0000,
+            color: THEME.enemies.demonic.eyes,
             transparent: true,
             opacity: 0.6
         });
@@ -908,7 +900,7 @@ export class DemonKnight extends Enemy {
         const impact = new THREE.Mesh(
             new THREE.SphereGeometry(1, 8, 8),
             new THREE.MeshBasicMaterial({
-                color: 0xff0000,
+                color: THEME.enemies.demonic.eyes,
                 transparent: true,
                 opacity: 0.8
             })
@@ -936,7 +928,7 @@ export class DemonKnight extends Enemy {
             const angle = (i / 6) * Math.PI * 2;
             const crackGeometry = new THREE.PlaneGeometry(0.2, 2);
             const crackMaterial = new THREE.MeshBasicMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: 0.6
             });
@@ -968,7 +960,7 @@ export class DemonKnight extends Enemy {
             const star = new THREE.Mesh(
                 new THREE.TetrahedronGeometry(0.1),
                 new THREE.MeshBasicMaterial({
-                    color: 0xffff00,
+                    color: THEME.ui.health.medium,
                     transparent: true,
                     opacity: 1
                 })

@@ -10,44 +10,10 @@ import { PossessedScientist } from '../enemies/possessedScientist.js';
 
 export class TunnelLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        
-        this.levelName = 'Tunnel Network';
-        this.levelNumber = 5;
-        this.ambientColor = 0x000011;
-        this.fogColor = 0x111111;
-        this.fogDensity = 0.05;
-        
-        // Tunnel system properties
-        this.tunnelWidth = 3;
-        this.tunnelHeight = 4;
-        this.mainPaths = [];
-        this.secretPaths = [];
-        this.ambushPoints = [];
-        this.chokePoints = [];
-        
-        // Close-quarters mechanics
-        this.crammedSpaces = true;
-        this.echoingFootsteps = true;
-        this.limitedVisibility = true;
-        
-        // Tunnel features
-        this.ventilationShafts = [];
-        this.waterPipes = [];
-        this.electricalConduits = [];
-        this.emergencyLights = [];
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Initialize base level properties

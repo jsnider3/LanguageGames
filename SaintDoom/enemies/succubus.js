@@ -2,20 +2,12 @@ import * as THREE from 'three';
 // Succubus Infiltrator Enemy Type
 // Ranged psychic attacks with teleportation ability
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class Succubus extends Enemy {
+export class Succubus extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        // Override stats
-        this.health = 60;
-        this.maxHealth = 60;
-        this.moveSpeed = 3;
-        this.damage = 20;
-        this.attackRange = 20;
-        this.sightRange = 30;
-        this.type = 'succubus';
         
         // Psychic attack properties
         this.psychicCooldown = 3000;
@@ -87,7 +79,7 @@ export class Succubus extends Enemy {
         // Hypnotic eyes - MeshBasicMaterial doesn't support emissive
         const eyeGeometry = new THREE.SphereGeometry(0.04, 6, 6);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff
+            color: THEME.effects.particles.magic
         });
         
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -148,7 +140,7 @@ export class Succubus extends Enemy {
         // Create pulsing aura
         const auraGeometry = new THREE.SphereGeometry(1, 16, 16);
         const auraMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
+            color: THEME.effects.particles.magic,
             transparent: true,
             opacity: 0.1,
             side: THREE.BackSide
@@ -285,7 +277,7 @@ export class Succubus extends Enemy {
         // Create psychic wave
         const waveGeometry = new THREE.RingGeometry(0.5, 1, 32);
         const waveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
+            color: THEME.effects.particles.magic,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -303,7 +295,7 @@ export class Succubus extends Enemy {
         ];
         const beamGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const beamMaterial = new THREE.LineBasicMaterial({
-            color: 0xff00ff,
+            color: THEME.effects.particles.magic,
             linewidth: 3,
             transparent: true,
             opacity: 0.8
@@ -335,7 +327,7 @@ export class Succubus extends Enemy {
         animateAttack();
         
         // Deal damage
-        this.target.takeDamage(this.damage);
+        this.target.takeDamage(this.damage, "Succubus Shadow Strike");
     }
     
     charmAttack() {
@@ -381,7 +373,7 @@ export class Succubus extends Enemy {
         }
         
         // Small damage
-        this.target.takeDamage(this.damage * 0.5);
+        this.target.takeDamage(this.damage * 0.5, "Succubus Charm");
     }
     
     lifeDrain() {
@@ -392,7 +384,7 @@ export class Succubus extends Enemy {
             const particle = new THREE.Mesh(
                 new THREE.SphereGeometry(0.05, 4, 4),
                 new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
+                    color: THEME.ui.health.low,
                     transparent: true,
                     opacity: 1
                 })
@@ -425,7 +417,7 @@ export class Succubus extends Enemy {
         }
         
         // Damage target and heal self
-        this.target.takeDamage(this.damage * 0.75);
+        this.target.takeDamage(this.damage * 0.75, "Succubus Life Drain");
         this.health = Math.min(this.maxHealth, this.health + this.damage * 0.5);
     }
     
@@ -549,7 +541,7 @@ export class Succubus extends Enemy {
         // Create spiral portal
         const portalGeometry = new THREE.TorusGeometry(1, 0.3, 8, 16);
         const portalMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
+            color: THEME.effects.particles.magic,
             transparent: true,
             opacity: 0.8
         });
@@ -606,7 +598,7 @@ export class Succubus extends Enemy {
         // Create imploding vortex
         const vortexGeometry = new THREE.ConeGeometry(2, 3, 16);
         const vortexMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
+            color: THEME.effects.particles.magic,
             transparent: true,
             opacity: 0.6,
             side: THREE.DoubleSide

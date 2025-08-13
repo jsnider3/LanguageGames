@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BaseWeapon } from '../core/BaseWeapon.js';
+import { THEME } from '../modules/config/theme.js';
+
 
 export class PhaseShifter extends BaseWeapon {
     constructor() {
@@ -21,6 +23,7 @@ export class PhaseShifter extends BaseWeapon {
         this.phaseActive = false;
         this.phaseStartTime = 0;
         this.dimensionalRift = null;
+        this.activeEffects = [];
     }
 
     createWeaponModel() {
@@ -96,7 +99,7 @@ export class PhaseShifter extends BaseWeapon {
         // Phase energy indicator
         const indicatorGeometry = new THREE.BoxGeometry(0.6, 0.1, 0.05);
         const indicatorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             emissive: 0x004400,
             emissiveIntensity: 0.5,
             transparent: true,
@@ -246,7 +249,7 @@ export class PhaseShifter extends BaseWeapon {
         // Dimensional tear effect
         const tearGeometry = new THREE.PlaneGeometry(2, 0.1);
         const tearMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.8
         });
@@ -255,22 +258,13 @@ export class PhaseShifter extends BaseWeapon {
         tear.lookAt(position.clone().add(direction));
         scene.add(tear);
 
-        // Animate flash
-        let scale = 1;
-        let opacity = 0.6;
-        const flashInterval = setInterval(() => {
-            scale += 0.3;
-            opacity -= 0.12;
-            flash.scale.setScalar(scale);
-            flash.material.opacity = opacity;
-            tear.material.opacity = opacity * 1.3;
-
-            if (opacity <= 0) {
-                scene.remove(flash);
-                scene.remove(tear);
-                clearInterval(flashInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            type: 'muzzle_flash',
+            mesh: flash,
+            tear: tear,
+            duration: 500,
+            currentTime: 0
+        });
     }
 
     createDimensionalRift(scene, position) {
@@ -308,23 +302,12 @@ export class PhaseShifter extends BaseWeapon {
         riftGroup.position.y = 2;
         scene.add(riftGroup);
 
-        // Animate rift
-        let time = 0;
-        const riftInterval = setInterval(() => {
-            time += 50;
-            rift.rotation.z += 0.05;
-            
-            riftGroup.children.forEach((child, index) => {
-                if (index > 0) { // Skip the rift itself
-                    child.rotation.y += 0.1;
-                }
-            });
-
-            if (time > 3000) {
-                scene.remove(riftGroup);
-                clearInterval(riftInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            type: 'dimensional_rift',
+            mesh: riftGroup,
+            duration: 3000,
+            currentTime: 0
+        });
 
         return riftGroup;
     }
@@ -344,15 +327,15 @@ export class PhaseShifter extends BaseWeapon {
             // Recharge phase energy
             this.phaseEnergy = Math.min(
                 this.maxPhaseEnergy,
-                this.phaseEnergy + (this.phaseRechargeRate * deltaTime / 1000)
+                this.phaseEnergy + (this.phaseRechargeRate * deltaTime)
             );
         }
 
         // Animate dimensional rings
         if (this.dimensionalRings) {
             this.dimensionalRings.forEach((ring, index) => {
-                ring.rotation.z += deltaTime * 0.001 * (index + 1);
-                ring.rotation.y += deltaTime * 0.0005;
+                ring.rotation.z += deltaTime * 1 * (index + 1);
+                ring.rotation.y += deltaTime * 0.5;
             });
         }
 
@@ -364,9 +347,9 @@ export class PhaseShifter extends BaseWeapon {
             if (this.phaseActive) {
                 this.phaseIndicator.material.color.setHex(0x00ffff);
             } else if (energyPercent > 0.3) {
-                this.phaseIndicator.material.color.setHex(0x00ff00);
+                this.phaseIndicator.material.color.setHex(THEME.ui.health.full);
             } else {
-                this.phaseIndicator.material.color.setHex(0xff0000);
+                this.phaseIndicator.material.color.setHex(THEME.ui.health.low);
             }
         }
 
@@ -375,6 +358,39 @@ export class PhaseShifter extends BaseWeapon {
             const pulseIntensity = 0.8 + Math.sin(Date.now() * 0.01) * 0.2;
             this.phaseChamber.material.emissiveIntensity = pulseIntensity;
         }
+
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                if (effect.tear) this.scene.remove(effect.tear);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'muzzle_flash':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + 30 * deltaTime);
+                    effect.mesh.material.opacity -= 1.2 * deltaTime;
+                    effect.tear.material.opacity -= 1.6 * deltaTime;
+                    break;
+                case 'dimensional_rift':
+                    effect.mesh.rotation.z += 5 * deltaTime;
+                    effect.mesh.children.forEach((child, index) => {
+                        if (index > 0) { // Skip the rift itself
+                            child.rotation.y += 10 * deltaTime;
+                        }
+                    });
+                    break;
+            }
+
+            return true;
+        });
     }
 
     updateProjectile(projectile, deltaTime, scene) {
@@ -388,18 +404,18 @@ export class PhaseShifter extends BaseWeapon {
         }
 
         // Move projectile
-        const movement = userData.velocity.clone().multiplyScalar(deltaTime / 1000);
+        const movement = userData.velocity.clone().multiplyScalar(deltaTime);
         projectile.position.add(movement);
 
         // Animate phase effects
-        projectile.children[0].rotation.x += deltaTime * 0.02;
-        projectile.children[0].rotation.y += deltaTime * 0.03;
+        projectile.children[0].rotation.x += 20 * deltaTime;
+        projectile.children[0].rotation.y += 30 * deltaTime;
 
         // Animate rings
         if (projectile.children.length > 1) {
             for (let i = 1; i < projectile.children.length - 1; i++) {
                 if (projectile.children[i].rotation) {
-                    projectile.children[i].rotation.z += deltaTime * 0.01;
+                    projectile.children[i].rotation.z += 10 * deltaTime;
                 }
             }
         }

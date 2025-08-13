@@ -1,22 +1,15 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
+import { THEME } from '../modules/config/theme.js';
 // Desecrated Chapel Level
 // The first objective - find and cleanse the chapel
 
 export class ChapelLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.scene = arguments[0].scene;
-            this.game = arguments[0];
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
         
         // walls is already initialized in BaseLevel
         this.chapelReached = false;
@@ -29,22 +22,22 @@ export class ChapelLevel extends BaseLevel {
         
         // Materials
         const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2a2a2a,
+            color: THEME.materials.floor.chapel,
             roughness: 0.9,
             metalness: 0.1
         });
         
         const wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a4a3a,
+            color: THEME.materials.wall.chapel,
             roughness: 0.8,
             metalness: 0.2
         });
         
         const chapelMaterial = new THREE.MeshStandardMaterial({
-            color: 0x5a3030, // Reddish tint for desecration
+            color: THEME.materials.wall.desecrated,
             roughness: 0.7,
             metalness: 0.1,
-            emissive: 0x200000,
+            emissive: THEME.lights.point.demonic,
             emissiveIntensity: 0.2
         });
         
@@ -59,6 +52,9 @@ export class ChapelLevel extends BaseLevel {
         
         // Add environmental details
         this.addEnvironmentalDetails();
+        
+        // Create exit door to armory (always visible)
+        this.createExitDoor();
         
         return this.walls;
     }
@@ -180,6 +176,10 @@ export class ChapelLevel extends BaseLevel {
         altar.userData = { isAltar: true };
         this.scene.add(altar);
         
+        // Store reference and add to walls for collision
+        this.altar = altar;
+        this.walls.push(altar);
+        
         // Add demonic symbol above altar
         const symbolGeometry = new THREE.RingGeometry(0.5, 1, 6);
         const symbolMaterial = new THREE.MeshBasicMaterial({
@@ -300,18 +300,57 @@ export class ChapelLevel extends BaseLevel {
         if (playerPosition.z < -25) {
             this.chapelReached = true;
             
+            // Check if chapel was already cleansed in a previous visit
+            if (this.chapelCleansed) {
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.setObjective("Chapel already cleansed - proceed to exit");
+                    this.game.narrativeSystem.displaySubtitle("The chapel remains purified.");
+                }
+                // Don't spawn enemies if already cleansed
+                return true;
+            }
+            
             if (this.game.narrativeSystem) {
                 this.game.narrativeSystem.setObjective("Cleanse the altar - defeat all demons");
                 this.game.narrativeSystem.displaySubtitle("The chapel... desecrated as expected. Time to work.");
             }
             
-            // Spawn chapel enemies
+            // Spawn chapel enemies only if not cleansed
             this.spawnChapelEnemies();
             
             return true;
         }
         
         return false;
+    }
+    
+    update(deltaTime) {
+        // Call parent update
+        if (super.update) {
+            super.update(deltaTime);
+        }
+        
+        // Update objective based on enemy count
+        if (this.chapelReached && !this.chapelCleansed) {
+            if (this.game && this.game.enemies) {
+                const enemyCount = this.game.enemies.length;
+                
+                if (enemyCount === 0 && !this.objectiveUpdated) {
+                    // All enemies defeated
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.setObjective("All demons defeated! Approach the altar to cleanse it");
+                        this.game.narrativeSystem.displaySubtitle("The demons are vanquished. Now cleanse the altar.");
+                    }
+                    this.objectiveUpdated = true;
+                } else if (enemyCount > 0 && this.lastEnemyCount !== enemyCount) {
+                    // Update enemy count in objective
+                    if (this.game.narrativeSystem) {
+                        this.game.narrativeSystem.setObjective(`Cleanse the altar - defeat all demons (${enemyCount} remaining)`);
+                    }
+                    this.lastEnemyCount = enemyCount;
+                }
+            }
+        }
     }
     
     spawnChapelEnemies() {
@@ -357,22 +396,35 @@ export class ChapelLevel extends BaseLevel {
     }
     
     createExitDoor() {
-        // Door to Chapter 2 (appears after cleansing)
+        // Door to Armory (always visible, locked until chapel is cleansed)
         const doorGeometry = new THREE.BoxGeometry(2, 3, 0.3);
         const doorMaterial = new THREE.MeshStandardMaterial({
             color: 0x654321,
             roughness: 0.8,
-            emissive: 0x00ff00,
-            emissiveIntensity: 0
+            emissive: 0xff0000,  // Red glow when locked
+            emissiveIntensity: 0.2
         });
         
         const door = new THREE.Mesh(doorGeometry, doorMaterial);
-        door.position.set(0, 1.5, 10);  // At the back wall
+        door.position.set(5, 1.5, -20);  // On the right side of corridor, just before chapel room
+        door.rotation.y = Math.PI / 2;  // Rotate 90 degrees to be flush with side wall
         door.userData = { 
             isDoor: true,
-            toLevel: 'chapter2',
-            locked: true
+            toLevel: 'armory',
+            locked: true,
+            requiresCleansing: true  // Indicates it needs chapel cleansed to open
         };
+        
+        // Add a sign above the door
+        const signGeometry = new THREE.PlaneGeometry(3, 0.5);
+        const signMaterial = new THREE.MeshStandardMaterial({
+            color: 0x444444,
+            emissive: 0x222222,
+            emissiveIntensity: 0.2
+        });
+        const sign = new THREE.Mesh(signGeometry, signMaterial);
+        sign.position.set(0, 3.2, 10.1);
+        this.scene.add(sign);
         
         this.exitDoor = door;
         this.scene.add(door);
@@ -381,12 +433,63 @@ export class ChapelLevel extends BaseLevel {
     unlockExitDoor() {
         if (this.exitDoor) {
             this.exitDoor.userData.locked = false;
+            this.exitDoor.userData.requiresCleansing = false;
+            // Change from red to green glow when unlocked
+            this.exitDoor.material.emissive = new THREE.Color(0x00ff00);
             this.exitDoor.material.emissiveIntensity = 0.3;
             
             if (this.game && this.game.narrativeSystem) {
-                this.game.narrativeSystem.displaySubtitle("A door opens. The path ahead leads deeper underground.");
+                this.game.narrativeSystem.displaySubtitle("The chapel is cleansed. The armory door unlocks.");
             }
         }
+    }
+    
+    checkExitDoorCollision(player) {
+        // Check if player is near the exit door
+        if (!player || !player.position || !this.exitDoor) return false;
+        
+        const distance = player.position.distanceTo(this.exitDoor.position);
+        
+        // Check if player is near the door
+        if (distance < 2) {
+            if (!this.exitDoor.userData.locked) {
+                // Show prompt
+                if (this.game && this.game.showInteractPrompt) {
+                    this.game.showInteractPrompt("Press E to enter the Armory");
+                }
+                
+                // Check for E key press
+                if (this.game && this.game.inputManager) {
+                    const input = this.game.inputManager.getInput();
+                    if (input.interact) {
+                        console.log('[ChapelLevel] Player interacting with unlocked door');
+                        // Use ZoneManager for seamless transition if available
+                        if (this.game && this.game.zoneManager) {
+                            console.log('[ChapelLevel] Starting zone transition via ZoneManager');
+                            // Use triggerTransition instead of startTransition
+                            this.game.zoneManager.triggerTransition('chapel', 'armory', player);
+                            return 'transition'; // Special return value to indicate transition started
+                        } else {
+                            console.log('[ChapelLevel] No ZoneManager, falling back to regular loading');
+                            // Fallback to regular level loading
+                            return 'armory';
+                        }
+                    }
+                }
+            } else {
+                // Door is locked
+                if (this.game && this.game.showInteractPrompt) {
+                    this.game.showInteractPrompt("Door locked - Cleanse the chapel first");
+                }
+            }
+        } else {
+            // Hide prompt if player moves away
+            if (this.game && this.game.hideInteractPrompt) {
+                this.game.hideInteractPrompt();
+            }
+        }
+        
+        return false;
     }
     
     clearLevel() {

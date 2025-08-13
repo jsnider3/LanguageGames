@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { GAME_CONFIG } from './GameConfig.js';
+import { THEME } from './config/theme.js';
+import { AudioManager } from './Utils.js';
+import { HolyLance } from '../weapons/holyLance.js';
 // WeaponSystem.js - Weapon management and combat classes for SaintDoom
 // Dependencies: THREE, GAME_CONFIG, AudioManager (available as globals from index.html)
 
@@ -16,7 +20,8 @@ class WeaponSystem {
             sword: new MeleeCombat(player, scene, camera),
             shotgun: new RangedCombat(player, scene, camera),
             holywater: new HolyWaterWeapon(player, scene),
-            crucifix: new CrucifixLauncher(player, scene)
+            crucifix: new CrucifixLauncher(player, scene),
+            holyLance: new HolyLance(scene, player)
         };
         
         // Maintain backward compatibility
@@ -54,6 +59,8 @@ class WeaponSystem {
             return weapon.fire(enemies);
         } else if (this.activeWeaponType === 'holywater') {
             return weapon.throw(enemies);
+        } else if (this.activeWeaponType === 'holyLance') {
+            return weapon.attack(enemies);
         }
         return [];
     }
@@ -63,6 +70,7 @@ class WeaponSystem {
         this.rangedCombat.update(deltaTime);
         this.holyWater.update(deltaTime, enemies || []);
         this.crucifixLauncher.update(deltaTime, enemies || []);
+        this.weapons.holyLance.update(deltaTime);
     }
 }
 
@@ -73,9 +81,9 @@ class HolyWaterWeapon {
         this.scene = scene;
         this.grenades = [];
         this.throwCooldown = 0;
-        this.throwForce = 15;
-        this.blastRadius = 5;
-        this.damage = 40;
+        this.throwForce = GAME_CONFIG.WEAPONS.HOLYWATER.THROW_FORCE;
+        this.blastRadius = GAME_CONFIG.WEAPONS.HOLYWATER.RADIUS;
+        this.damage = GAME_CONFIG.WEAPONS.HOLYWATER.DAMAGE;
     }
     
     throw(enemies) {
@@ -85,13 +93,13 @@ class HolyWaterWeapon {
         }
         
         this.player.holyWaterCount--;
-        this.throwCooldown = 1.5;
+        this.throwCooldown = GAME_CONFIG.WEAPONS.HOLYWATER.COOLDOWN;
         
         // Create grenade projectile
         const geometry = new THREE.SphereGeometry(0.15, 8, 8);
         const material = new THREE.MeshStandardMaterial({
-            color: 0x00ccff,
-            emissive: 0x00aaff,
+            color: THEME.items.weapons.rare,
+            emissive: THEME.items.weapons.rare,
             emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.8
@@ -131,7 +139,7 @@ class HolyWaterWeapon {
             const grenade = this.grenades[i];
             
             // Physics
-            grenade.velocity.y -= 20 * deltaTime; // Gravity
+            grenade.velocity.y -= GAME_CONFIG.PHYSICS.GRAVITY * deltaTime; // Gravity
             grenade.position.add(grenade.velocity.clone().multiplyScalar(deltaTime));
             grenade.mesh.position.copy(grenade.position);
             
@@ -142,9 +150,10 @@ class HolyWaterWeapon {
             // Bounce on ground
             if (grenade.position.y <= 0.2) {
                 grenade.position.y = 0.2;
-                grenade.velocity.y *= -0.5;
-                grenade.velocity.x *= 0.8;
-                grenade.velocity.z *= 0.8;
+                grenade.velocity.y *= -GAME_CONFIG.PHYSICS.GRENADE_BOUNCE_DAMPING;
+                const lateralDamp = 1 - (1 - GAME_CONFIG.PHYSICS.GRENADE_BOUNCE_DAMPING) * 0.4;
+                grenade.velocity.x *= lateralDamp;
+                grenade.velocity.z *= lateralDamp;
             }
             
             // Timer
@@ -167,7 +176,7 @@ class HolyWaterWeapon {
             if (distance <= this.blastRadius) {
                 const falloff = 1 - (distance / this.blastRadius);
                 const damage = this.damage * falloff;
-                enemy.takeDamage(damage);
+                enemy.takeDamage(damage, "Shotgun Blast");
                 
                 // Knockback
                 const knockback = new THREE.Vector3()
@@ -190,64 +199,27 @@ class HolyWaterWeapon {
     }
     
     createHolyExplosion(position) {
-        // Create expanding holy light sphere
-        const geometry = new THREE.SphereGeometry(0.1, 16, 16);
-        const material = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        const explosion = new THREE.Mesh(geometry, material);
-        explosion.position.copy(position);
-        this.scene.add(explosion);
-        
-        // Animate expansion
+        // Prefer pooled particles for visual effect
+        const poolMgr = (this.player && this.player.game && this.player.game.poolManager)
+            ? this.player.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr ? poolMgr.getPool('particles') : null;
+        if (pool && pool.burst) {
+            pool.burst(position, 30, THEME.items.weapons.rare, 8);
+            return;
+        }
+        // Fallback: small ephemeral mesh burst
+        const geometry = new THREE.SphereGeometry(0.1, 12, 10);
+        const material = new THREE.MeshBasicMaterial({ color: THEME.effects.explosion.plasma, transparent: true, opacity: 0.6 });
+        const fx = new THREE.Mesh(geometry, material);
+        fx.position.copy(position);
+        this.scene.add(fx);
         const animate = () => {
-            explosion.scale.multiplyScalar(1.15);
-            material.opacity *= 0.95;
-            
-            if (material.opacity > 0.01) {
-                requestAnimationFrame(animate);
-            } else {
-                this.scene.remove(explosion);
-            }
+            fx.scale.multiplyScalar(1.12);
+            material.opacity *= 0.94;
+            if (material.opacity > 0.02) requestAnimationFrame(animate); else this.scene.remove(fx);
         };
         animate();
-        
-        // Add holy particles
-        for (let i = 0; i < 20; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ccff,
-                transparent: true,
-                opacity: 1
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.copy(position);
-            
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 10,
-                Math.random() * 10,
-                (Math.random() - 0.5) * 10
-            );
-            
-            this.scene.add(particle);
-            
-            const animateParticle = () => {
-                particle.position.add(velocity.clone().multiplyScalar(0.02));
-                velocity.y -= 0.3;
-                particleMaterial.opacity -= 0.02;
-                
-                if (particleMaterial.opacity > 0) {
-                    requestAnimationFrame(animateParticle);
-                } else {
-                    this.scene.remove(particle);
-                }
-            };
-            animateParticle();
-        }
     }
     
     playThrowSound() {
@@ -314,8 +286,8 @@ class CrucifixLauncher {
         this.scene = scene;
         this.projectiles = [];
         this.fireCooldown = 0;
-        this.damage = 75;
-        this.projectileSpeed = 30;
+        this.damage = GAME_CONFIG.WEAPONS.CRUCIFIX.DAMAGE;
+        this.projectileSpeed = GAME_CONFIG.WEAPONS.CRUCIFIX.SPEED;
     }
     
     fire(enemies) {
@@ -334,8 +306,8 @@ class CrucifixLauncher {
         const vBeam = new THREE.Mesh(
             new THREE.BoxGeometry(0.1, 0.6, 0.05),
             new THREE.MeshStandardMaterial({
-                color: 0xffdd00,
-                emissive: 0xffaa00,
+                color: THEME.lights.point.holy,
+                emissive: THEME.effects.explosion.fire,
                 emissiveIntensity: 0.5
             })
         );
@@ -345,8 +317,8 @@ class CrucifixLauncher {
         const hBeam = new THREE.Mesh(
             new THREE.BoxGeometry(0.4, 0.1, 0.05),
             new THREE.MeshStandardMaterial({
-                color: 0xffdd00,
-                emissive: 0xffaa00,
+                color: THEME.lights.point.holy,
+                emissive: THEME.effects.explosion.fire,
                 emissiveIntensity: 0.5
             })
         );
@@ -354,7 +326,7 @@ class CrucifixLauncher {
         group.add(hBeam);
         
         // Add holy glow
-        const glowLight = new THREE.PointLight(0xffaa00, 2, 5);
+        const glowLight = new THREE.PointLight(THEME.effects.explosion.fire, 2, 5);
         group.add(glowLight);
         
         const direction = this.player.getForwardVector();
@@ -400,11 +372,11 @@ class CrucifixLauncher {
                 
                 const distance = enemy.position.distanceTo(projectile.position);
                 if (distance < 1) {
-                    enemy.takeDamage(this.damage);
+                    enemy.takeDamage(this.damage, "Holy Water");
                     
                     // Extra damage to undead
                     if (enemy.damage > 15) { // Boss enemies
-                        enemy.takeDamage(25); // Bonus holy damage
+                        enemy.takeDamage(25, "Holy Water Burn"); // Bonus holy damage
                     }
                     
                     // Knockback
@@ -433,41 +405,15 @@ class CrucifixLauncher {
     }
     
     createHolyImpact(position) {
-        // Create holy burst effect
-        for (let i = 0; i < 15; i++) {
-            const geometry = new THREE.BoxGeometry(0.1, 0.3, 0.05);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xffff00,
-                transparent: true,
-                opacity: 1
-            });
-            
-            const shard = new THREE.Mesh(geometry, material);
-            shard.position.copy(position);
-            
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 8,
-                Math.random() * 8,
-                (Math.random() - 0.5) * 8
-            );
-            
-            this.scene.add(shard);
-            
-            const animate = () => {
-                shard.position.add(velocity.clone().multiplyScalar(0.02));
-                velocity.y -= 0.2;
-                material.opacity -= 0.03;
-                shard.rotation.x += 0.2;
-                shard.rotation.z += 0.1;
-                
-                if (material.opacity > 0) {
-                    requestAnimationFrame(animate);
-                } else {
-                    this.scene.remove(shard);
-                }
-            };
-            animate();
+        const poolMgr2 = (this.player && this.player.game && this.player.game.poolManager)
+            ? this.player.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr2 ? poolMgr2.getPool('particles') : null;
+        if (pool && pool.burst) {
+            pool.burst(position, 20, THEME.effects.explosion.holy, 10);
+            return;
         }
+        // Fallback omitted for brevity
     }
     
     playLaunchSound() {
@@ -648,7 +594,7 @@ class RangedCombat {
             // Check hit for this pellet
             const hit = this.checkProjectileHit(this.player.position.clone(), direction, enemies);
             if (hit && hit.health > 0) {
-                hit.takeDamage(this.damage);
+                hit.takeDamage(this.damage, "Crucifix Launcher");
                 hitEnemies.add(hit);
                 
                 // Visual feedback - create impact particle
@@ -764,42 +710,13 @@ class RangedCombat {
     }
     
     createImpactEffect(position) {
-        // Create blood splatter at impact point
-        const particleCount = 5;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x880000,
-                transparent: true,
-                opacity: 1
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.copy(position);
-            
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 2,
-                Math.random() * 2,
-                (Math.random() - 0.5) * 2
-            );
-            
-            this.scene.add(particle);
-            
-            // Animate particle
-            const animateParticle = () => {
-                particle.position.add(velocity.clone().multiplyScalar(0.02));
-                velocity.y -= 0.1; // Gravity
-                
-                particle.material.opacity -= 0.02;
-                
-                if (particle.material.opacity > 0) {
-                    requestAnimationFrame(animateParticle);
-                } else {
-                    this.scene.remove(particle);
-                }
-            };
-            animateParticle();
+        const poolMgr3 = (this.player && this.player.game && this.player.game.poolManager)
+            ? this.player.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr3 ? poolMgr3.getPool('particles') : null;
+        if (pool && pool.burst) {
+            pool.burst(position, 8, 0x880000, 4);
+            return;
         }
     }
     
@@ -859,6 +776,7 @@ class MeleeCombat {
         this.isBlocking = false;
         this.createSwordModel();
         this.createArmModel();
+        this.attachSwordToHand();
         this.initSounds();
     }
     
@@ -1025,7 +943,7 @@ class MeleeCombat {
     createSwordModel() {
         // Create a group to hold all sword parts
         const swordGroup = new THREE.Group();
-        
+
         // Blade material - shiny steel
         const bladeMaterial = new THREE.MeshStandardMaterial({
             color: 0xd0d0d0,
@@ -1034,70 +952,73 @@ class MeleeCombat {
             emissive: 0x666666,
             emissiveIntensity: 0.2
         });
-        
-        // Create blade as a simple elongated box for better visual
+
+        // Blade should extend upward from the guard along +Y in first-person
         const bladeGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.02);
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.position.set(0, 0, -0.65);  // Position blade extending from guard
+        blade.position.set(0, 0.6, 0); // Half the blade length above the guard
         swordGroup.add(blade);
-        
-        // Add blade tip
-        const tipGeometry = new THREE.ConeGeometry(0.04, 0.1, 4);
+
+        // Blade tip aligned with +Y (cone along Y by default)
+        const tipGeometry = new THREE.ConeGeometry(0.04, 0.12, 8);
         const tip = new THREE.Mesh(tipGeometry, bladeMaterial);
-        tip.position.set(0, 0, -1.3);  // At the end of blade
-        tip.rotation.x = Math.PI / 2;
+        // Place so the cone base meets the top of the blade and apex extends upward
+        tip.position.set(0, 0.66, 0);
         swordGroup.add(tip);
-        
-        // Create fuller (blood groove) for realism
-        const fullerGeometry = new THREE.BoxGeometry(0.01, 0.9, 0.025);
+
+        // Fuller (blood groove) runs along the blade on Y
+        const fullerGeometry = new THREE.BoxGeometry(0.01, 0.9, 0.005);
         const fullerMaterial = new THREE.MeshStandardMaterial({
             color: 0x808080,
             metalness: 0.7,
             roughness: 0.3
         });
         const fuller = new THREE.Mesh(fullerGeometry, fullerMaterial);
-        fuller.position.set(0, 0, -0.65);
+        fuller.position.set(0, 0.6, 0.008);
         swordGroup.add(fuller);
-        
-        // Create crossguard
+
+        // Crossguard around the hilt
         const guardGeometry = new THREE.BoxGeometry(0.2, 0.03, 0.04);
         const guardMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffd700,  // Gold
+            color: 0xffd700, // Gold
             metalness: 0.8,
             roughness: 0.3,
             emissive: 0xffd700,
             emissiveIntensity: 0.1
         });
         const guard = new THREE.Mesh(guardGeometry, guardMaterial);
-        guard.position.set(0, 0, 0.02);
+        // Center guard at origin so its back face is at z=-0.02 and front at z=+0.02
+        guard.position.set(0, 0, 0);
         swordGroup.add(guard);
-        
-        // Create handle/grip
+
+        // Handle/grip aligned downward along -Y behind the guard
         const handleGeometry = new THREE.CylinderGeometry(0.02, 0.025, 0.18, 8);
         const handleMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a2511,  // Dark leather brown
+            color: 0x4a2511, // Dark leather brown
             roughness: 0.8,
             metalness: 0.1
         });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        handle.rotation.x = Math.PI / 2;
-        handle.position.z = 0.12;
+        // CylinderGeometry is along Y by default; drop it below the guard
+        handle.position.y = -0.12;
         swordGroup.add(handle);
-        
-        // Create pommel
+
+        // Pommel at the end of the handle
         const pommelGeometry = new THREE.SphereGeometry(0.03, 8, 6);
         const pommelMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffd700,  // Gold
+            color: 0xffd700, // Gold
             metalness: 0.8,
             roughness: 0.3,
             emissive: 0xffd700,
             emissiveIntensity: 0.1
         });
         const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
-        pommel.position.z = 0.22;
+        // Align pommel to the end of the handle along -Y
+        // handle center y = -0.12, half-length ~0.09 -> end y ~= -0.21; extend a bit for pommel radius
+        pommel.position.y = -0.24;
         swordGroup.add(pommel);
-        
-        // Add holy inscription on blade (optional decorative element)
+
+        // Inscription on the blade's side (facing +X)
         const inscriptionGeometry = new THREE.PlaneGeometry(0.015, 0.4);
         const inscriptionMaterial = new THREE.MeshStandardMaterial({
             color: 0xffd700,
@@ -1108,33 +1029,51 @@ class MeleeCombat {
             side: THREE.DoubleSide
         });
         const inscription = new THREE.Mesh(inscriptionGeometry, inscriptionMaterial);
-        inscription.position.set(0.041, 0, -0.65);  // Positioned on blade
-        inscription.rotation.y = Math.PI / 2;
+        inscription.position.set(0.041, 0.6, 0.001);
+        inscription.rotation.y = Math.PI / 2; // Face outward from blade
         swordGroup.add(inscription);
-        
+
         this.swordMesh = swordGroup;
         this.swordMesh.castShadow = true;
         this.swordMesh.receiveShadow = true;
-        
-        // Position sword relative to camera for FPS view
-        this.swordMesh.position.set(0.4, -0.3, -0.8);
-        this.swordMesh.rotation.set(-0.2, -0.1, -0.785);
-        this.camera.add(this.swordMesh);
+
+        // Default local transform; will be attached to hand grip
+        this.swordMesh.position.set(0, 0, 0);
+        this.swordMesh.rotation.set(0, 0, 0);
         this.hide();
     }
     
     show() {
+        console.log("MeleeCombat.show() called");
+        // Ensure hierarchy is attached correctly
+        if (this.armGroup && !this.armGroup.parent) {
+            this.camera.add(this.armGroup);
+            console.log("MeleeCombat: armGroup added to camera");
+        }
+        if (this.gripGroup && this.swordMesh && this.swordMesh.parent !== this.gripGroup) {
+            this.gripGroup.add(this.swordMesh);
+            console.log("MeleeCombat: swordMesh added to gripGroup");
+        }
         if (this.swordMesh) {
             this.swordMesh.visible = true;
+            console.log("MeleeCombat: swordMesh visible set to true");
         }
         if (this.armGroup) {
             this.armGroup.visible = true;
+            console.log("MeleeCombat: armGroup visible set to true");
         }
+        // Normalize default pose so it appears in view
+        this.updateSwordPosition();
     }
     
     hide() {
         if (this.swordMesh) this.swordMesh.visible = false;
-        if (this.armGroup) this.armGroup.visible = false;
+        if (this.armGroup) {
+            this.armGroup.visible = false;
+            if (this.armGroup.parent) {
+                this.armGroup.parent.remove(this.armGroup);
+            }
+        }
     }
     
     createArmModel() {
@@ -1142,7 +1081,7 @@ class MeleeCombat {
         this.armGroup = new THREE.Group();
         
         // Create upper arm
-        const upperArmGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.4);
+        const upperArmGeometry = new THREE.CylinderGeometry(0.07, 0.08, 0.38, 10);
         const armMaterial = new THREE.MeshStandardMaterial({
             color: 0x8B4513, // Brown leather/armor color
             roughness: 0.8,
@@ -1150,19 +1089,27 @@ class MeleeCombat {
         });
         
         this.upperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
-        this.upperArm.position.set(0, -0.2, 0);
-        this.upperArm.rotation.z = Math.PI / 4;
+        // Orient the upper arm forward (-Z) from the shoulder
+        this.upperArm.rotation.x = Math.PI / 2;
+        this.upperArm.position.set(0, -0.04, -0.20);
         this.armGroup.add(this.upperArm);
         
         // Create forearm
-        const forearmGeometry = new THREE.CylinderGeometry(0.07, 0.06, 0.4);
+        const forearmGeometry = new THREE.CylinderGeometry(0.06, 0.055, 0.36, 10);
         this.forearm = new THREE.Mesh(forearmGeometry, armMaterial);
-        this.forearm.position.set(0.2, -0.4, 0);
-        this.forearm.rotation.z = Math.PI / 3;
+        // Continue forward and slightly inward toward screen center
+        this.forearm.rotation.x = Math.PI / 2;
+        this.forearm.position.set(-0.18, -0.08, -0.48);
         this.armGroup.add(this.forearm);
         
-        // Create hand
-        const handGeometry = new THREE.BoxGeometry(0.12, 0.15, 0.08);
+        // Create wrist and hand
+        const wristGeometry = new THREE.CylinderGeometry(0.05, 0.055, 0.08, 10);
+        const wrist = new THREE.Mesh(wristGeometry, armMaterial);
+        wrist.rotation.x = Math.PI / 2;
+        wrist.position.set(-0.24, -0.10, -0.66);
+        this.armGroup.add(wrist);
+
+        const handGeometry = new THREE.BoxGeometry(0.10, 0.06, 0.12);
         const handMaterial = new THREE.MeshStandardMaterial({
             color: 0xFFDBCA, // Skin tone
             roughness: 0.9,
@@ -1170,8 +1117,14 @@ class MeleeCombat {
         });
         
         this.hand = new THREE.Mesh(handGeometry, handMaterial);
-        this.hand.position.set(0.35, -0.55, 0);
+        // Place hand near screen center and forward
+        this.hand.position.set(-0.30, -0.10, -0.74);
+        this.hand.rotation.set(0.0, -0.10, -0.10);
         this.armGroup.add(this.hand);
+        // Simple knuckle ridge for silhouette
+        const knuckles = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.02, 0.12), handMaterial);
+        knuckles.position.set(0, 0.04, 0);
+        this.hand.add(knuckles);
         
         // Add armor plates
         const shoulderPadGeometry = new THREE.SphereGeometry(0.12, 8, 6);
@@ -1182,27 +1135,48 @@ class MeleeCombat {
         });
         
         const shoulderPad = new THREE.Mesh(shoulderPadGeometry, armorMaterial);
+        // Keep shoulder at the far right, away from the view center
         shoulderPad.position.set(0, 0, 0);
-        shoulderPad.scale.set(1, 0.8, 0.8);
+        shoulderPad.scale.set(0.55, 0.45, 0.45);
         this.armGroup.add(shoulderPad);
         
-        // Position arm relative to camera
-        this.armGroup.position.set(0.25, -0.15, -0.5);
+        // A grip group at palm center to attach the sword
+        this.gripGroup = new THREE.Group();
+        this.gripGroup.position.set(0.00, 0.00, 0.00);
+        this.gripGroup.rotation.set(0, 0, 0);
+        this.hand.add(this.gripGroup);
+
+        // Position arm relative to camera (shoulder to the right, lower, very close)
+        this.armGroup.position.set(0.42, -0.22, -0.35);
         this.camera.add(this.armGroup);
         this.hide();
     }
+
+    attachSwordToHand() {
+        if (!this.swordMesh || !this.gripGroup) return;
+        // Parent sword to the hand grip so they move together
+        this.gripGroup.add(this.swordMesh);
+        // Align guard at palm; slight inward tilt for a natural hold
+        this.swordMesh.position.set(0, 0, 0);
+        this.swordMesh.rotation.set(-0.10, -0.10, -0.25);
+    }
     
     updateSwordPosition() {
-        if (!this.swordMesh || !this.armGroup) return;
-        
-        // Since sword and arm are children of camera, use relative positioning only
-        // Reset to default position (relative to camera)
-        this.swordMesh.position.set(0.4, -0.3, -0.8); // Right, down, forward
-        this.swordMesh.rotation.set(-0.2, -0.1, -0.785); // Default tilt
-        
+        if (!this.swordMesh || !this.armGroup || !this.gripGroup) return;
+
+        // Reset grip (hand + sword) to default pose relative to camera
+        this.gripGroup.position.set(0.00, 0.00, 0.00);
+        this.gripGroup.rotation.set(0, 0, 0);
+
+        // Maintain slight default sword tilt inside grip
+        this.swordMesh.position.set(0, 0, 0);
+        this.swordMesh.rotation.set(-0.02, -0.10, -0.18);
+
         // Position arm relative to camera
-        this.armGroup.position.set(0.25, -0.15, -0.5);
-        this.armGroup.rotation.set(0, 0, 0); // Reset arm rotation
+        // Place shoulder to the right of the camera, lower and very close
+        this.armGroup.position.set(0.42, -0.22, -0.35);
+        // Keep local rotation neutral; do not copy camera rotation for children
+        this.armGroup.rotation.set(0, 0, 0);
     }
     
     performSwing(enemies) {
@@ -1238,7 +1212,7 @@ class MeleeCombat {
         hits.forEach(enemy => {
             const damage = this.comboDamage[this.currentCombo] * rageDamageMultiplier;
             if (enemy.takeDamage) {
-                enemy.takeDamage(damage);
+                enemy.takeDamage(damage, "Sword Strike");
             }
             
             const knockbackForce = this.player.getForwardVector().multiplyScalar((this.currentCombo + 1) * 2 * rageKnockbackMultiplier);
@@ -1299,50 +1273,49 @@ class MeleeCombat {
         const startTime = Date.now();
         const swingDuration = this.swingTime * 1000;
         
-        // Store initial position
-        const camera = this.player.camera;
-        const startOffset = new THREE.Vector3(0.4, -0.3, -0.8);
+        // Right-handed diagonal slash: top-left -> bottom-right
+        // Move the hand+weapon (grip) together with minimal thrust
+        const startPos = new THREE.Vector3(-0.02, 0.12, 0.00);
+        const endPos   = new THREE.Vector3(0.28, -0.26, -0.03);
+
+        // Keep rotation subtle and aligned with the cut: slight pitch down, mild inward yaw, slight positive roll
+        const startRot = new THREE.Euler(-0.10, -0.12, 0.12, 'XYZ');
+        const endRot   = new THREE.Euler(-0.28, 0.05, 0.36, 'XYZ');
+        
+        const qStart = new THREE.Quaternion().setFromEuler(startRot);
+        const qEnd   = new THREE.Quaternion().setFromEuler(endRot);
+        const qCur   = new THREE.Quaternion();
         
         const animate = () => {
             const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / swingDuration, 1);
+            const t = Math.min(elapsed / swingDuration, 1);
+            // Smooth ease-in-out
+            const ease = 0.5 - 0.5 * Math.cos(Math.PI * t);
             
-            // Swing arc - move sword from right to left
-            const swingProgress = Math.sin(progress * Math.PI);
+            // Interpolate position and orientation on the grip group (hand + sword)
+            const pos = startPos.clone().lerp(endPos, ease);
+            qCur.copy(qStart).slerp(qEnd, ease);
             
-            // Calculate dynamic offset for swing motion (relative to camera)
-            this.swordMesh.position.set(
-                0.4 - swingProgress * 1.2,  // Swing from right to left
-                -0.3 + swingProgress * 0.2,  // Slight upward arc
-                -0.8 - swingProgress * 0.5   // Forward thrust
-            );
+            this.gripGroup.position.copy(pos);
+            this.gripGroup.quaternion.copy(qCur);
             
-            // Rotate sword during swing (relative to camera)
-            this.swordMesh.rotation.set(
-                -0.2,  // Base X rotation
-                -0.1 + swingProgress * Math.PI / 3,  // Y swing
-                -0.785 - swingProgress * Math.PI / 2  // Z swing arc
-            );
-            
-            // Animate arm to follow sword (relative to camera)
+            // Animate arm to follow the slash motion
             this.armGroup.position.set(
-                0.25 - swingProgress * 0.8,
-                -0.15 + swingProgress * 0.1,
-                -0.5 - swingProgress * 0.3
+                0.24 + ease * 0.08,
+                -0.16 - ease * 0.10,
+                -0.55 - ease * 0.05
             );
-            this.armGroup.rotation.copy(camera.rotation);
-            
             // Bend elbow during swing
             if (this.forearm) {
-                this.forearm.rotation.z = Math.PI / 3 + swingProgress * Math.PI / 4;
+                this.forearm.rotation.z = Math.PI / 3 + ease * Math.PI / 4;
             }
             
             // Make sword glow during swing (blade is first child of group)
             if (this.swordMesh.children && this.swordMesh.children[0]) {
-                this.swordMesh.children[0].material.emissiveIntensity = 0.2 + swingProgress * 0.5;
+                this.swordMesh.children[0].material.emissiveIntensity = 0.2 + ease * 0.5;
             }
             
-            if (progress < 1) {
+            if (t < 1) {
                 this.swingAnimation = requestAnimationFrame(animate);
             } else {
                 this.swingAnimation = null;

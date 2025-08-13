@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BaseWeapon } from '../core/BaseWeapon.js';
+import { THEME } from '../modules/config/theme.js';
+
 
 export class TemporalMine extends BaseWeapon {
     constructor() {
@@ -24,6 +26,7 @@ export class TemporalMine extends BaseWeapon {
         this.chronoEnergy = 100;
         this.maxChronoEnergy = 100;
         this.energyRegenRate = 8; // per second
+        this.activeEffects = [];
     }
 
     createWeaponModel() {
@@ -114,7 +117,7 @@ export class TemporalMine extends BaseWeapon {
         // Mine count display
         const countGeometry = new THREE.PlaneGeometry(0.4, 0.2);
         const countMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             emissive: 0x004400,
             emissiveIntensity: 0.3,
             transparent: true,
@@ -237,8 +240,8 @@ export class TemporalMine extends BaseWeapon {
         // Status indicator lights
         const statusGeometry = new THREE.SphereGeometry(0.08, 8, 8);
         const statusMaterial = new THREE.MeshStandardMaterial({
-            color: 0xff0000, // Red when arming
-            emissive: 0x440000,
+            color: THEME.ui.health.low, // Red when arming
+            emissive: THEME.materials.robeEmissive,
             emissiveIntensity: 0.8
         });
         const statusLight = new THREE.Mesh(statusGeometry, statusMaterial);
@@ -300,7 +303,7 @@ export class TemporalMine extends BaseWeapon {
         
         // Change status light to green
         if (mine.userData.statusLight) {
-            mine.userData.statusLight.material.color.setHex(0x00ff00);
+            mine.userData.statusLight.material.color.setHex(THEME.ui.health.full);
             mine.userData.statusLight.material.emissive.setHex(0x004400);
         }
 
@@ -390,34 +393,14 @@ export class TemporalMine extends BaseWeapon {
         shockwave.rotation.x = -Math.PI / 2;
         scene.add(shockwave);
 
-        // Animate explosion
-        let scale = 0.1;
-        let opacity = 0.8;
-        const explosionInterval = setInterval(() => {
-            scale += 0.2;
-            opacity -= 0.05;
-
-            explosion.scale.setScalar(scale);
-            explosion.material.opacity = opacity;
-            shockwave.material.opacity = opacity * 0.75;
-
-            // Clean up fractures
-            scene.children.forEach(child => {
-                if (child.geometry && child.geometry.type === 'PlaneGeometry' && 
-                    child.material.color.getHex() === 0x87ceeb) {
-                    child.material.opacity = opacity;
-                    if (opacity <= 0) {
-                        scene.remove(child);
-                    }
-                }
-            });
-
-            if (opacity <= 0) {
-                scene.remove(explosion);
-                scene.remove(shockwave);
-                clearInterval(explosionInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: explosion,
+            type: 'temporal_explosion',
+            duration: 1000,
+            currentTime: 0,
+            shockwave: shockwave,
+            fractures: scene.children.filter(c => c.geometry && c.geometry.type === 'PlaneGeometry' && c.material.color.getHex() === 0x87ceeb)
+        });
     }
 
     createTimeDistortionField(scene, position) {
@@ -485,30 +468,14 @@ export class TemporalMine extends BaseWeapon {
         fieldGroup.position.copy(position);
         scene.add(fieldGroup);
 
-        // Animate time distortion
-        let time = 0;
-        const distortionInterval = setInterval(() => {
-            time += 50;
-            
-            // Slow pulsing bubble
-            const pulse = 1 + Math.sin(time * 0.002) * 0.1;
-            bubble.scale.setScalar(pulse);
-
-            // Rippling waves
-            fieldGroup.children.forEach((child, index) => {
-                if (index > 0 && index < 6) { // Wave meshes
-                    child.scale.setScalar(1 + Math.sin(time * 0.003 + index) * 0.2);
-                }
-            });
-
-            // Slow particle movement
-            particles.rotation.y += 0.005;
-
-            if (time > this.timeSlowDuration) {
-                scene.remove(fieldGroup);
-                clearInterval(distortionInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: fieldGroup,
+            type: 'time_distortion_field',
+            duration: this.timeSlowDuration,
+            currentTime: 0,
+            bubble: bubble,
+            particles: particles
+        });
 
         return fieldGroup;
     }
@@ -528,17 +495,12 @@ export class TemporalMine extends BaseWeapon {
         trail.lookAt(endPos);
         scene.add(trail);
 
-        // Fade out trail
-        let opacity = 0.6;
-        const trailInterval = setInterval(() => {
-            opacity -= 0.1;
-            trail.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                scene.remove(trail);
-                clearInterval(trailInterval);
-            }
-        }, 100);
+        this.activeEffects.push({
+            mesh: trail,
+            type: 'deployment_trail',
+            duration: 1000,
+            currentTime: 0
+        });
     }
 
     update(deltaTime) {
@@ -546,16 +508,16 @@ export class TemporalMine extends BaseWeapon {
         if (this.chronoEnergy < this.maxChronoEnergy) {
             this.chronoEnergy = Math.min(
                 this.maxChronoEnergy,
-                this.chronoEnergy + (this.energyRegenRate * deltaTime / 1000)
+                this.chronoEnergy + (this.energyRegenRate * deltaTime)
             );
         }
 
         // Animate weapon effects
         if (this.timeRings) {
             this.timeRings.forEach((ring, index) => {
-                ring.rotation.x += deltaTime * 0.0003 * (index + 1);
-                ring.rotation.y += deltaTime * 0.0005;
-                ring.rotation.z += deltaTime * 0.0002;
+                ring.rotation.x += deltaTime * 0.3 * (index + 1);
+                ring.rotation.y += deltaTime * 0.5;
+                ring.rotation.z += deltaTime * 0.2;
             });
         }
 
@@ -573,9 +535,9 @@ export class TemporalMine extends BaseWeapon {
             if (energyPercent > 0.6) {
                 this.energyIndicator.material.color.setHex(0x00ced1);
             } else if (energyPercent > 0.3) {
-                this.energyIndicator.material.color.setHex(0xffff00);
+                this.energyIndicator.material.color.setHex(THEME.ui.health.medium);
             } else {
-                this.energyIndicator.material.color.setHex(0xff0000);
+                this.energyIndicator.material.color.setHex(THEME.ui.health.low);
             }
         }
 
@@ -585,12 +547,50 @@ export class TemporalMine extends BaseWeapon {
                 this.updateMine(mine, deltaTime);
             }
         });
+
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'temporal_explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + 20 * deltaTime);
+                    effect.mesh.material.opacity -= 0.8 * deltaTime;
+                    effect.shockwave.material.opacity -= 0.8 * deltaTime;
+                    effect.fractures.forEach(f => f.material.opacity -= 0.8 * deltaTime);
+                    break;
+                case 'time_distortion_field':
+                    const pulse = 1 + Math.sin(effect.currentTime * 2) * 0.1;
+                    effect.bubble.scale.setScalar(pulse);
+                    effect.mesh.children.forEach((child, index) => {
+                        if (index > 0 && index < 6) { // Wave meshes
+                            child.scale.setScalar(1 + Math.sin(effect.currentTime * 3 + index) * 0.2);
+                        }
+                    });
+                    effect.particles.rotation.y += 0.5 * deltaTime;
+                    break;
+                case 'deployment_trail':
+                    effect.mesh.material.opacity -= 1 * deltaTime;
+                    break;
+            }
+
+            return true;
+        });
     }
 
     updateMine(mine, deltaTime) {
         // Animate mine core
         if (mine.userData.core) {
-            mine.userData.core.rotation.y += deltaTime * 0.002;
+            mine.userData.core.rotation.y += 2 * deltaTime;
             const pulseIntensity = mine.userData.armed ? 
                 0.8 + Math.sin(Date.now() * 0.008) * 0.2 : 0.5;
             mine.userData.core.material.emissiveIntensity = pulseIntensity;
@@ -599,7 +599,7 @@ export class TemporalMine extends BaseWeapon {
         // Animate proximity rings
         if (mine.userData.rings) {
             mine.userData.rings.forEach((ring, index) => {
-                ring.rotation.z += deltaTime * 0.001 * (index + 1);
+                ring.rotation.z += 1 * (index + 1) * deltaTime;
                 if (mine.userData.armed) {
                     const scale = 1 + Math.sin(Date.now() * 0.005 + index) * 0.1;
                     ring.scale.setScalar(scale);

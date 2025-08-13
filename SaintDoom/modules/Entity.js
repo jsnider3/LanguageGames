@@ -89,7 +89,7 @@ export class Entity {
         
         const distance = this.position.distanceTo(target.position);
         if (distance < this.getAttackRange()) {
-            target.takeDamage(this.damage);
+            target.takeDamage(this.damage, this.name || "Unknown Entity");
             this.lastAttackTime = Date.now();
             this.onAttack(target);
             return true;

@@ -110,10 +110,11 @@
             background: linear-gradient(180deg, #1a0000 0%, #000 100%);
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             z-index: 1000;
             color: #fff;
+            padding-top: 150px;
         }
         
         #startScreen h1 {
@@ -442,7 +443,7 @@
     <div id="startScreen">
         <h1>SAINTDOOM</h1>
         <h2>Unholy Retribution</h2>
-        <div class="menu-options">
+        <div class="menu-options" style="display:none;">
             <button class="menu-button" id="startButton">BEGIN CRUSADE</button>
             <button class="menu-button" id="levelSelectButton">LEVEL SELECT</button>
             <button class="menu-button" id="loadButton" style="display:none;">Continue</button>
@@ -456,8 +457,8 @@
         <h2>LEVEL SELECT</h2>
         <div class="menu-options" style="max-height: 400px; overflow-y: auto;">
             <button class="menu-button level-select-btn" data-level="tutorial">Tutorial - Vatican Inquisition</button>
-            <button class="menu-button level-select-btn" data-level="chapter1">Chapter 1 - Desecrated Chapel</button>
-            <button class="menu-button level-select-btn" data-level="chapter2" id="chapter2Btn">Chapter 2 - The Armory</button>
+            <button class="menu-button level-select-btn" data-level="chapel">Chapter 1 - Desecrated Chapel</button>
+            <button class="menu-button level-select-btn" data-level="armory">Chapter 2 - The Armory</button>
             <button class="menu-button level-select-btn" data-level="laboratory">Chapter 3 - Laboratory Complex</button>
             <button class="menu-button level-select-btn" data-level="containment">Chapter 4 - Containment Area</button>
             <button class="menu-button level-select-btn" data-level="tunnels">Chapter 5 - Tunnel Network</button>
@@ -558,198 +559,26 @@
         import { Hellhound } from './enemies/hellhound.js';
         import { InputManager } from './modules/InputManager.js';
         import { Player } from './modules/Player.js';
-        import { Enemy } from './enemy.js';
+        // Enemy class removed - now using BaseEnemy from core/BaseEnemy.js
         import { CollisionSystem } from './modules/CollisionSystem.js';
         import { Level } from './level.js';
         import { GAME_CONFIG } from './modules/GameConfig.js';
         import { AudioManager, GeometryCache, MeshFactory, ParticleSystem, VectorUtils } from './modules/Utils.js';
         import { Game } from './modules/Game.js';
+        import { TransitionZoneFactory } from './modules/TransitionZones.js';
+        import { FacilityMap } from './modules/FacilityMap.js';
         
-        window.NarrativeSystem = NarrativeSystem;
-        window.PossessedScientist = PossessedScientist;
-        window.Hellhound = Hellhound;
-        window.InputManager = InputManager;
-        window.Player = Player;
-        window.Enemy = Enemy;
-        window.CollisionSystem = CollisionSystem;
-        window.Level = Level;
-        window.GAME_CONFIG = GAME_CONFIG;
-        window.AudioManager = AudioManager;
-        window.GeometryCache = GeometryCache;
-        window.MeshFactory = MeshFactory;
-        window.ParticleSystem = ParticleSystem;
-        window.VectorUtils = VectorUtils;
-        window.Game = Game;
-        
+        // Note: avoiding window.* globals to keep modules self-contained
         // Don't signal modules loaded here - wait for the async module loading to complete
     </script>
-    <script>
+    <script type="module">
+import { Game } from './modules/Game.js';
 // ============= Classes imported from modules =============
 // InputManager and Player are now imported from ./modules/
 
 
 // ============= PICKUPS =============
-class Pickup {
-    constructor(scene, position, type) {
-        this.scene = scene;
-        this.position = position.clone();
-        this.type = type;
-        this.collected = false;
-        this.radius = 0.5;
-        
-        this.createMesh();
-        this.bobAmount = 0;
-    }
-    
-    createMesh() {
-        const group = new THREE.Group();
-        
-        if (this.type === 'health') {
-            // Red cross health pack
-            const boxGeometry = GeometryCache.getBox(GAME_CONFIG.PICKUPS.HEALTH.SIZE, GAME_CONFIG.PICKUPS.HEALTH.SIZE, 0.1);
-            const boxMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                emissive: 0xffffff,
-                emissiveIntensity: 0.1
-            });
-            const box = new THREE.Mesh(boxGeometry, boxMaterial);
-            group.add(box);
-            
-            // Red cross
-            const crossMaterial = new THREE.MeshStandardMaterial({
-                color: GAME_CONFIG.PICKUPS.HEALTH.COLOR,
-                emissive: GAME_CONFIG.PICKUPS.HEALTH.COLOR,
-                emissiveIntensity: 0.3
-            });
-            
-            const vertBar = new THREE.Mesh(
-                GeometryCache.getBox(0.1, 0.3, 0.11),
-                crossMaterial
-            );
-            group.add(vertBar);
-            
-            const horizBar = new THREE.Mesh(
-                GeometryCache.getBox(0.3, 0.1, 0.11),
-                crossMaterial
-            );
-            group.add(horizBar);
-            
-            this.value = GAME_CONFIG.PICKUPS.HEALTH.VALUE
-            
-        } else if (this.type === 'shells') {
-            // Shell ammo box
-            const boxGeometry = GeometryCache.getBox(0.5, 0.3, 0.3);
-            const boxMaterial = new THREE.MeshStandardMaterial({
-                color: GAME_CONFIG.PICKUPS.SHELLS.COLOR,
-                roughness: 0.8
-            });
-            const box = new THREE.Mesh(boxGeometry, boxMaterial);
-            group.add(box);
-            
-            // Shell icon
-            const shellGeometry = GeometryCache.getCylinder(0.02, 0.03, 0.15);
-            const shellMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffaa00,
-                metalness: 0.7,
-                roughness: 0.3
-            });
-            
-            for (let i = 0; i < GAME_CONFIG.PICKUPS.SHELLS.COUNT; i++) {
-                const shell = new THREE.Mesh(shellGeometry, shellMaterial);
-                shell.position.set(-0.1 + i * 0.1, 0.05, -0.16);
-                shell.rotation.x = Math.PI / 2;
-                group.add(shell);
-            }
-            
-            this.value = GAME_CONFIG.PICKUPS.SHELLS.VALUE
-            
-        } else if (this.type === 'armor') {
-            // Armor vest
-            const vestGeometry = GeometryCache.getBox(GAME_CONFIG.PICKUPS.ARMOR.SIZE, 0.5, 0.15);
-            const vestMaterial = new THREE.MeshStandardMaterial({
-                color: GAME_CONFIG.PICKUPS.ARMOR.COLOR,
-                metalness: 0.5,
-                roughness: 0.5,
-                emissive: 0x000044,
-                emissiveIntensity: 0.2
-            });
-            const vest = new THREE.Mesh(vestGeometry, vestMaterial);
-            group.add(vest);
-            
-            this.value = GAME_CONFIG.PICKUPS.ARMOR.VALUE;
-        }
-        
-        this.mesh = group;
-        this.mesh.position.copy(this.position);
-        this.mesh.position.y = 0.5;
-        this.scene.add(this.mesh);
-    }
-    
-    update(deltaTime, player, game) {
-        if (this.collected) return;
-        
-        // Floating animation
-        this.bobAmount += deltaTime * GAME_CONFIG.PICKUPS.BOB_SPEED;
-        this.mesh.position.y = this.position.y + 0.5 + Math.sin(this.bobAmount) * GAME_CONFIG.PICKUPS.BOB_AMPLITUDE;
-        this.mesh.rotation.y += deltaTime;
-        
-        // Check collection - use larger radius for easier pickup
-        const playerPos = new THREE.Vector3(player.position.x, 0, player.position.z);
-        const pickupPos = new THREE.Vector3(this.position.x, 0, this.position.z);
-        const distance = playerPos.distanceTo(pickupPos);
-        
-        if (distance < GAME_CONFIG.PICKUPS.RADIUS) {
-            this.collect(player, game);
-        }
-    }
-    
-    collect(player, game) {
-        if (this.collected) return;
-        
-        let collected = false;
-        let scoreValue = 0;
-        
-        if (this.type === 'health') {
-            if (player.health < player.maxHealth) {
-                player.heal(this.value);
-                collected = true;
-                scoreValue = GAME_CONFIG.PICKUPS.HEALTH.SCORE;
-                AudioManager.playPickupSound();
-            }
-        } else if (this.type === 'shells') {
-            if (player.ammo.shells < player.maxAmmo.shells) {
-                player.addAmmo('shells', this.value);
-                collected = true;
-                scoreValue = GAME_CONFIG.PICKUPS.SHELLS.SCORE;
-                AudioManager.playAmmoSound();
-            }
-        } else if (this.type === 'armor') {
-            if (player.armor < player.maxArmor) {
-                player.addArmor(this.value);
-                collected = true;
-                scoreValue = GAME_CONFIG.PICKUPS.ARMOR.SCORE;
-                AudioManager.playArmorSound();
-            }
-        }
-        
-        if (collected) {
-            this.collected = true;
-            this.scene.remove(this.mesh);
-            
-            // Add score for pickup
-            if (game && game.addScore) {
-                game.addScore(scoreValue);
-            }
-        }
-    }
-    
-    
-    destroy() {
-        if (this.mesh) {
-            this.scene.remove(this.mesh);
-        }
-    }
-}
+// Moved to modules/Pickup.js
 
 // Hellhound class moved to enemies/hellhound.js
 
@@ -760,6 +589,7 @@ class Pickup {
 // Weapon classes moved to modules/WeaponSystem.js
 
 // ============= LEVEL =============
+/* Inline Level fallback (deprecated). Use level.js instead.
 class Level {
     constructor(scene) {
         this.scene = scene;
@@ -1358,12 +1188,12 @@ class Level {
     }
 }
 
+*/
 // CollisionSystem class moved to modules/CollisionSystem.js
 
 // ============= MAIN GAME CLASS MOVED TO modules/Game.js =============
 
 // Make Pickup class available globally
-window.Pickup = Pickup;
 
 // ============= START GAME =============
 window.addEventListener('DOMContentLoaded', () => {
@@ -1381,7 +1211,6 @@ window.addEventListener('DOMContentLoaded', () => {
             // Create game instance if it doesn't exist
             if (!game) {
                 game = new Game();
-                window.currentGame = game; // Set global reference for input manager
             }
             
             game.init('tutorial');
@@ -1401,10 +1230,10 @@ window.addEventListener('DOMContentLoaded', () => {
         
         // Check unlocked levels (stored in localStorage)
         // FOR TESTING: All levels unlocked
-        const unlockedLevels = ["tutorial", "chapter1", "chapter2", "laboratory", "containment", 
+        const unlockedLevels = ["tutorial", "chapel", "armory", "laboratory", "containment", 
                                "tunnels", "spawning", "observatory", "communications", 
                                "reactor", "finalarena", "archive", "techfacility"];
-        // const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapter1"]');
+        // const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapel"]');
         document.querySelectorAll('.level-select-btn').forEach(btn => {
             const level = btn.dataset.level;
             if (!unlockedLevels.includes(level)) {
@@ -1430,7 +1259,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 // Create game instance if it doesn't exist
                 if (!game) {
                     game = new Game();
-                    window.currentGame = game; // Set global reference for input manager
                 }
                 
                 game.init(levelName);
@@ -1622,6 +1450,12 @@ window.addEventListener('DOMContentLoaded', () => {
         // Set flag to indicate modules are loaded
         window.modulesLoaded = true;
         window.dispatchEvent(new Event('modulesLoaded'));
+        
+        // Show menu buttons now that modules are loaded
+        const menuOptions = document.querySelector('#startScreen .menu-options');
+        if (menuOptions) {
+            menuOptions.style.display = 'flex';
+        }
             } catch (error) {
                 console.error('Error loading modules:', error);
             }

@@ -5,49 +5,10 @@ import * as THREE from 'three';
 
 export class ReactorLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        this.name = "Reactor Core";
-        this.description = "Navigate the unstable reactor core before it reaches critical meltdown";
-        this.backgroundColor = new THREE.Color(0x2a1a00);
-        
-        this.reactorCore = null;
-        this.coolingTowers = [];
-        this.controlRods = [];
-        this.radiationZones = [];
-        this.coolingPipes = [];
-        this.emergencyShutoffs = [];
-        
-        this.meltdownTimer = 300000; // 5 minutes
-        this.currentTimer = this.meltdownTimer;
-        this.reactorStable = false;
-        this.radiationLevel = 100; // Maximum radiation
-        this.coolingSystemActive = false;
-        this.controlRodsInserted = 0;
-        this.totalControlRods = 6;
-        
-        this.radiationDamageRate = 10; // Damage per second in radiation
-        this.radiationProtection = 0; // Player protection level
-        this.temperatureLevel = 100; // Reactor temperature
-        this.pressureLevel = 100; // Reactor pressure
-        
-        this.warningLights = [];
-        this.alarmSounds = [];
-        this.steamVents = [];
-        this.emergencyProtocol = false;
-        
-        this.init();
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Return required data structure for Game.js

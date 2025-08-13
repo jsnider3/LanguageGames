@@ -230,6 +230,80 @@ export class VisualEffectsManager {
         return ring;
     }
 
+    createGeneralExplosion(position, config = {}) {
+        const defaults = {
+            type: 'sphere', // 'sphere', 'ring', 'particles', or 'combined'
+            color: 0xff6600,
+            radius: 3,
+            duration: 1000,
+            particleCount: 20,
+            emissiveIntensity: 1.0,
+            soundEffect: null,
+            damage: 0,
+            knockback: 0
+        };
+
+        const settings = { ...defaults, ...config };
+
+        if (settings.type.includes('sphere')) {
+            const geometry = new THREE.SphereGeometry(settings.radius * 0.1, 16, 16);
+            const material = new THREE.MeshBasicMaterial({
+                color: settings.color,
+                transparent: true,
+                opacity: 1.0,
+                emissive: settings.color,
+                emissiveIntensity: settings.emissiveIntensity
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.copy(position);
+            this.scene.add(sphere);
+
+            this.activeEffects.add({
+                mesh: sphere,
+                type: 'explosion_sphere',
+                duration: settings.duration,
+                currentTime: 0,
+                scaleRate: settings.radius / (settings.duration / 16),
+                opacityRate: 1.0 / (settings.duration / 16)
+            });
+        }
+
+        if (settings.type.includes('ring')) {
+            this.createRingExplosion(position, {
+                innerRadius: settings.radius * 0.1,
+                outerRadius: settings.radius,
+                color: settings.color,
+                expansionSpeed: settings.radius / (settings.duration / 16),
+                lifetime: settings.duration
+            });
+        }
+
+        if (settings.type.includes('particles')) {
+            this.createParticleExplosion(position, {
+                count: settings.particleCount,
+                color: settings.color,
+                size: settings.radius * 0.05,
+                speed: settings.radius * 0.5,
+                lifetime: settings.duration,
+                gravity: true,
+                fadeOut: true
+            });
+        }
+
+        // Handle damage and knockback (this would typically be handled by game logic, but for centralization, we can add it here)
+        // if (settings.damage > 0) {
+        //     // Apply damage to nearby entities
+        // }
+        // if (settings.knockback > 0) {
+        //     // Apply knockback to nearby entities
+        // }
+
+        // Play sound effect
+        // if (settings.soundEffect) {
+        //     // Play sound
+        // }
+    }
+
     createLightningBolt(startPos, endPos, config = {}) {
         const defaults = {
             segments: 10,

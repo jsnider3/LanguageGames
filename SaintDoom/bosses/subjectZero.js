@@ -1,16 +1,11 @@
-import * as THREE from 'three';
-import { Enemy } from '../enemies/enemy.js';
 
-export class SubjectZero extends Enemy {
+import * as THREE from 'three';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
+
+export class SubjectZero extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'Subject Zero';
-        this.health = 600;
-        this.maxHealth = 600;
-        this.speed = 2.5; // Fast and mobile
-        this.damage = 45;
-        this.attackRange = 6;
-        this.detectionRange = 40;
         
         // Subject Zero specific properties
         this.teleportCooldown = 4000;
@@ -49,6 +44,7 @@ export class SubjectZero extends Enemy {
         this.psychicAura = null;
         this.realityRift = null;
         this.nightmareField = null;
+        this.activeEffects = [];
         
         this.createMesh();
         this.createPsychicEffects();
@@ -97,7 +93,7 @@ export class SubjectZero extends Enemy {
         // Glowing psychic eyes
         const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             emissive: 0x004488,
             emissiveIntensity: 1.0
         });
@@ -182,7 +178,7 @@ export class SubjectZero extends Enemy {
         // Broken restraint shackles
         const shackleGeometry = new THREE.TorusGeometry(0.4, 0.08, 8, 16);
         const shackleMaterial = new THREE.MeshLambertMaterial({
-            color: 0x666666,
+            color: THEME.materials.wall.armory,
             metalness: 0.8
         });
         
@@ -200,7 +196,7 @@ export class SubjectZero extends Enemy {
         // Broken chains
         for (let i = 0; i < 4; i++) {
             const chainGeometry = new THREE.CylinderGeometry(0.02, 0.02, 1, 6);
-            const chainMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+            const chainMaterial = new THREE.MeshLambertMaterial({ color: THEME.materials.metal.dark });
             const chain = new THREE.Mesh(chainGeometry, chainMaterial);
             chain.position.set(
                 (Math.random() - 0.5) * 3,
@@ -218,7 +214,7 @@ export class SubjectZero extends Enemy {
         // Subject identification tattoos/markings
         const idGeometry = new THREE.PlaneGeometry(0.5, 0.2);
         const idMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             emissive: 0x004400,
             emissiveIntensity: 0.5,
             transparent: true,
@@ -247,7 +243,7 @@ export class SubjectZero extends Enemy {
         for (let i = 0; i < 6; i++) {
             const orbGeometry = new THREE.SphereGeometry(0.2, 8, 8);
             const orbMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00aaff,
+                color: THEME.effects.explosion.plasma,
                 emissive: 0x004488,
                 emissiveIntensity: 0.8
             });
@@ -294,6 +290,106 @@ export class SubjectZero extends Enemy {
         if (this.mesh) {
             this.mesh.position.copy(this.position);
         }
+        
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                if (effect.onEnd) {
+                    effect.onEnd();
+                }
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'teleport_effect':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'teleport_particles':
+                    effect.mesh.rotation.y += 0.05;
+                    effect.mesh.material.opacity -= 0.02;
+                    break;
+                case 'phase_shift':
+                    effect.mesh.rotation.y += 0.02;
+                    effect.mesh.rotation.x += 0.01;
+                    const pulse = 1 + Math.sin(effect.currentTime * 10) * 0.2;
+                    effect.mesh.scale.setScalar(pulse);
+                    break;
+                case 'psychic_blast':
+                    const movement = effect.velocity.clone().multiplyScalar(deltaTime);
+                    effect.mesh.position.add(movement);
+                    effect.mesh.rotation.x += 0.08;
+                    effect.mesh.rotation.y += 0.05;
+                    const blastPulse = 1 + Math.sin(effect.currentTime * 10) * 0.2;
+                    effect.mesh.scale.setScalar(blastPulse);
+                    break;
+                case 'psychic_explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'shard':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.mesh.rotation.x += 0.1;
+                    effect.mesh.rotation.y += 0.08;
+                    effect.mesh.material.opacity -= 0.05;
+                    break;
+                case 'mind_control':
+                    effect.mesh.rotation.z += 0.05;
+                    effect.mesh.material.opacity -= 0.03;
+                    break;
+                case 'reality_distortion':
+                    effect.mesh.rotation.x += 0.05;
+                    effect.mesh.rotation.y += 0.08;
+                    effect.mesh.rotation.z += 0.03;
+                    effect.mesh.material.opacity -= 0.02;
+                    break;
+                case 'reality_rift':
+                    effect.mesh.rotation.z += 0.03;
+                    effect.mesh.scale.setScalar(1 + Math.sin(effect.currentTime * 10) * 0.2);
+                    break;
+                case 'echo_spawn':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'echo_blast':
+                    const echoMovement = effect.velocity.clone().multiplyScalar(deltaTime);
+                    effect.mesh.position.add(echoMovement);
+                    effect.mesh.rotation.x += 0.1;
+                    break;
+                case 'nightmare_zone':
+                    effect.mesh.rotation.y += 0.01;
+                    effect.mesh.material.opacity = 0.4 + Math.sin(effect.currentTime * 10) * 0.2;
+                    break;
+                case 'nightmare_entity':
+                    effect.angle += 0.02;
+                    effect.mesh.position.x = effect.center.x + Math.cos(effect.angle) * (8 + Math.sin(Date.now() * 0.003) * 3);
+                    effect.mesh.position.z = effect.center.z + Math.sin(effect.angle) * (8 + Math.cos(Date.now() * 0.003) * 3);
+                    effect.mesh.rotation.y = effect.angle;
+                    effect.mesh.material.opacity = 0.3 + Math.random() * 0.5;
+                    break;
+                case 'psychic_feedback':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'psychic_death':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'death_shockwave':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+            }
+
+            return true;
+        });
     }
 
     executePsychicCombat(player, distance, deltaTime) {
@@ -403,24 +499,14 @@ export class SubjectZero extends Enemy {
         effect.position.copy(position);
         this.scene.add(effect);
 
-        // Animate effect
-        let scale = type === 'out' ? 1 : 0.1;
-        let opacity = 0.8;
-        const effectInterval = setInterval(() => {
-            if (type === 'out') {
-                scale += 0.3;
-            } else {
-                scale += 0.2;
-            }
-            opacity -= 0.08;
-            effect.scale.setScalar(scale);
-            effect.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(effect);
-                clearInterval(effectInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: effect,
+            type: 'teleport_effect',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: (type === 'out' ? 0.3 : 0.2) / 0.05,
+            opacityRate: 0.08 / 0.05
+        });
 
         // Teleport particles
         this.createTeleportParticles(position);
@@ -455,18 +541,12 @@ export class SubjectZero extends Enemy {
         const particleSystem = new THREE.Points(particles, particleMaterial);
         this.scene.add(particleSystem);
 
-        // Animate particles dispersing
-        let time = 0;
-        const particleInterval = setInterval(() => {
-            time += 50;
-            particleSystem.rotation.y += 0.05;
-            particleSystem.material.opacity -= 0.02;
-
-            if (time > 2000) {
-                this.scene.remove(particleSystem);
-                clearInterval(particleInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: particleSystem,
+            type: 'teleport_particles',
+            duration: 2000,
+            currentTime: 0
+        });
     }
 
     activatePhaseShift() {
@@ -510,20 +590,12 @@ export class SubjectZero extends Enemy {
         phase.position.copy(this.position);
         this.scene.add(phase);
 
-        // Animate phase field
-        let time = 0;
-        const phaseInterval = setInterval(() => {
-            time += 100;
-            phase.rotation.y += 0.02;
-            phase.rotation.x += 0.01;
-            const pulse = 1 + Math.sin(time * 0.01) * 0.2;
-            phase.scale.setScalar(pulse);
-
-            if (time > this.phaseShiftDuration) {
-                this.scene.remove(phase);
-                clearInterval(phaseInterval);
-            }
-        }, 100);
+        this.activeEffects.push({
+            mesh: phase,
+            type: 'phase_shift',
+            duration: this.phaseShiftDuration,
+            currentTime: 0
+        });
     }
 
     psychicBlast(player) {
@@ -538,7 +610,7 @@ export class SubjectZero extends Enemy {
         // Create psychic projectile
         const blastGeometry = new THREE.SphereGeometry(0.5, 16, 16);
         const blastMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             emissive: 0x004488,
             emissiveIntensity: 0.8,
             transparent: true,
@@ -563,54 +635,39 @@ export class SubjectZero extends Enemy {
         const speed = 18;
         const velocity = direction.multiplyScalar(speed);
 
-        blast.userData = {
-            type: 'psychic_blast',
-            velocity: velocity,
-            damage: this.abilities.psychic_blast.damage * this.aggressionLevel,
-            life: 3000,
-            birthTime: Date.now()
-        };
-
         this.scene.add(blast);
-        this.animatePsychicBlast(blast);
+        this.activeEffects.push({
+            mesh: blast,
+            type: 'psychic_blast',
+            duration: 3000,
+            currentTime: 0,
+            velocity: velocity,
+            onEnd: () => this.createPsychicExplosion(blast.position)
+        });
         
         // Hand gesture
         this.animateAttack();
     }
 
-    animatePsychicBlast(blast) {
-        const blastInterval = setInterval(() => {
-            const age = Date.now() - blast.userData.birthTime;
-            if (age > blast.userData.life) {
-                this.createPsychicExplosion(blast.position);
-                this.scene.remove(blast);
-                clearInterval(blastInterval);
-                return;
-            }
-
-            const movement = blast.userData.velocity.clone().multiplyScalar(16 / 1000);
-            blast.position.add(movement);
-            
-            // Psychic blast effects
-            blast.rotation.x += 0.08;
-            blast.rotation.y += 0.05;
-            
-            // Pulsing energy
-            const pulse = 1 + Math.sin(age * 0.01) * 0.2;
-            blast.scale.setScalar(pulse);
-        }, 16);
-    }
-
     createPsychicExplosion(position) {
         const explosionGeometry = new THREE.SphereGeometry(2.5, 16, 16);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.8
         });
         const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
         explosion.position.copy(position);
         this.scene.add(explosion);
+
+        this.activeEffects.push({
+            mesh: explosion,
+            type: 'psychic_explosion',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.3 / 0.05,
+            opacityRate: 0.06 / 0.05
+        });
 
         // Mind shatter effect
         for (let i = 0; i < 8; i++) {
@@ -635,40 +692,18 @@ export class SubjectZero extends Enemy {
             );
             this.scene.add(shard);
 
-            // Animate shards
-            const shardVelocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 5,
-                Math.random() * 5,
-                (Math.random() - 0.5) * 5
-            );
-            
-            const shardInterval = setInterval(() => {
-                shard.position.add(shardVelocity.multiplyScalar(0.05));
-                shard.rotation.x += 0.1;
-                shard.rotation.y += 0.08;
-                shard.material.opacity -= 0.05;
-
-                if (shard.material.opacity <= 0) {
-                    this.scene.remove(shard);
-                    clearInterval(shardInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: shard,
+                type: 'shard',
+                duration: 1000,
+                currentTime: 0,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 5,
+                    Math.random() * 5,
+                    (Math.random() - 0.5) * 5
+                )
+            });
         }
-
-        // Animate main explosion
-        let scale = 0.1;
-        let opacity = 0.8;
-        const explosionInterval = setInterval(() => {
-            scale += 0.3;
-            opacity -= 0.06;
-            explosion.scale.setScalar(scale);
-            explosion.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(explosion);
-                clearInterval(explosionInterval);
-            }
-        }, 50);
     }
 
     mindControl(player) {
@@ -691,6 +726,14 @@ export class SubjectZero extends Enemy {
         controlBeam.rotation.x = Math.PI / 2;
         this.scene.add(controlBeam);
 
+        this.activeEffects.push({
+            mesh: controlBeam,
+            type: 'mind_control',
+            duration: 2000,
+            currentTime: 0,
+            onEnd: () => { this.mindControlTarget = null; }
+        });
+
         // Apply mind control effect
         if (player.addStatusEffect) {
             player.addStatusEffect('mind_controlled', {
@@ -701,20 +744,6 @@ export class SubjectZero extends Enemy {
                 controller: this
             });
         }
-
-        // Animate control beam
-        let opacity = 0.6;
-        const controlInterval = setInterval(() => {
-            controlBeam.rotation.z += 0.05;
-            opacity -= 0.03;
-            controlBeam.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(controlBeam);
-                clearInterval(controlInterval);
-                this.mindControlTarget = null;
-            }
-        }, 100);
     }
 
     realityDistortion(player) {
@@ -735,6 +764,14 @@ export class SubjectZero extends Enemy {
         this.realityRift.position.copy(playerPosition);
         this.realityRift.rotation.x = Math.PI / 2;
         this.scene.add(this.realityRift);
+
+        this.activeEffects.push({
+            mesh: this.realityRift,
+            type: 'reality_rift',
+            duration: 5000,
+            currentTime: 0,
+            onEnd: () => { this.realityRift = null; }
+        });
 
         // Distortion effects around player
         for (let i = 0; i < 12; i++) {
@@ -760,18 +797,12 @@ export class SubjectZero extends Enemy {
             
             this.scene.add(distortion);
 
-            // Animate distortions
-            const distortionInterval = setInterval(() => {
-                distortion.rotation.x += 0.05;
-                distortion.rotation.y += 0.08;
-                distortion.rotation.z += 0.03;
-                distortion.material.opacity -= 0.02;
-
-                if (distortion.material.opacity <= 0) {
-                    this.scene.remove(distortion);
-                    clearInterval(distortionInterval);
-                }
-            }, 100);
+            this.activeEffects.push({
+                mesh: distortion,
+                type: 'reality_distortion',
+                duration: 5000,
+                currentTime: 0
+            });
         }
 
         // Apply reality distortion effects to player
@@ -786,22 +817,8 @@ export class SubjectZero extends Enemy {
 
         // Damage player in rift
         if (player.takeDamage) {
-            player.takeDamage(this.abilities.reality_distortion.damage);
+            player.takeDamage(this.abilities.reality_distortion.damage, "Subject Zero Reality Distortion");
         }
-
-        // Animate reality rift
-        let riftTime = 0;
-        const riftInterval = setInterval(() => {
-            riftTime += 100;
-            this.realityRift.rotation.z += 0.03;
-            this.realityRift.scale.setScalar(1 + Math.sin(riftTime * 0.01) * 0.2);
-
-            if (riftTime > 5000) {
-                this.scene.remove(this.realityRift);
-                clearInterval(riftInterval);
-                this.realityRift = null;
-            }
-        }, 100);
     }
 
     createTemporalEchoes() {
@@ -872,20 +889,14 @@ export class SubjectZero extends Enemy {
         spawn.position.copy(position);
         this.scene.add(spawn);
 
-        // Animate spawn effect
-        let scale = 0.1;
-        let opacity = 0.6;
-        const spawnInterval = setInterval(() => {
-            scale += 0.2;
-            opacity -= 0.05;
-            spawn.scale.setScalar(scale);
-            spawn.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(spawn);
-                clearInterval(spawnInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: spawn,
+            type: 'echo_spawn',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.2 / 0.05,
+            opacityRate: 0.05 / 0.05
+        });
     }
 
     updateEchoClones(deltaTime) {
@@ -910,7 +921,7 @@ export class SubjectZero extends Enemy {
             }
 
             // Animate echo
-            echo.mesh.rotation.y += deltaTime * 0.002;
+            echo.mesh.rotation.y += deltaTime * 2;
             const flutter = Math.sin(Date.now() * 0.005 + i) * 0.1;
             echo.mesh.position.y = echo.position.y + flutter;
         }
@@ -939,29 +950,14 @@ export class SubjectZero extends Enemy {
         const speed = 15;
         const velocity = direction.multiplyScalar(speed);
 
-        echoBlast.userData = {
-            type: 'echo_blast',
-            velocity: velocity,
-            damage: 15,
-            life: 2500,
-            birthTime: Date.now()
-        };
-
         this.scene.add(echoBlast);
-        
-        // Animate echo blast
-        const echoBlastInterval = setInterval(() => {
-            const age = Date.now() - echoBlast.userData.birthTime;
-            if (age > echoBlast.userData.life) {
-                this.scene.remove(echoBlast);
-                clearInterval(echoBlastInterval);
-                return;
-            }
-
-            const movement = echoBlast.userData.velocity.clone().multiplyScalar(16 / 1000);
-            echoBlast.position.add(movement);
-            echoBlast.rotation.x += 0.1;
-        }, 16);
+        this.activeEffects.push({
+            mesh: echoBlast,
+            type: 'echo_blast',
+            duration: 2500,
+            currentTime: 0,
+            velocity: velocity
+        });
     }
 
     createNightmareZone(player) {
@@ -987,6 +983,14 @@ export class SubjectZero extends Enemy {
         this.nightmareField.position.y = 3;
         this.scene.add(this.nightmareField);
 
+        this.activeEffects.push({
+            mesh: this.nightmareField,
+            type: 'nightmare_zone',
+            duration: this.abilities.nightmare_zone.duration,
+            currentTime: 0,
+            onEnd: () => { this.nightmareField = null; }
+        });
+
         // Nightmare entities within the zone
         this.createNightmareEntities(playerPosition);
 
@@ -1000,20 +1004,6 @@ export class SubjectZero extends Enemy {
                 fearEffect: true
             });
         }
-
-        // Animate nightmare zone
-        let nightmareTime = 0;
-        const nightmareInterval = setInterval(() => {
-            nightmareTime += 100;
-            this.nightmareField.rotation.y += 0.01;
-            this.nightmareField.material.opacity = 0.4 + Math.sin(nightmareTime * 0.01) * 0.2;
-
-            if (nightmareTime > this.abilities.nightmare_zone.duration) {
-                this.scene.remove(this.nightmareField);
-                clearInterval(nightmareInterval);
-                this.nightmareField = null;
-            }
-        }, 100);
     }
 
     createNightmareEntities(centerPosition) {
@@ -1021,7 +1011,7 @@ export class SubjectZero extends Enemy {
         for (let i = 0; i < 8; i++) {
             const shadowGeometry = new THREE.ConeGeometry(0.5, 2, 6);
             const shadowMaterial = new THREE.MeshBasicMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: 0.6
             });
@@ -1036,22 +1026,14 @@ export class SubjectZero extends Enemy {
             
             this.scene.add(shadow);
 
-            // Animate shadows moving in nightmare zone
-            let shadowAngle = angle;
-            const shadowInterval = setInterval(() => {
-                shadowAngle += 0.02;
-                shadow.position.x = centerPosition.x + Math.cos(shadowAngle) * (8 + Math.sin(Date.now() * 0.003) * 3);
-                shadow.position.z = centerPosition.z + Math.sin(shadowAngle) * (8 + Math.cos(Date.now() * 0.003) * 3);
-                shadow.rotation.y = shadowAngle;
-                
-                // Flicker opacity
-                shadow.material.opacity = 0.3 + Math.random() * 0.5;
-            }, 100);
-
-            setTimeout(() => {
-                this.scene.remove(shadow);
-                clearInterval(shadowInterval);
-            }, this.abilities.nightmare_zone.duration);
+            this.activeEffects.push({
+                mesh: shadow,
+                type: 'nightmare_entity',
+                duration: this.abilities.nightmare_zone.duration,
+                currentTime: 0,
+                angle: angle,
+                center: centerPosition
+            });
         }
     }
 
@@ -1074,7 +1056,7 @@ export class SubjectZero extends Enemy {
             ).normalize();
         }
 
-        this.position.add(direction.multiplyScalar(this.speed * deltaTime / 1000));
+        this.position.add(direction.multiplyScalar(this.speed * deltaTime));
 
         // Face player
         if (this.mesh) {
@@ -1091,14 +1073,14 @@ export class SubjectZero extends Enemy {
             Math.cos(time * 0.8) * 1
         );
         
-        this.position.add(floatOffset.multiplyScalar(deltaTime / 1000));
+        this.position.add(floatOffset.multiplyScalar(deltaTime));
     }
 
     updatePsychicEnergy(deltaTime) {
         // Regenerate psychic energy
         if (this.psychicEnergy < this.maxPsychicEnergy) {
             this.psychicEnergy = Math.min(this.maxPsychicEnergy,
-                this.psychicEnergy + (25 * deltaTime / 1000));
+                this.psychicEnergy + (25 * deltaTime));
         }
     }
 
@@ -1160,12 +1142,12 @@ export class SubjectZero extends Enemy {
         if (this.psychicAura) {
             const auraPulse = 1 + Math.sin(Date.now() * 0.004) * 0.3;
             this.psychicAura.scale.setScalar(auraPulse);
-            this.psychicAura.rotation.y += deltaTime * 0.001;
+            this.psychicAura.rotation.y += deltaTime * 0.1;
         }
 
         // Floating effect for Subject Zero
         const hoverOffset = Math.sin(Date.now() * 0.003) * 0.3;
-        this.position.y = this.position.y + hoverOffset * deltaTime * 0.001;
+        this.position.y = this.position.y + hoverOffset * deltaTime;
     }
 
     takeDamage(amount, damageType) {
@@ -1207,20 +1189,14 @@ export class SubjectZero extends Enemy {
         feedback.position.copy(this.position);
         this.scene.add(feedback);
 
-        // Animate feedback
-        let scale = 0.1;
-        let opacity = 0.6;
-        const feedbackInterval = setInterval(() => {
-            scale += 0.4;
-            opacity -= 0.05;
-            feedback.scale.setScalar(scale);
-            feedback.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(feedback);
-                clearInterval(feedbackInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: feedback,
+            type: 'psychic_feedback',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.4 / 0.05,
+            opacityRate: 0.05 / 0.05
+        });
     }
 
     destroy() {
@@ -1260,6 +1236,15 @@ export class SubjectZero extends Enemy {
         deathEffect.position.copy(this.position);
         this.scene.add(deathEffect);
 
+        this.activeEffects.push({
+            mesh: deathEffect,
+            type: 'psychic_death',
+            duration: 1250,
+            currentTime: 0,
+            scaleRate: 0.2 / 0.05,
+            opacityRate: 0.04 / 0.05
+        });
+
         // Psychic shockwave
         for (let i = 0; i < 6; i++) {
             setTimeout(() => {
@@ -1276,37 +1261,16 @@ export class SubjectZero extends Enemy {
                 shock.rotation.x = -Math.PI / 2;
                 this.scene.add(shock);
 
-                // Animate shock
-                let scale = 1;
-                let opacity = 0.7;
-                const shockInterval = setInterval(() => {
-                    scale += 0.6;
-                    opacity -= 0.06;
-                    shock.scale.setScalar(scale);
-                    shock.material.opacity = opacity;
-
-                    if (opacity <= 0) {
-                        this.scene.remove(shock);
-                        clearInterval(shockInterval);
-                    }
-                }, 50);
+                this.activeEffects.push({
+                    mesh: shock,
+                    type: 'death_shockwave',
+                    duration: 1000,
+                    currentTime: 0,
+                    scaleRate: 0.6 / 0.05,
+                    opacityRate: 0.06 / 0.05
+                });
             }, i * 200);
         }
-
-        // Main death effect animation
-        let scale = 0.1;
-        let opacity = 1.0;
-        const deathInterval = setInterval(() => {
-            scale += 0.2;
-            opacity -= 0.04;
-            deathEffect.scale.setScalar(scale);
-            deathEffect.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                this.scene.remove(deathEffect);
-                clearInterval(deathInterval);
-            }
-        }, 50);
     }
 
     getStatusInfo() {

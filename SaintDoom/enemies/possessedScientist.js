@@ -1,389 +1,644 @@
 import * as THREE from 'three';
-// Possessed Scientist Enemy Type
-// Former MIB researchers corrupted by demonic influence
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class PossessedScientist extends Enemy {
+export class PossessedScientist extends BaseEnemy {
     constructor(scene, position) {
-        // Call parent constructor first
         super(scene, position);
         
-        // Override with PossessedScientist-specific stats
+        // Stats
         this.health = 50;
         this.maxHealth = 50;
-        this.moveSpeed = 2.5;  // Slightly faster for better pursuit
         this.damage = 10;
+        this.moveSpeed = 2;
         this.attackRange = 2;
-        this.sightRange = 25;  // Increased to see across chapel
-        this.type = 'possessed_scientist';
-        
-        // Override the mesh created by parent
-        this.scene.remove(this.mesh);
-        this.createPossessedScientistMesh();
-        
-        // AI properties
-        this.target = null;
+        this.attackCooldown = 1.5; // seconds
         this.lastAttackTime = 0;
-        this.attackCooldown = 2000;
-        this.wanderAngle = Math.random() * Math.PI * 2;
         
-        // Death dialogue
-        this.deathPhrases = [
-            "The stars... were wrong...",
-            "Thank... you...",
-            "Free... at last...",
-            "God forgive us...",
-            "We opened... the door..."
-        ];
+        // AI state
+        this.state = 'idle'; // idle, chasing, attacking, hurt, dead
+        this.isDead = false;
+        this.deathCounted = false;
+        this.sightRange = 15;
+        this.hearingRange = 20;
+        this.target = null;
         
-        // Possession effects
-        this.possessionLevel = Math.random(); // 0-1, affects behavior
-        this.lastTwitchTime = 0;
-        this.twitchInterval = 2000 + Math.random() * 3000;
+        // Physics
+        this.radius = 0.3;
+        this.height = 1.8;
+        
+        // Visual
+        this.createMesh();
+        
+        // Animation
+        this.bobAmount = 0;
+        this.hurtTime = 0;
     }
     
-    createPossessedScientistMesh() {
-        // Body - lab coat stained with blood
-        const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.35, 1.2, 8);
-        const bodyMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xcccccc,
-            emissive: 0x110000,
-            emissiveIntensity: 0.2
-        });
-        this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        this.bodyMesh.position.y = 0.6;
+    createMesh() {
+        // Create a recognizable possessed scientist model
+        const group = new THREE.Group();
         
-        // Head - distorted human face
-        const headGeometry = new THREE.SphereGeometry(0.2, 8, 6);
-        const headMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0x808060,
+        // Lab coat body - tattered, burnt and stained
+        const torsoGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.3);
+        const labCoatMaterial = new THREE.MeshStandardMaterial({
+            color: 0xc0c0c0, // Dirty gray-white lab coat
+            roughness: 0.9,
+            metalness: 0.05,
+            emissive: 0x110000,
+            emissiveIntensity: 0.1
+        });
+        this.bodyMesh = new THREE.Mesh(torsoGeometry, labCoatMaterial);
+        this.bodyMesh.position.y = 0.7;
+        this.bodyMesh.castShadow = true;
+        this.bodyMesh.receiveShadow = true;
+        group.add(this.bodyMesh);
+        
+        // Burn marks on coat
+        const burnGeometry = new THREE.BoxGeometry(0.2, 0.3, 0.02);
+        const burnMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.95
+        });
+        const burn = new THREE.Mesh(burnGeometry, burnMaterial);
+        burn.position.set(0.15, 0.5, -0.16);
+        burn.rotation.z = -0.2;
+        group.add(burn);
+        
+        // Lab coat collar
+        const collarGeometry = new THREE.BoxGeometry(0.5, 0.1, 0.25);
+        const collar = new THREE.Mesh(collarGeometry, labCoatMaterial);
+        collar.position.set(0, 1.15, 0);
+        group.add(collar);
+        
+        // Shirt underneath (visible at neck)
+        const shirtGeometry = new THREE.BoxGeometry(0.4, 0.15, 0.24);
+        const shirtMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4488cc, // Blue shirt
+            roughness: 0.7
+        });
+        const shirt = new THREE.Mesh(shirtGeometry, shirtMaterial);
+        shirt.position.set(0, 1.05, 0);
+        group.add(shirt);
+        
+        // Tie (askew and disheveled)
+        const tieGeometry = new THREE.BoxGeometry(0.05, 0.4, 0.02);
+        const tieMaterial = new THREE.MeshStandardMaterial({
+            color: 0x660022, // Dark red tie
+            roughness: 0.6
+        });
+        const tie = new THREE.Mesh(tieGeometry, tieMaterial);
+        tie.position.set(0.02, 0.85, -0.16);
+        tie.rotation.z = 0.1; // Slightly crooked
+        group.add(tie);
+        
+        // Lab coat pocket with pens
+        const pocketGeometry = new THREE.BoxGeometry(0.15, 0.12, 0.02);
+        const pocket = new THREE.Mesh(pocketGeometry, labCoatMaterial);
+        pocket.position.set(-0.2, 0.75, -0.16);
+        group.add(pocket);
+        
+        // Pen in pocket
+        const penGeometry = new THREE.CylinderGeometry(0.01, 0.01, 0.15);
+        const penMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+        const pen = new THREE.Mesh(penGeometry, penMaterial);
+        pen.position.set(-0.2, 0.82, -0.17);
+        group.add(pen);
+        
+        // Large blood stains on coat - more visible
+        const bloodStainGeometry = new THREE.BoxGeometry(0.25, 0.35, 0.02);
+        const bloodMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.bosses.belial.primary,
+            roughness: 0.3,
             emissive: 0x220000,
             emissiveIntensity: 0.3
         });
-        this.headMesh = new THREE.Mesh(headGeometry, headMaterial);
-        this.headMesh.position.y = 1.5;
+        const bloodStain = new THREE.Mesh(bloodStainGeometry, bloodMaterial);
+        bloodStain.position.set(0.1, 0.6, -0.17);
+        group.add(bloodStain);
         
-        // Eyes - glowing demonic red
-        const eyeGeometry = new THREE.SphereGeometry(0.03, 4, 4);
-        const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000
+        // Additional blood splatter
+        const splatterGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.02);
+        const splatter = new THREE.Mesh(splatterGeometry, bloodMaterial);
+        splatter.position.set(-0.15, 0.85, -0.17);
+        splatter.rotation.z = 0.3;
+        group.add(splatter);
+        
+        // Legs - black dress pants
+        const legMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            roughness: 0.8
         });
+        const leftLegGeometry = new THREE.CylinderGeometry(0.1, 0.09, 0.7);
+        const leftLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
+        leftLeg.position.set(-0.12, 0.2, 0);
+        leftLeg.castShadow = true;
+        group.add(leftLeg);
         
-        this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.08, 1.5, 0.15);
+        const rightLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
+        rightLeg.position.set(0.12, 0.2, 0);
+        rightLeg.castShadow = true;
+        group.add(rightLeg);
         
-        this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.08, 1.5, 0.15);
+        // Shoes
+        const shoeGeometry = new THREE.BoxGeometry(0.12, 0.06, 0.2);
+        const shoeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.4
+        });
+        const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+        leftShoe.position.set(-0.12, 0.03, 0.03);
+        group.add(leftShoe);
         
-        // Group mesh
-        this.mesh = new THREE.Group();
-        this.mesh.add(this.bodyMesh);
-        this.mesh.add(this.headMesh);
-        this.mesh.add(this.leftEye);
-        this.mesh.add(this.rightEye);
-        this.mesh.position.copy(this.position);
+        const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+        rightShoe.position.set(0.12, 0.03, 0.03);
+        group.add(rightShoe);
         
-        // Add blood stains (decals)
-        this.addBloodStains();
-        
-        // Add to scene
-        this.scene.add(this.mesh);
-        
-        // Shadow
-        this.bodyMesh.castShadow = true;
+        // Head - gaunt and corrupted
+        const headGeometry = new THREE.SphereGeometry(0.17, 8, 6);
+        const skinMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8a9980, // Deathly pale green-gray
+            roughness: 0.7,
+            emissive: 0x001100,
+            emissiveIntensity: 0.3
+        });
+        this.headMesh = new THREE.Mesh(headGeometry, skinMaterial);
+        this.headMesh.position.y = 1.4;
+        this.headMesh.scale.set(0.9, 1.2, 0.85); // Gaunt and elongated
         this.headMesh.castShadow = true;
-    }
-    
-    addBloodStains() {
-        // Add random blood splatter textures
-        const bloodGeometry = new THREE.PlaneGeometry(0.2, 0.2);
-        const bloodMaterial = new THREE.MeshBasicMaterial({
-            color: 0x660000,
-            transparent: true,
-            opacity: 0.7
+        group.add(this.headMesh);
+        
+        // Dark veins on face - signs of corruption
+        const veinGeometry = new THREE.CylinderGeometry(0.005, 0.005, 0.1);
+        const veinMaterial = new THREE.MeshBasicMaterial({ color: 0x220022 });
+        
+        const vein1 = new THREE.Mesh(veinGeometry, veinMaterial);
+        vein1.position.set(-0.1, 1.45, -0.17);
+        vein1.rotation.z = 0.3;
+        group.add(vein1);
+        
+        const vein2 = new THREE.Mesh(veinGeometry, veinMaterial);
+        vein2.position.set(0.1, 1.45, -0.17);
+        vein2.rotation.z = -0.3;
+        group.add(vein2);
+        
+        const vein3 = new THREE.Mesh(veinGeometry, veinMaterial);
+        vein3.position.set(0, 1.35, -0.17);
+        vein3.rotation.z = 1.57;
+        group.add(vein3);
+        
+        // Broken glasses hanging off one ear (more realistic)
+        const glassesFrameGeometry = new THREE.TorusGeometry(0.05, 0.006, 3, 6);
+        const glassesMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const leftLens = new THREE.Mesh(glassesFrameGeometry, glassesMaterial);
+        leftLens.position.set(-0.1, 1.38, -0.17);
+        leftLens.rotation.z = -0.3;
+        leftLens.rotation.y = 0.2;
+        group.add(leftLens);
+        
+        // DEMONIC GLOWING EYES - Elongated and sinister
+        const eyeGeometry = new THREE.SphereGeometry(0.04, 6, 4);
+        const eyeMaterial = new THREE.MeshBasicMaterial({
+            color: THEME.ui.health.low
         });
         
+        // Left eye - stretched vertically for demonic look
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.06, 1.42, -0.16);
+        leftEye.scale.y = 1.5; // Elongated
+        leftEye.scale.z = 0.5;
+        group.add(leftEye);
+        this.leftEye = leftEye;
+        
+        // Right eye - stretched vertically
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.06, 1.42, -0.16);
+        rightEye.scale.y = 1.5; // Elongated
+        rightEye.scale.z = 0.5;
+        group.add(rightEye);
+        this.rightEye = rightEye;
+        
+        // Inner yellow pupils for contrast
+        const pupilGeometry = new THREE.SphereGeometry(0.015, 4, 4);
+        const pupilMaterial = new THREE.MeshBasicMaterial({
+            color: THEME.ui.health.medium
+        });
+        const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+        leftPupil.position.set(-0.06, 1.42, -0.17);
+        group.add(leftPupil);
+        
+        const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+        rightPupil.position.set(0.06, 1.42, -0.17);
+        group.add(rightPupil);
+        
+        // Stronger red glow from eyes
+        const leftEyeLight = new THREE.PointLight(0xff0000, 0.8, 2);
+        leftEyeLight.position.set(-0.06, 1.42, -0.2);
+        group.add(leftEyeLight);
+        
+        const rightEyeLight = new THREE.PointLight(0xff0000, 0.8, 2);
+        rightEyeLight.position.set(0.06, 1.42, -0.2);
+        group.add(rightEyeLight);
+        
+        // Messy gray hair
+        const hairGeometry = new THREE.SphereGeometry(0.2, 6, 4);
+        const hairMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.materials.metal.default, // Gray hair
+            roughness: 0.9
+        });
+        const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+        hair.position.set(0, 1.5, 0.02);
+        hair.scale.set(1, 0.6, 0.8);
+        group.add(hair);
+        
+        // Disheveled hair strands
+        const strandGeometry = new THREE.ConeGeometry(0.03, 0.1, 3);
         for (let i = 0; i < 3; i++) {
-            const blood = new THREE.Mesh(bloodGeometry, bloodMaterial);
-            blood.position.set(
-                (Math.random() - 0.5) * 0.4,
-                Math.random() * 1.2,
-                0.31
+            const strand = new THREE.Mesh(strandGeometry, hairMaterial);
+            strand.position.set(
+                (Math.random() - 0.5) * 0.2,
+                1.55,
+                (Math.random() - 0.5) * 0.1
             );
-            blood.rotation.z = Math.random() * Math.PI;
-            this.bodyMesh.add(blood);
+            strand.rotation.z = (Math.random() - 0.5) * 0.5;
+            group.add(strand);
         }
+        
+        // Mouth - wide snarling grin
+        const mouthGeometry = new THREE.BoxGeometry(0.12, 0.02, 0.03);
+        const mouthMaterial = new THREE.MeshBasicMaterial({
+            color: THEME.materials.black
+        });
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, 1.28, -0.16);
+        group.add(mouth);
+        
+        // Exposed teeth
+        const teethGeometry = new THREE.BoxGeometry(0.1, 0.015, 0.01);
+        const teethMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffcc
+        });
+        const teeth = new THREE.Mesh(teethGeometry, teethMaterial);
+        teeth.position.set(0, 1.29, -0.165);
+        group.add(teeth);
+        
+        // Arms with lab coat sleeves
+        const upperArmGeometry = new THREE.CylinderGeometry(0.09, 0.08, 0.4);
+        const sleeveMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf0f0f0, // White lab coat sleeves
+            roughness: 0.85
+        });
+        
+        // Left arm
+        const leftUpperArm = new THREE.Mesh(upperArmGeometry, sleeveMaterial);
+        leftUpperArm.position.set(-0.3, 0.8, 0);
+        leftUpperArm.rotation.z = 0.2;
+        leftUpperArm.castShadow = true;
+        group.add(leftUpperArm);
+        
+        const lowerArmGeometry = new THREE.CylinderGeometry(0.07, 0.06, 0.4);
+        const leftLowerArm = new THREE.Mesh(lowerArmGeometry, sleeveMaterial);
+        leftLowerArm.position.set(-0.38, 0.45, 0);
+        leftLowerArm.rotation.z = 0.15;
+        leftLowerArm.castShadow = true;
+        group.add(leftLowerArm);
+        
+        // Hands - pale and veiny
+        const handGeometry = new THREE.SphereGeometry(0.06, 4, 4);
+        const handMaterial = new THREE.MeshStandardMaterial({
+            color: 0xccbbaa, // Pale skin like head
+            roughness: 0.6
+        });
+        const leftHand = new THREE.Mesh(handGeometry, handMaterial);
+        leftHand.position.set(-0.42, 0.25, 0);
+        group.add(leftHand);
+        
+        // Right arm
+        const rightUpperArm = new THREE.Mesh(upperArmGeometry, sleeveMaterial);
+        rightUpperArm.position.set(0.3, 0.8, 0);
+        rightUpperArm.rotation.z = -0.2;
+        rightUpperArm.castShadow = true;
+        group.add(rightUpperArm);
+        
+        const rightLowerArm = new THREE.Mesh(lowerArmGeometry, sleeveMaterial);
+        rightLowerArm.position.set(0.38, 0.45, 0);
+        rightLowerArm.rotation.z = -0.15;
+        rightLowerArm.castShadow = true;
+        group.add(rightLowerArm);
+        
+        const rightHand = new THREE.Mesh(handGeometry, handMaterial);
+        rightHand.position.set(0.42, 0.25, 0);
+        group.add(rightHand);
+        
+        // Store arm references for animation
+        this.leftArm = { upper: leftUpperArm, lower: leftLowerArm, hand: leftHand };
+        this.rightArm = { upper: rightUpperArm, lower: rightLowerArm, hand: rightHand };
+        
+        this.mesh = group;
+        this.mesh.position.copy(this.position);
+        this.scene.add(this.mesh);
     }
     
     update(deltaTime, player) {
-        // Always call parent update first to handle death state properly
-        super.update(deltaTime, player);
-        
-        // Exit if dead after parent has handled it
-        if (this.isDead || this.state === 'dead') return;
-        
-        // PossessedScientist-specific behavior
-        const distanceToPlayer = this.position.distanceTo(player.position);
-        
-        // Possession twitch effect
-        const now = Date.now();
-        if (now - this.lastTwitchTime > this.twitchInterval) {
-            this.twitch();
-            this.lastTwitchTime = now;
+        if (this.health <= 0) {
+            this.state = 'dead';
+            return;
         }
         
-        // Handle custom states that parent doesn't know about
-        if (this.state === 'pursuing') {
-            this.handlePursuingState(distanceToPlayer, player, deltaTime);
-        } else if (this.state === 'wandering') {
-            this.handleWanderingState(deltaTime);
+        this.target = player;
+        
+        // Update AI based on state
+        switch(this.state) {
+            case 'idle':
+                this.updateIdle(deltaTime);
+                break;
+            case 'chasing':
+                this.updateChasing(deltaTime);
+                break;
+            case 'attacking':
+                this.updateAttacking(deltaTime);
+                break;
+            case 'hurt':
+                this.updateHurt(deltaTime);
+                break;
         }
         
-        // Override parent's lookAt behavior for PossessedScientist
-        if (this.state === 'chasing' || this.state === 'attacking' || this.state === 'pursuing') {
-            const lookDirection = new THREE.Vector3()
-                .subVectors(player.position, this.position)
-                .normalize();
-            this.mesh.rotation.y = Math.atan2(lookDirection.x, lookDirection.z);
-        }
-    }
-    
-    // Override parent's updateIdle to use 'chasing' state and add wandering behavior
-    updateIdle(deltaTime) {
-        const distanceToPlayer = this.target ? this.position.distanceTo(this.target.position) : Infinity;
+        // Update mesh position
+        this.mesh.position.copy(this.position);
         
-        if (distanceToPlayer < this.sightRange && this.canSeePlayer()) {
-            this.state = 'chasing';  // Use standard chasing state for consistency
-            // Emit detection sound/animation
-            this.onPlayerDetected();
-        } else {
-            // Set velocity to zero when idle
-            this.velocity.set(0, 0, 0);
-            
-            // Randomly start wandering
-            if (Math.random() < 0.01) {
-                this.state = 'wandering';
-                this.wanderAngle = Math.random() * Math.PI * 2;
-            }
-        }
-    }
-    
-    handlePursuingState(distanceToPlayer, player, deltaTime) {
-        if (distanceToPlayer <= this.attackRange) {
-            this.state = 'attacking';
-        } else if (distanceToPlayer > this.sightRange * 2) {  // More forgiving pursuit range
-            this.state = 'idle';
-            this.target = null;
-        } else {
-            // Move toward player
+        // Make enemy face player when chasing or attacking
+        if ((this.state === 'chasing' || this.state === 'attacking') && this.target) {
             const direction = new THREE.Vector3()
-                .subVectors(player.position, this.position);
+                .subVectors(this.target.position, this.position)
+                .normalize();
+            this.mesh.lookAt(this.target.position);
+            this.mesh.rotation.x = 0; // Keep upright
+            this.mesh.rotation.z = 0;
+        }
+        
+        // Bob animation when moving
+        if (this.velocity.length() > 0.1) {
+            this.bobAmount += deltaTime * 8;
+            const bobOffset = Math.sin(this.bobAmount) * 0.05;
+            this.mesh.position.y = this.position.y + bobOffset;
             
-            // Check for valid direction
-            if (direction.length() > 0.001) {
-                direction.normalize();
-                
-                // Erratic movement based on possession level
-                const erraticOffset = new THREE.Vector3(
-                    (Math.random() - 0.5) * this.possessionLevel,
-                    0,
-                    (Math.random() - 0.5) * this.possessionLevel
-                );
-                
-                direction.add(erraticOffset);
-                if (direction.length() > 0.001) {
-                    direction.normalize();
-                    
-                    // Update velocity for collision system
-                    this.velocity.x = direction.x * this.moveSpeed;
-                    this.velocity.z = direction.z * this.moveSpeed;
-                    
-                    // Validate before applying movement
-                    const newX = this.position.x + this.velocity.x * deltaTime;
-                    const newZ = this.position.z + this.velocity.z * deltaTime;
-                    
-                    if (!isNaN(newX) && !isNaN(newZ)) {
-                        this.position.x = newX;
-                        this.position.z = newZ;
-                    }
-                }
+            // Animate arms while moving - shambling walk
+            if (this.leftArm && this.rightArm) {
+                const armSwing = Math.sin(this.bobAmount) * 0.3;
+                this.leftArm.upper.rotation.x = armSwing;
+                this.rightArm.upper.rotation.x = -armSwing;
+                this.leftArm.lower.rotation.x = Math.abs(armSwing) * 0.5;
+                this.rightArm.lower.rotation.x = Math.abs(armSwing) * 0.5;
             }
+        }
+        
+        // Creepy idle animations
+        if (this.leftEye && this.rightEye) {
+            // Make eyes pulse brighter occasionally
+            const flicker = Math.random() > 0.98;
+            if (flicker) {
+                this.leftEye.material.color.setHex(THEME.ui.health.medium); // Bright yellow
+                this.rightEye.material.color.setHex(THEME.ui.health.medium);
+                setTimeout(() => {
+                    this.leftEye.material.color.setHex(THEME.ui.health.low); // Back to red
+                    this.rightEye.material.color.setHex(THEME.ui.health.low);
+                }, 100);
+            }
+        }
+        
+        // Twitch head occasionally when idle
+        if (this.state === 'idle' && Math.random() > 0.99) {
+            this.headMesh.rotation.z = (Math.random() - 0.5) * 0.3;
+            setTimeout(() => {
+                this.headMesh.rotation.z = 0;
+            }, 200);
+        }
+        
+        // Hurt flash effect
+        if (this.hurtTime > 0) {
+            this.hurtTime -= deltaTime;
+            const flashIntensity = Math.sin(this.hurtTime * 20) * 0.5 + 0.5;
+            this.bodyMesh.material.emissive = new THREE.Color(flashIntensity, 0, 0);
+            this.bodyMesh.material.emissiveIntensity = flashIntensity;
+        } else {
+            this.bodyMesh.material.emissive = new THREE.Color(0, 0, 0);
+            this.bodyMesh.material.emissiveIntensity = 0;
         }
     }
     
-    handleAttackingState(distanceToPlayer, player) {
-        const now = Date.now();
-        const heightDifference = Math.abs(this.position.y - player.position.y);
+    updateIdle(deltaTime) {
+        // Check if player is in sight range
+        if (this.canSeePlayer()) {
+            this.state = 'chasing';
+        }
+    }
+    
+    updateChasing(deltaTime) {
+        if (!this.target) return;
         
-        // Check both horizontal distance and height
-        if (distanceToPlayer > this.attackRange || heightDifference > 1.0) {
-            this.state = 'pursuing';
-        } else if (now - this.lastAttackTime > this.attackCooldown) {
-            // Stop moving when attacking
-            this.velocity.set(0, 0, 0);
-            this.performAttack(player);
+        const distance = this.position.distanceTo(this.target.position);
+        
+        // Check if in attack range
+        if (distance <= this.attackRange) {
+            this.state = 'attacking';
+            return;
+        }
+        
+        // Check if lost sight
+        if (distance > this.sightRange && !this.canSeePlayer()) {
+            this.state = 'idle';
+            return;
+        }
+        
+        // Move toward player
+        const direction = new THREE.Vector3()
+            .subVectors(this.target.position, this.position)
+            .normalize();
+        
+        direction.y = 0; // Keep on ground
+        
+        this.velocity = direction.multiplyScalar(this.moveSpeed);
+        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+    }
+    
+    updateAttacking(deltaTime) {
+        if (!this.target) return;
+        
+        const now = Date.now() / 1000;
+        const distance = this.position.distanceTo(this.target.position);
+        
+        // Check if out of range
+        if (distance > this.attackRange) {
+            this.state = 'chasing';
+            return;
+        }
+        
+        // Attack if cooldown is ready
+        if (now - this.lastAttackTime >= this.attackCooldown) {
+            this.performAttack();
             this.lastAttackTime = now;
         }
+        
+        // Stop moving while attacking
+        this.velocity.set(0, 0, 0);
     }
     
-    handleWanderingState(deltaTime) {
-        // Wander randomly
-        const wanderDirection = new THREE.Vector3(
-            Math.cos(this.wanderAngle),
-            0,
-            Math.sin(this.wanderAngle)
-        );
-        
-        // Update velocity for collision system
-        this.velocity.x = wanderDirection.x * this.moveSpeed * 0.5;
-        this.velocity.z = wanderDirection.z * this.moveSpeed * 0.5;
-        
-        // Validate before applying movement
-        const newX = this.position.x + this.velocity.x * deltaTime;
-        const newZ = this.position.z + this.velocity.z * deltaTime;
-        
-        if (!isNaN(newX) && !isNaN(newZ)) {
-            this.position.x = newX;
-            this.position.z = newZ;
-        }
-        
-        // Occasionally change direction
-        if (Math.random() < 0.02) {
-            this.wanderAngle += (Math.random() - 0.5) * Math.PI * 0.5;
-            
-            // Small chance to return to idle
-            if (Math.random() < 0.1) {
-                this.state = 'idle';
-            }
+    updateHurt(deltaTime) {
+        // Brief stun when hurt
+        this.hurtTime -= deltaTime;
+        if (this.hurtTime <= 0) {
+            this.state = 'chasing';
         }
     }
     
-    canSeePlayer(player) {
-        // Simple line of sight check
-        // In a full implementation, this would do raycasting
+    canSeePlayer() {
+        if (!this.target) return false;
+        
+        const distance = this.position.distanceTo(this.target.position);
+        if (distance > this.sightRange) return false;
+        
+        // Simple line of sight check (could add raycasting for walls later)
         return true;
     }
     
-    onPlayerDetected() {
-        // Visual feedback for detection - brighten eyes
-        const brightColor = 0xff6666;
-        this.leftEye.material.color.setHex(brightColor);
-        this.rightEye.material.color.setHex(brightColor);
-        
-        setTimeout(() => {
-            this.leftEye.material.color.setHex(0xff0000);
-            this.rightEye.material.color.setHex(0xff0000);
-        }, 500);
-        
-        // TODO: Play detection sound
-    }
-    
-    // Override parent's performAttack with PossessedScientist-specific visual effects
     performAttack() {
-        // Use parent's attack logic
-        super.performAttack();
+        if (!this.target) return;
         
-        // PossessedScientist-specific visual feedback
-        this.bodyMesh.material.emissiveIntensity = 0.5;
-        setTimeout(() => {
-            this.bodyMesh.material.emissiveIntensity = 0.2;
-        }, 200);
+        // Simple melee attack
+        const distance = this.position.distanceTo(this.target.position);
+        const heightDifference = Math.abs(this.position.y - this.target.position.y);
         
-        // TODO: Play attack sound
-    }
-    
-    twitch() {
-        // Possession twitch effect
-        const twitchAmount = this.possessionLevel * 0.2;
-        
-        this.headMesh.rotation.z = (Math.random() - 0.5) * twitchAmount;
-        this.headMesh.rotation.x = (Math.random() - 0.5) * twitchAmount;
-        
-        setTimeout(() => {
-            this.headMesh.rotation.z = 0;
-            this.headMesh.rotation.x = 0;
-        }, 100);
-    }
-    
-    takeDamage(damage, damageType = 'normal') {
-        // Holy damage is more effective
-        if (damageType === 'holy') {
-            damage *= 1.5;
+        // Only attack if within range AND at similar height (within 1 meter)
+        if (distance <= this.attackRange && heightDifference < 1.0) {
+            this.target.takeDamage(this.damage, "Possessed Scientist");
+            
+            // Visual feedback - lunge forward
+            const lungeDirection = new THREE.Vector3()
+                .subVectors(this.target.position, this.position)
+                .normalize();
+            
+            this.position.add(lungeDirection.multiplyScalar(0.2));
         }
-        
-        // Use parent's takeDamage method
-        super.takeDamage(damage);
     }
     
-    onDeath() {
-        // Call parent's onDeath method first for consistent death handling
-        super.onDeath();
+    takeDamage(amount) {
+        this.health -= amount;
+        this.health = Math.max(0, this.health);
         
-        // PossessedScientist-specific death behavior
-        // Death phrase
-        const phrase = this.deathPhrases[Math.floor(Math.random() * this.deathPhrases.length)];
-        this.showDeathText(phrase);
-        
-        // Emit holy particles (soul released)
-        this.emitSoulParticles();
-    }
-    
-    showDeathText(text) {
-        // Create floating text above corpse
-        // This would integrate with the game's UI system
-        // TODO: Add actual floating text UI element
-    }
-    
-    emitSoulParticles() {
-        // Create ascending white particles representing released soul
-        const particleCount = 10;
-        for (let i = 0; i < particleCount; i++) {
-            const particle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.05, 4, 4),
-                new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff,
-                    transparent: true,
-                    opacity: 0.8
-                })
-            );
+        if (this.health > 0) {
+            // Enter hurt state
+            this.state = 'hurt';
+            this.hurtTime = 0.3; // Stun duration
             
-            particle.position.copy(this.position);
-            particle.position.y += 1;
-            this.scene.add(particle);
-            
-            // Animate particle ascending
-            const startY = particle.position.y;
-            const animateParticle = setInterval(() => {
-                particle.position.y += 0.05;
-                particle.material.opacity -= 0.02;
-                
-                if (particle.material.opacity <= 0) {
-                    clearInterval(animateParticle);
-                    this.scene.remove(particle);
-                }
-            }, 16);
+            // Flash red
+            this.bodyMesh.material.emissive = new THREE.Color(1, 0, 0);
+            this.bodyMesh.material.emissiveIntensity = 1;
+        } else {
+            this.onDeath();
         }
     }
     
     applyKnockback(force) {
-        // Override parent method to add stun effect
-        // Call parent's applyKnockback
-        super.applyKnockback(force);
+        // Validate force vector
+        if (!force || isNaN(force.x) || isNaN(force.y) || isNaN(force.z)) {
+            return;
+        }
         
-        // Stun briefly
-        const previousState = this.state;
-        this.state = 'stunned';
+        // Apply knockback to velocity, not directly to position
+        // This lets the physics system handle ground collision properly
+        const knockbackForce = force.clone();
         
-        setTimeout(() => {
-            if (this.state === 'stunned' && !this.isDead) {
-                this.state = previousState;
+        // Reduce downward knockback to prevent pushing through floor
+        if (knockbackForce.y < 0) {
+            knockbackForce.y *= 0.3; // Reduce downward force
+        }
+        
+        // Apply to velocity for smooth physics-based movement
+        this.velocity.add(knockbackForce);
+        
+        // Clamp velocity to prevent excessive speeds
+        const maxSpeed = 20;
+        if (this.velocity.length() > maxSpeed) {
+            this.velocity.normalize().multiplyScalar(maxSpeed);
+        }
+        
+        // Ensure enemy doesn't go below ground level
+        const minY = this.groundOffset || 0;
+        if (this.position.y < minY) {
+            this.position.y = minY;
+            if (this.velocity.y < 0) {
+                this.velocity.y = 0;
             }
-        }, 300);
+        }
+        
+        // Validate position after knockback
+        if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
+            // Reset to a valid position
+            this.position.set(0, 1, 0);
+        }
+    }
+    
+    onDeath() {
+        this.state = 'dead';
+        this.isDead = true;  // Set isDead flag for kill counting
+        
+        // Death animation - fall over
+        if (this.mesh) {
+            const fallAnimation = () => {
+                if (this.mesh.rotation.x < Math.PI / 2) {
+                    this.mesh.rotation.x += 0.1;
+                    this.mesh.position.y -= 0.02;
+                    requestAnimationFrame(fallAnimation);
+                }
+            };
+            fallAnimation();
+        }
+        
+        // Spawn death particles
+        this.createDeathParticles();
+    }
+    
+    createDeathParticles() {
+        // Prefer pooled particles if available
+        const poolMgr = (this.game && this.game.poolManager)
+            ? this.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr ? poolMgr.getPool('particles') : null;
+
+        if (pool && pool.burst) {
+            const pos = this.position.clone();
+            pos.y += 0.5;
+            // Burst mixed colors: run twice with different colors
+            pool.burst(pos, 12, 0x880000, 5);
+            pool.burst(pos, 10, 0x004400, 5);
+            return;
+        }
+        // Fallback simple effect if pool not available
+        const sphere = new THREE.SphereGeometry(0.05, 4, 4);
+        for (let i = 0; i < 10; i++) {
+            const mat = new THREE.MeshBasicMaterial({ color: THEME.effects.blood.demon, transparent: true, opacity: 1 });
+            const p = new THREE.Mesh(sphere, mat);
+            p.position.copy(this.position);
+            p.position.y += 0.5;
+            const vel = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3);
+            this.scene.add(p);
+            const step = () => {
+                p.position.add(vel.clone().multiplyScalar(0.02));
+                vel.y -= 0.2;
+                mat.opacity -= 0.03;
+                if (mat.opacity > 0) requestAnimationFrame(step); else this.scene.remove(p);
+            };
+            step();
+        }
     }
     
     destroy() {
-        // Clean up when enemy is removed
+        // Remove from scene
         if (this.mesh) {
             this.scene.remove(this.mesh);
         }

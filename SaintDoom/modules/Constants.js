@@ -118,7 +118,10 @@ export const PICKUPS = {
     PICKUP_RADIUS: 1,
     FLOAT_HEIGHT: 0.5,
     FLOAT_SPEED: 2,
-    ROTATE_SPEED: 1
+    ROTATE_SPEED: 1,
+    COLLECTION_DISTANCE: 2,
+    GLOW_INTENSITY: 0.5,
+    BEACON_HEIGHT: 4
 };
 
 export const NETWORK = {
@@ -168,4 +171,166 @@ export const OBJECTIVE_TYPES = {
     ESCORT: 'escort',
     DESTROY_TARGET: 'destroy_target',
     ACTIVATE_SWITCHES: 'activate_switches'
+};
+
+// Level-specific constants
+export const LEVEL_CONFIG = {
+    CORRIDOR_WIDTH: 6,
+    CORRIDOR_HEIGHT: 3,
+    ROOM_HEIGHT: 5,
+    WALL_THICKNESS: 0.5,
+    DOOR_WIDTH: 4,
+    DOOR_HEIGHT: 3,
+    PILLAR_SIZE: 1,
+    LIGHT_RANGE: 15,
+    LIGHT_INTENSITY: 0.8,
+    AMBIENT_LIGHT_INTENSITY: 0.2,
+    EMERGENCY_LIGHT_COLOR: 0xff0000,
+    EMERGENCY_LIGHT_INTENSITY: 0.3,
+    FLICKER_CHANCE: 0.3,
+    BLOOD_STAIN_OPACITY: 0.6,
+    DAMAGE_DECAL_OPACITY: 0.7
+};
+
+// Timer intervals (to replace magic numbers in setTimeout/setInterval)
+export const TIMERS = {
+    FLICKER_INTERVAL: 100, // ms
+    SPAWN_INTERVAL: 5000, // ms
+    WAVE_INTERVAL: 10000, // ms
+    DOOR_OPEN_DELAY: 1000, // ms
+    EXPLOSION_DELAY: 500, // ms
+    RESPAWN_DELAY: 3000, // ms
+    MESSAGE_FADE_DELAY: 2000, // ms
+    LEVEL_TRANSITION_DELAY: 2000, // ms
+    HOWL_COOLDOWN: 10000, // ms
+    LEAP_COOLDOWN: 3000, // ms
+    SPEED_BOOST_DURATION: 3000 // ms
+};
+
+// Collision constants
+export const COLLISION = {
+    MAX_STEP_SIZE: 0.15, // Half the collision margin for continuous detection
+    MAX_DELTA_TIME: 0.05, // Cap at 50ms (20 FPS minimum)
+    PUSH_BACK_DISTANCE: 0.1,
+    PUSH_BACK_MAX_ATTEMPTS: 10,
+    ENEMY_PUSH_FACTOR: 0.5, // How much enemies and players push apart
+    WALL_SLIDE_FACTOR: 0.7, // Sliding along walls
+    EPSILON: 0.001 // Small value for floating point comparisons
+};
+
+// Shadow optimization settings
+export const SHADOWS = {
+    MAX_SHADOW_CASTERS: 3,
+    SHADOW_MAP_SIZE: 1024,
+    SHADOW_CAMERA_NEAR: 0.5,
+    SHADOW_CAMERA_FAR: 50,
+    SHADOW_BIAS: -0.001,
+    SHADOW_NORMAL_BIAS: 0.01
+};
+
+// Zone management constants
+export const ZONES = {
+    MAX_MEMORY_MB: 100,
+    PROXY_RADIUS: 50,
+    SIMPLIFIED_RADIUS: 30,
+    FULL_RADIUS: 20,
+    UNLOAD_RADIUS: 100,
+    PREDICTIVE_RADIUS: 40,
+    MEMORY_CHECK_INTERVAL: 1000, // ms
+    TRANSITION_DURATION: 1500, // ms
+    MIN_FPS_FOR_FULL: 45,
+    MIN_FPS_FOR_SIMPLIFIED: 30
+};
+
+// Visual effect constants
+export const EFFECTS = {
+    PARTICLE_POOL_SIZE: 100,
+    EXPLOSION_PARTICLES: 20,
+    BLOOD_PARTICLES: 5,
+    SPARK_PARTICLES: 10,
+    SMOKE_PARTICLES: 15,
+    PARTICLE_GRAVITY: -9.8,
+    PARTICLE_FRICTION: 0.95,
+    PARTICLE_LIFETIME: 1.5, // seconds
+    GLOW_INTENSITY: 0.5,
+    FLASH_DURATION: 0.1, // seconds
+    TRAIL_LENGTH: 10,
+    IMPACT_SCALE: 1.5
+};
+
+// Tutorial constants
+export const TUTORIAL = {
+    STEP_DELAY: 1000, // ms
+    MESSAGE_DURATION: 5000, // ms
+    CARDINAL_HEIGHT: 2.0,
+    MISSILE_LAUNCH_HEIGHT: 10,
+    MISSILE_SPEED: 20,
+    CAMERA_TRANSITION_TIME: 2000, // ms
+    SWORD_VISIBILITY_DELAY: 200 // ms
+};
+
+// Boss constants
+export const BOSS = {
+    BELIAL_PHASES: 3,
+    PHASE_HEALTH_THRESHOLDS: [0.75, 0.5, 0.25],
+    TELEPORT_COOLDOWN: 5000, // ms
+    SUMMON_COOLDOWN: 8000, // ms
+    SPECIAL_ATTACK_COOLDOWN: 10000, // ms
+    INVULNERABILITY_DURATION: 2000, // ms
+    RAGE_MODE_THRESHOLD: 0.2, // 20% health
+    MINION_SPAWN_COUNT: 3
+};
+
+// Weapon constants
+export const WEAPONS = {
+    SWORD_SWING_TIME: 0.3, // seconds
+    SHOTGUN_RELOAD_TIME: 1.5, // seconds
+    PISTOL_FIRE_RATE: 0.2, // seconds between shots
+    GRENADE_FUSE_TIME: 3, // seconds
+    ROCKET_SPEED: 30,
+    PLASMA_SPEED: 40,
+    RAILGUN_CHARGE_TIME: 1, // seconds
+    MAX_PROJECTILE_DISTANCE: 100
+};
+
+// HUD constants
+export const HUD = {
+    HEALTH_LOW_THRESHOLD: 30,
+    HEALTH_CRITICAL_THRESHOLD: 10,
+    AMMO_LOW_THRESHOLD: 10,
+    SCORE_POPUP_DURATION: 1000, // ms
+    COMBO_TIMEOUT: 2000, // ms
+    MESSAGE_FADE_TIME: 500, // ms
+    RADAR_RADIUS: 30,
+    MINIMAP_SIZE: 200
+};
+
+// Debug constants
+export const DEBUG = {
+    SHOW_COLLISION_BOXES: false,
+    SHOW_AI_PATHS: false,
+    SHOW_PERFORMANCE_STATS: false,
+    LOG_LEVEL: 'info',
+    SLOW_MOTION_FACTOR: 0.5,
+    GOD_MODE_ENABLED: false,
+    INFINITE_AMMO: false
+};
+
+// Memory optimization constants
+export const MEMORY = {
+    POOL_SIZES: {
+        VECTORS: 50,
+        QUATERNIONS: 20,
+        MATRICES: 10,
+        BULLETS: 100,
+        PARTICLES: 200
+    },
+    CACHE_SIZES: {
+        GEOMETRY: 50,
+        MATERIAL: 30,
+        TEXTURE: 20
+    },
+    GC_INTERVAL: 30000, // ms
+    MEMORY_WARNING_THRESHOLD: 80, // MB
+    MEMORY_CRITICAL_THRESHOLD: 95 // MB
 };

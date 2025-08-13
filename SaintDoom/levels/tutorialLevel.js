@@ -1,27 +1,15 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
+import { THEME } from '../modules/config/theme.js';
 // Tutorial Level - Vatican Inquisition Chamber
 // Player learns controls while being evaluated by the Inquisition
 
 export class TutorialLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.scene = arguments[0].scene;
-            this.game = arguments[0];
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        
-        // walls is already initialized in BaseLevel
-        this.tutorialStep = 0;
-        this.inquisitorSpoken = {};
-        this.missileReady = false;
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     }
     
     create() {
@@ -30,22 +18,22 @@ export class TutorialLevel extends BaseLevel {
         
         // Materials for Vatican chamber
         const marbleFloorMaterial = new THREE.MeshStandardMaterial({
-            color: 0xf0f0e8,
+            color: THEME.materials.floor.vatican,
             roughness: 0.3,
             metalness: 0.1
         });
         
         const stoneWallMaterial = new THREE.MeshStandardMaterial({
-            color: 0x8a8a7a,
+            color: THEME.materials.wall.stone,
             roughness: 0.9,
             metalness: 0.0
         });
         
         const goldMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffd700,
+            color: THEME.materials.gold,
             roughness: 0.4,
             metalness: 0.8,
-            emissive: 0xffd700,
+            emissive: THEME.materials.gold,
             emissiveIntensity: 0.1
         });
         
@@ -115,37 +103,222 @@ export class TutorialLevel extends BaseLevel {
     }
     
     createInquisitor(x, y, z) {
-        // Create a simple inquisitor figure
+        // Create a detailed Cardinal Torretti figure
         const inquisitorGroup = new THREE.Group();
         
-        // Robe (red cylinder)
-        const robeGeometry = new THREE.CylinderGeometry(0.4, 0.5, 2, 8);
+        // Base robe material with rich fabric appearance
         const robeMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8b0000,
-            emissive: 0x400000,
-            emissiveIntensity: 0.2
+            color: THEME.materials.robe,
+            emissive: THEME.materials.robeEmissive,
+            emissiveIntensity: 0.15,
+            roughness: 0.8,
+            metalness: 0.1
         });
-        const robe = new THREE.Mesh(robeGeometry, robeMaterial);
-        robe.position.y = 1;
-        inquisitorGroup.add(robe);
         
-        // Head
-        const headGeometry = new THREE.SphereGeometry(0.2, 8, 6);
-        const headMaterial = new THREE.MeshStandardMaterial({ color: 0xf4e4d4 });
+        // Lower robe (wider at bottom)
+        const lowerRobeGeometry = new THREE.CylinderGeometry(0.35, 0.6, 1.2, 16);
+        const lowerRobe = new THREE.Mesh(lowerRobeGeometry, robeMaterial);
+        lowerRobe.position.y = 0.6;
+        inquisitorGroup.add(lowerRobe);
+        
+        // Upper robe (torso)
+        const upperRobeGeometry = new THREE.CylinderGeometry(0.3, 0.35, 1, 12);
+        const upperRobe = new THREE.Mesh(upperRobeGeometry, robeMaterial);
+        upperRobe.position.y = 1.5;
+        inquisitorGroup.add(upperRobe);
+        
+        // Shoulders
+        const shoulderGeometry = new THREE.SphereGeometry(0.35, 8, 6);
+        const shoulders = new THREE.Mesh(shoulderGeometry, robeMaterial);
+        shoulders.position.y = 1.9;
+        shoulders.scale.y = 0.6;
+        inquisitorGroup.add(shoulders);
+        
+        // Arms
+        for (let side of [-1, 1]) {
+            // Upper arm
+            const upperArmGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.5, 8);
+            const upperArm = new THREE.Mesh(upperArmGeometry, robeMaterial);
+            upperArm.position.set(side * 0.28, 1.7, 0);
+            upperArm.rotation.z = side * Math.PI / 10;
+            inquisitorGroup.add(upperArm);
+            
+            // Elbow joint
+            const elbowGeometry = new THREE.SphereGeometry(0.09, 6, 4);
+            const elbow = new THREE.Mesh(elbowGeometry, robeMaterial);
+            elbow.position.set(side * 0.35, 1.45, 0);
+            inquisitorGroup.add(elbow);
+            
+            // Lower arm
+            const lowerArmGeometry = new THREE.CylinderGeometry(0.07, 0.08, 0.45, 8);
+            const lowerArm = new THREE.Mesh(lowerArmGeometry, robeMaterial);
+            lowerArm.position.set(side * 0.38, 1.25, -0.1);
+            lowerArm.rotation.z = side * Math.PI / 16;
+            lowerArm.rotation.x = -Math.PI / 10;
+            inquisitorGroup.add(lowerArm);
+            
+            // Hands
+            const handGeometry = new THREE.SphereGeometry(0.06, 6, 4);
+            const handMaterial = new THREE.MeshStandardMaterial({ 
+                color: THEME.materials.skin,
+                roughness: 0.7
+            });
+            const hand = new THREE.Mesh(handGeometry, handMaterial);
+            hand.position.set(side * 0.4, 1.05, -0.15);
+            inquisitorGroup.add(hand);
+        }
+        
+        // Neck
+        const neckGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.15, 8);
+        const neckMaterial = new THREE.MeshStandardMaterial({ 
+            color: THEME.materials.skin,
+            roughness: 0.7
+        });
+        const neck = new THREE.Mesh(neckGeometry, neckMaterial);
+        neck.position.y = 2.1;
+        inquisitorGroup.add(neck);
+        
+        // Head (more detailed)
+        const headGeometry = new THREE.SphereGeometry(0.18, 12, 10);
+        const headMaterial = new THREE.MeshStandardMaterial({ 
+            color: THEME.materials.skin,
+            roughness: 0.6
+        });
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 2.2;
+        head.position.y = 2.3;
+        head.scale.y = 1.1; // Slightly elongated
         inquisitorGroup.add(head);
         
-        // Hat (cardinal's hat)
-        const hatGeometry = new THREE.ConeGeometry(0.3, 0.4, 8);
-        const hatMaterial = new THREE.MeshStandardMaterial({ color: 0x8b0000 });
-        const hat = new THREE.Mesh(hatGeometry, hatMaterial);
-        hat.position.y = 2.5;
-        inquisitorGroup.add(hat);
+        // Eyes (dark, judgmental)
+        for (let side of [-1, 1]) {
+            const eyeGeometry = new THREE.SphereGeometry(0.02, 6, 4);
+            const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x1a1a1a });
+            const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            eye.position.set(side * 0.06, 2.32, -0.15);
+            inquisitorGroup.add(eye);
+        }
+        
+        // Nose
+        const noseGeometry = new THREE.ConeGeometry(0.02, 0.04, 4);
+        const nose = new THREE.Mesh(noseGeometry, headMaterial);
+        nose.position.set(0, 2.28, -0.16);
+        nose.rotation.x = Math.PI / 2;
+        inquisitorGroup.add(nose);
+        
+        // Mouth (stern expression)
+        const mouthGeometry = new THREE.BoxGeometry(0.08, 0.01, 0.02);
+        const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x4a3030 });
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, 2.22, -0.15);
+        inquisitorGroup.add(mouth);
+        
+        // Cardinal's zucchetto (skullcap)
+        const zucchettoGeometry = new THREE.SphereGeometry(0.19, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+        const zucchettoMaterial = new THREE.MeshStandardMaterial({ 
+            color: THEME.materials.robe,
+            roughness: 0.6
+        });
+        const zucchetto = new THREE.Mesh(zucchettoGeometry, zucchettoMaterial);
+        zucchetto.position.y = 2.4;
+        inquisitorGroup.add(zucchetto);
+        
+        // Cardinal's biretta (square cap with ridges)
+        const birettaGroup = new THREE.Group();
+        
+        // Base of biretta
+        const birettaBase = new THREE.BoxGeometry(0.3, 0.08, 0.3);
+        const birettaMaterial = new THREE.MeshStandardMaterial({ 
+            color: THEME.materials.robe,
+            roughness: 0.5
+        });
+        const biretta = new THREE.Mesh(birettaBase, birettaMaterial);
+        birettaGroup.add(biretta);
+        
+        // Three ridges on top
+        for (let i = 0; i < 3; i++) {
+            const ridgeGeometry = new THREE.BoxGeometry(0.28, 0.12, 0.02);
+            const ridge = new THREE.Mesh(ridgeGeometry, birettaMaterial);
+            ridge.position.y = 0.08;
+            ridge.position.z = (i - 1) * 0.1;
+            birettaGroup.add(ridge);
+        }
+        
+        // Tuft on top
+        const tuftGeometry = new THREE.SphereGeometry(0.04, 6, 4);
+        const tuft = new THREE.Mesh(tuftGeometry, birettaMaterial);
+        tuft.position.y = 0.15;
+        birettaGroup.add(tuft);
+        
+        birettaGroup.position.y = 2.55;
+        birettaGroup.rotation.y = Math.PI / 8; // Slight angle for character
+        inquisitorGroup.add(birettaGroup);
+        
+        // Golden pectoral cross
+        const crossGroup = new THREE.Group();
+        const crossMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.materials.gold,
+            emissive: THEME.materials.gold,
+            emissiveIntensity: 0.2,
+            metalness: 0.9,
+            roughness: 0.3
+        });
+        
+        // Vertical beam of cross
+        const crossVertical = new THREE.BoxGeometry(0.02, 0.12, 0.01);
+        const verticalBeam = new THREE.Mesh(crossVertical, crossMaterial);
+        crossGroup.add(verticalBeam);
+        
+        // Horizontal beam of cross
+        const crossHorizontal = new THREE.BoxGeometry(0.08, 0.02, 0.01);
+        const horizontalBeam = new THREE.Mesh(crossHorizontal, crossMaterial);
+        horizontalBeam.position.y = 0.03;
+        crossGroup.add(horizontalBeam);
+        
+        // Chain
+        const chainGeometry = new THREE.CylinderGeometry(0.01, 0.01, 0.3, 6);
+        const chain = new THREE.Mesh(chainGeometry, crossMaterial);
+        chain.position.y = 0.15;
+        chain.position.z = -0.01;
+        crossGroup.add(chain);
+        
+        crossGroup.position.set(0, 1.5, -0.32);
+        inquisitorGroup.add(crossGroup);
+        
+        // Cincture (belt/sash)
+        const cinctureGeometry = new THREE.TorusGeometry(0.36, 0.03, 4, 16);
+        const cinctureMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.materials.gold,
+            metalness: 0.6,
+            roughness: 0.4
+        });
+        const cincture = new THREE.Mesh(cinctureGeometry, cinctureMaterial);
+        cincture.position.y = 1.3;
+        cincture.rotation.x = Math.PI / 2;
+        inquisitorGroup.add(cincture);
+        
+        // Add subtle idle animation
+        this.inquisitorGroup = inquisitorGroup;
+        this.inquisitorAnimationTime = 0;
+        
+        // Rotate to face forward (toward positive Z, where player starts)
+        inquisitorGroup.rotation.y = Math.PI;
         
         inquisitorGroup.position.set(x, y, z);
         inquisitorGroup.userData = { isInquisitor: true };
         this.scene.add(inquisitorGroup);
+        
+        // Add a subtle glow beneath the Cardinal
+        const glowGeometry = new THREE.CircleGeometry(1, 32);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: THEME.materials.gold,
+            transparent: true,
+            opacity: 0.1,
+            side: THREE.DoubleSide
+        });
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        glow.position.set(x, y + 0.01, z);
+        glow.rotation.x = -Math.PI / 2;
+        this.scene.add(glow);
     }
     
     createMissileBay(z, wallMaterial) {
@@ -153,7 +326,7 @@ export class TutorialLevel extends BaseLevel {
         const bayFloor = new THREE.Mesh(
             new THREE.PlaneGeometry(10, 10),
             new THREE.MeshStandardMaterial({
-                color: 0x404040,
+                color: THEME.materials.floor.metal,
                 roughness: 0.9,
                 metalness: 0.2
             })
@@ -175,7 +348,7 @@ export class TutorialLevel extends BaseLevel {
         // Launch tube hole in ceiling
         const holeGeometry = new THREE.RingGeometry(0, 2, 16);
         const holeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x000000,
+            color: THEME.materials.black,
             side: THREE.DoubleSide
         });
         const hole = new THREE.Mesh(holeGeometry, holeMaterial);
@@ -198,7 +371,7 @@ export class TutorialLevel extends BaseLevel {
         // Missile body (metallic cylinder)
         const bodyGeometry = new THREE.CylinderGeometry(1.2, 1.2, 5, 16);
         const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0x808080,
+            color: THEME.materials.metal.bright,
             roughness: 0.2,
             metalness: 0.95
         });
@@ -209,7 +382,7 @@ export class TutorialLevel extends BaseLevel {
         // Nose cone (sharper)
         const noseGeometry = new THREE.ConeGeometry(1.2, 3, 16);
         const noseMaterial = new THREE.MeshStandardMaterial({
-            color: 0x404040,
+            color: THEME.materials.floor.metal,
             roughness: 0.3,
             metalness: 0.9
         });
@@ -238,7 +411,7 @@ export class TutorialLevel extends BaseLevel {
             // Leg strut
             const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
             const legMaterial = new THREE.MeshStandardMaterial({
-                color: 0x606060,
+                color: THEME.materials.metal.dark,
                 roughness: 0.4,
                 metalness: 0.8
             });
@@ -266,8 +439,8 @@ export class TutorialLevel extends BaseLevel {
         // Vatican emblem on side (smaller, more subtle)
         const emblemGeometry = new THREE.CircleGeometry(0.4, 16);
         const emblemMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffd700,
-            emissive: 0xffd700,
+            color: THEME.materials.gold,
+            emissive: THEME.materials.gold,
             emissiveIntensity: 0.1,
             metalness: 0.8
         });
@@ -279,8 +452,8 @@ export class TutorialLevel extends BaseLevel {
         // Entry hatch (more integrated into body)
         const hatchGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.05);
         const hatchMaterial = new THREE.MeshStandardMaterial({
-            color: 0x505050,
-            emissive: 0x00ff00,
+            color: THEME.materials.metal.dark,
+            emissive: THEME.ui.text.success,
             emissiveIntensity: 0,
             metalness: 0.9,
             roughness: 0.3
@@ -294,7 +467,7 @@ export class TutorialLevel extends BaseLevel {
         // Hatch outline
         const outlineGeometry = new THREE.BoxGeometry(0.7, 1.3, 0.02);
         const outlineMaterial = new THREE.MeshStandardMaterial({
-            color: 0x303030,
+            color: THEME.materials.metal.veryDark,
             metalness: 0.9
         });
         const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
@@ -313,17 +486,17 @@ export class TutorialLevel extends BaseLevel {
     
     addLighting() {
         // Warm cathedral lighting
-        const warmLight = new THREE.PointLight(0xffeeaa, 1, 20);
+        const warmLight = new THREE.PointLight(THEME.lights.point.warm, 1, 20);
         warmLight.position.set(0, 6, -10);
         warmLight.castShadow = true;
         this.scene.add(warmLight);
         
         // Ambient light from stained glass windows
-        const ambientLight = new THREE.AmbientLight(0xffffee, 0.3);
+        const ambientLight = new THREE.AmbientLight(THEME.lights.ambient.warm, 0.3);
         this.scene.add(ambientLight);
         
         // Dramatic spotlight on inquisitor
-        const spotlight = new THREE.SpotLight(0xffffff, 1);
+        const spotlight = new THREE.SpotLight(THEME.lights.spot.white, 1);
         spotlight.position.set(0, 7, -5);
         spotlight.target.position.set(0, 0, -10);
         spotlight.angle = Math.PI / 6;
@@ -333,7 +506,7 @@ export class TutorialLevel extends BaseLevel {
         this.scene.add(spotlight.target);
         
         // Red warning light in missile bay
-        const warningLight = new THREE.PointLight(0xff0000, 0.5, 10);
+        const warningLight = new THREE.PointLight(THEME.lights.point.warning, 0.5, 10);
         warningLight.position.set(0, 4, 25);
         this.scene.add(warningLight);
         
@@ -366,7 +539,7 @@ export class TutorialLevel extends BaseLevel {
         for (let i = -1; i <= 1; i += 2) {
             const pillarGeometry = new THREE.CylinderGeometry(0.5, 0.5, 8, 8);
             const pillarMaterial = new THREE.MeshStandardMaterial({
-                color: 0xf0f0e8,
+                color: THEME.materials.floor.vatican,
                 roughness: 0.5
             });
             
@@ -380,6 +553,230 @@ export class TutorialLevel extends BaseLevel {
             pillar2.castShadow = true;
             this.scene.add(pillar2);
         }
+        
+        // Add bookshelves along the walls
+        this.createBookshelf(-9, 3, -7, 0);      // Left wall, back
+        this.createBookshelf(-9, 3, -2, 0);      // Left wall, middle
+        this.createBookshelf(-9, 3, 3, 0);       // Left wall, front
+        
+        this.createBookshelf(9, 3, -7, Math.PI); // Right wall, back
+        this.createBookshelf(9, 3, -2, Math.PI); // Right wall, middle
+        this.createBookshelf(9, 3, 3, Math.PI);  // Right wall, front
+        
+        // Add reading tables with old tomes
+        this.createReadingTable(-5, 0, -3);
+        this.createReadingTable(5, 0, -3);
+    }
+    
+    createBookshelf(x, y, z, rotation) {
+        const bookshelfGroup = new THREE.Group();
+        
+        // Bookshelf frame
+        const frameMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4a3420, // Dark wood
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        
+        // Back panel
+        const backPanel = new THREE.Mesh(
+            new THREE.BoxGeometry(3, 6, 0.1),
+            frameMaterial
+        );
+        bookshelfGroup.add(backPanel);
+        
+        // Top and bottom
+        const shelfThickness = 0.15;
+        for (let i = 0; i <= 5; i++) {
+            const shelf = new THREE.Mesh(
+                new THREE.BoxGeometry(3, shelfThickness, 0.8),
+                frameMaterial
+            );
+            shelf.position.y = -2.5 + i;
+            shelf.position.z = 0.35;
+            bookshelfGroup.add(shelf);
+        }
+        
+        // Side panels
+        for (let side of [-1, 1]) {
+            const sidePanel = new THREE.Mesh(
+                new THREE.BoxGeometry(0.1, 6, 0.8),
+                frameMaterial
+            );
+            sidePanel.position.x = side * 1.5;
+            sidePanel.position.z = 0.35;
+            bookshelfGroup.add(sidePanel);
+        }
+        
+        // Add books
+        const bookColors = [
+            0x8b0000, // Dark red
+            0x2f4f2f, // Dark green
+            0x191970, // Midnight blue
+            0x4b0082, // Indigo
+            0x8b4513, // Saddle brown
+            0x800020, // Burgundy
+        ];
+        
+        // Fill each shelf with books
+        for (let shelf = 0; shelf < 5; shelf++) {
+            const shelfY = -2 + shelf;
+            let currentX = -1.3;
+            
+            while (currentX < 1.2) {
+                const bookHeight = 0.7 + Math.random() * 0.3;
+                const bookWidth = 0.1 + Math.random() * 0.15;
+                const bookDepth = 0.5 + Math.random() * 0.2;
+                
+                const bookMaterial = new THREE.MeshStandardMaterial({
+                    color: bookColors[Math.floor(Math.random() * bookColors.length)],
+                    roughness: 0.9,
+                    metalness: 0.05
+                });
+                
+                const book = new THREE.Mesh(
+                    new THREE.BoxGeometry(bookWidth, bookHeight, bookDepth),
+                    bookMaterial
+                );
+                
+                book.position.set(
+                    currentX + bookWidth / 2,
+                    shelfY + bookHeight / 2 + shelfThickness / 2,
+                    0.35
+                );
+                
+                // Occasionally tilt a book
+                if (Math.random() > 0.8) {
+                    book.rotation.z = (Math.random() - 0.5) * 0.1;
+                }
+                
+                bookshelfGroup.add(book);
+                currentX += bookWidth + 0.02;
+            }
+        }
+        
+        bookshelfGroup.position.set(x, y, z);
+        bookshelfGroup.rotation.y = rotation;
+        bookshelfGroup.castShadow = true;
+        this.scene.add(bookshelfGroup);
+    }
+    
+    createReadingTable(x, y, z) {
+        const tableGroup = new THREE.Group();
+        
+        // Table surface
+        const tableMaterial = new THREE.MeshStandardMaterial({
+            color: 0x654321, // Dark brown wood
+            roughness: 0.7,
+            metalness: 0.1
+        });
+        
+        const tableTop = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 0.1, 1.2),
+            tableMaterial
+        );
+        tableTop.position.y = 1;
+        tableGroup.add(tableTop);
+        
+        // Table legs
+        for (let legX of [-0.9, 0.9]) {
+            for (let legZ of [-0.5, 0.5]) {
+                const leg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 1, 8),
+                    tableMaterial
+                );
+                leg.position.set(legX, 0.5, legZ);
+                tableGroup.add(leg);
+            }
+        }
+        
+        // Open book on table
+        const bookGroup = new THREE.Group();
+        
+        // Book pages (open)
+        const pagesMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf5deb3, // Wheat/parchment color
+            roughness: 0.9
+        });
+        
+        const leftPage = new THREE.Mesh(
+            new THREE.BoxGeometry(0.3, 0.02, 0.4),
+            pagesMaterial
+        );
+        leftPage.position.set(-0.15, 0, 0);
+        leftPage.rotation.z = -0.05;
+        bookGroup.add(leftPage);
+        
+        const rightPage = new THREE.Mesh(
+            new THREE.BoxGeometry(0.3, 0.02, 0.4),
+            pagesMaterial
+        );
+        rightPage.position.set(0.15, 0, 0);
+        rightPage.rotation.z = 0.05;
+        bookGroup.add(rightPage);
+        
+        // Book cover (visible edges)
+        const coverMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b0000, // Dark red leather
+            roughness: 0.8
+        });
+        
+        const spine = new THREE.Mesh(
+            new THREE.BoxGeometry(0.03, 0.05, 0.42),
+            coverMaterial
+        );
+        spine.position.y = -0.01;
+        bookGroup.add(spine);
+        
+        bookGroup.position.y = 1.06;
+        bookGroup.rotation.y = Math.random() * 0.5 - 0.25;
+        tableGroup.add(bookGroup);
+        
+        // Candle holder
+        const candleHolderMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.materials.brass || 0xb87333,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        
+        const candleBase = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.08, 0.1, 0.05, 12),
+            candleHolderMaterial
+        );
+        candleBase.position.set(0.6, 1.03, 0.3);
+        tableGroup.add(candleBase);
+        
+        const candle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8),
+            new THREE.MeshStandardMaterial({
+                color: 0xfff8dc, // Cream candle color
+                roughness: 0.8
+            })
+        );
+        candle.position.set(0.6, 1.15, 0.3);
+        tableGroup.add(candle);
+        
+        // Candle flame (simple glow)
+        const flameGeometry = new THREE.SphereGeometry(0.04, 4, 4);
+        const flameMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffaa00,
+            emissive: 0xffaa00,
+            emissiveIntensity: 0.8,
+            transparent: true,
+            opacity: 0.8
+        });
+        const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        flame.position.set(0.6, 1.27, 0.3);
+        flame.scale.y = 1.5;
+        tableGroup.add(flame);
+        
+        // Small point light for candle
+        const candleLight = new THREE.PointLight(0xffaa66, 0.3, 3);
+        candleLight.position.set(0.6, 1.3, 0.3);
+        tableGroup.add(candleLight);
+        
+        tableGroup.position.set(x, y, z);
+        this.scene.add(tableGroup);
     }
     
     startTutorial() {
@@ -439,13 +836,14 @@ export class TutorialLevel extends BaseLevel {
                 ns.displaySubtitle("\"Your sanctified blade awaits. Press 1 to equip your sword.\"");
                 ns.setObjective("Press 1 to equip sword");
                 this.waitForWeapon = true;
-                // Give the player the sword now
-                if (this.game && this.game.weaponSystem) {
-                    // Enable weapon switching for sword only
+                
+                // Make sure player has sword in inventory
+                if (this.game && this.game.player) {
                     this.game.player.weapons = ['sword'];
                     this.game.player.currentWeaponIndex = 0;
                     this.game.player.currentWeapon = 'sword';
                 }
+                
                 this.showTutorialControls(['WASD - Move', 'Mouse - Look', '1 - Holy Sword']);
                 break;
                 
@@ -492,6 +890,41 @@ export class TutorialLevel extends BaseLevel {
         }
     }
     
+    update(deltaTime) {
+        // Call parent update
+        super.update(deltaTime);
+        
+        // Animate the Cardinal with subtle idle movement
+        if (this.inquisitorGroup) {
+            this.inquisitorAnimationTime = (this.inquisitorAnimationTime || 0) + deltaTime;
+            
+            // Gentle breathing animation
+            const breathScale = 1 + Math.sin(this.inquisitorAnimationTime * 2) * 0.02;
+            if (this.inquisitorGroup.children[1]) { // Upper robe
+                this.inquisitorGroup.children[1].scale.x = breathScale;
+                this.inquisitorGroup.children[1].scale.z = breathScale;
+            }
+            
+            // Subtle head movement (looking around occasionally)
+            const headTurn = Math.sin(this.inquisitorAnimationTime * 0.3) * 0.1;
+            this.inquisitorGroup.rotation.y = Math.PI + headTurn; // Keep facing player with subtle movement
+            
+            // Cross pendant swing
+            const crossGroup = this.inquisitorGroup.children.find(child => 
+                child.children && child.children.length === 3 && child.position.z < -0.3
+            );
+            if (crossGroup) {
+                crossGroup.rotation.z = Math.sin(this.inquisitorAnimationTime * 1.5) * 0.05;
+            }
+        }
+        
+        // Handle camera looking at missile during shake
+        if (this.cameraTransitioning && this.game.camera) {
+            // Keep camera looking at the missile during shake phase
+            this.game.camera.lookAt(this.cameraLookTarget);
+        }
+    }
+    
     checkTutorialProgress(input, player) {
         if (!this.game.narrativeSystem) return;
         
@@ -510,6 +943,10 @@ export class TutorialLevel extends BaseLevel {
         // Check weapon switch
         if (this.waitForWeapon && input.weapon1) {
             this.waitForWeapon = false;
+            // Now actually equip the sword
+            if (this.game && this.game.weaponSystem) {
+                this.game.weaponSystem.switchToWeapon('sword');
+            }
             this.addTimeout(() => this.nextTutorialStep(), 1000);
         }
         
@@ -540,13 +977,49 @@ export class TutorialLevel extends BaseLevel {
         ns.displaySubtitle("\"Initiating launch sequence. Godspeed, Saint Giovanni.\"");
         ns.setObjective("Launching...");
         
-        // Move player into missile (teleport to missile position)
+        // Prepare for launch sequence
         if (this.game.player) {
-            this.game.player.position.set(0, 2, 25);
-            this.game.player.velocity.set(0, 0, 0);
-            
             // Lock player controls during launch
             this.game.playerControlsLocked = true;
+            
+            // Store original camera settings
+            this.originalCameraPosition = this.game.camera.position.clone();
+            this.originalCameraRotation = this.game.camera.rotation.clone();
+            
+            // Move player position away to ensure we're "in" the missile
+            this.originalPlayerPosition = this.game.player.position.clone();
+            this.game.player.position.set(0, 2, 25); // Inside missile
+            
+            // Position camera to view the missile from outside
+            this.cameraTargetPosition = new THREE.Vector3(5, 3, 30);
+            this.cameraLookTarget = new THREE.Vector3(0, 3, 25);
+            
+            // Immediately set camera position for instant transition
+            this.game.camera.position.copy(this.cameraTargetPosition);
+            this.game.camera.lookAt(this.cameraLookTarget);
+            
+            // Start camera transition animation
+            this.cameraTransitionTime = 0;
+            this.cameraTransitioning = true;
+        }
+        
+        // Close missile hatch with animation
+        if (this.missileHatch) {
+            // Hide weapons immediately when hatch starts closing
+            this.hideWeapons();
+            
+            // Animate hatch closing
+            const closeHatch = () => {
+                if (this.missileHatch.material.opacity > 0.8) {
+                    this.missileHatch.material.opacity -= 0.05;
+                    this.missileHatch.material.transparent = true;
+                    requestAnimationFrame(closeHatch);
+                } else {
+                    // Hatch fully closed
+                    this.missileHatch.material.emissiveIntensity = 0;
+                }
+            };
+            closeHatch();
         }
         
         // Shake effect
@@ -557,10 +1030,10 @@ export class TutorialLevel extends BaseLevel {
                 this.missileGroup.position.z = 25 + Math.random() * 0.2 - 0.1;
             }
             
-            // Also shake the player with the missile
-            if (this.game.player) {
-                this.game.player.position.x = this.missileGroup.position.x;
-                this.game.player.position.z = this.missileGroup.position.z;
+            // Shake camera slightly too
+            if (this.game.camera && this.cameraTargetPosition) {
+                this.game.camera.position.x = this.cameraTargetPosition.x + (Math.random() * 0.1 - 0.05);
+                this.game.camera.position.y = this.cameraTargetPosition.y + (Math.random() * 0.1 - 0.05);
             }
             
             shakeTime += 50;
@@ -574,6 +1047,9 @@ export class TutorialLevel extends BaseLevel {
         
         // Add smoke particles
         this.createLaunchSmoke();
+        
+        // Add engine ignition effects
+        this.createEngineIgnition();
     }
     
     animateLaunch() {
@@ -583,9 +1059,10 @@ export class TutorialLevel extends BaseLevel {
                 this.missileGroup.position.y += launchSpeed;
                 launchSpeed *= 1.1; // Accelerate
                 
-                // Move player with missile
-                if (this.game.player) {
-                    this.game.player.position.y = this.missileGroup.position.y + 1;
+                // Camera follows missile upward
+                if (this.game.camera) {
+                    this.game.camera.position.y += launchSpeed * 0.8;
+                    this.game.camera.lookAt(this.missileGroup.position);
                 }
                 
                 if (this.missileGroup.position.y > 20) {
@@ -597,14 +1074,85 @@ export class TutorialLevel extends BaseLevel {
         }, 16);
     }
     
+    hideWeapons() {
+        // Hide all weapon meshes and hands when entering missile
+        if (this.game.weaponSystem) {
+            // Hide the sword mesh
+            if (this.game.weaponSystem.swordMesh) {
+                this.game.weaponSystem.swordMesh.visible = false;
+            }
+            // Hide the arm groups (hands holding weapons)
+            if (this.game.weaponSystem.armGroup) {
+                this.game.weaponSystem.armGroup.visible = false;
+            }
+            if (this.game.weaponSystem.gripGroup) {
+                this.game.weaponSystem.gripGroup.visible = false;
+            }
+            // Hide the shotgun if it exists
+            if (this.game.weaponSystem.shotgunMesh) {
+                this.game.weaponSystem.shotgunMesh.visible = false;
+            }
+            // Hide holy water if it exists
+            if (this.game.weaponSystem.holyWaterMesh) {
+                this.game.weaponSystem.holyWaterMesh.visible = false;
+            }
+            // Hide any projectile meshes
+            if (this.game.weaponSystem.projectileMesh) {
+                this.game.weaponSystem.projectileMesh.visible = false;
+            }
+        }
+    }
+    
+    createEngineIgnition() {
+        // Create engine flame effect at base of missile
+        const flameGeometry = new THREE.ConeGeometry(1.5, 4, 8);
+        const flameMaterial = new THREE.MeshStandardMaterial({
+            color: THEME.effects.explosion.fire,
+            transparent: true,
+            opacity: 0.8,
+            emissive: THEME.effects.explosion.fire,
+            emissiveIntensity: 0.5
+        });
+        
+        const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        flame.position.set(0, -1, 25);
+        flame.rotation.x = Math.PI;
+        this.scene.add(flame);
+        
+        // Animate flame
+        const animateFlame = () => {
+            flame.scale.x = 1 + Math.random() * 0.3;
+            flame.scale.z = 1 + Math.random() * 0.3;
+            flame.scale.y = 1 + Math.random() * 0.5;
+            flame.material.opacity = 0.6 + Math.random() * 0.3;
+            
+            if (this.missileGroup && this.missileGroup.position.y < 20) {
+                requestAnimationFrame(animateFlame);
+            } else {
+                this.scene.remove(flame);
+            }
+        };
+        animateFlame();
+        
+        // Add bright light at engine
+        const engineLight = new THREE.PointLight(THEME.effects.explosion.fire, 3, 20);
+        engineLight.position.set(0, 0, 25);
+        this.scene.add(engineLight);
+        
+        // Remove light after launch
+        this.addTimeout(() => {
+            this.scene.remove(engineLight);
+        }, 5000);
+    }
+    
     createLaunchSmoke() {
         // Create simple smoke effect
         const smokeCount = 20;
         for (let i = 0; i < smokeCount; i++) {
             const smoke = new THREE.Mesh(
                 new THREE.SphereGeometry(Math.random() * 2 + 1, 8, 6),
-                new THREE.MeshBasicMaterial({
-                    color: 0xaaaaaa,
+                new THREE.MeshStandardMaterial({
+                    color: THEME.effects.smoke,
                     transparent: true,
                     opacity: 0.5
                 })
@@ -643,7 +1191,7 @@ export class TutorialLevel extends BaseLevel {
         
         // Load Chapter 1
         this.addTimeout(() => {
-            this.game.loadLevel('chapter1');
+            this.game.loadLevel('chapel');
         }, 2000);
     }
     
@@ -653,37 +1201,53 @@ export class TutorialLevel extends BaseLevel {
             super.cleanup();
         }
         
-        // Remove all level geometry (now handled by parent)
-        // Additional tutorial-specific cleanup below
+        // Store references to objects we want to keep (camera, lights that should persist)
+        const objectsToKeep = [];
         
-        // Clean up missile and decorations
-        if (this.missileGroup) {
-            this.scene.remove(this.missileGroup);
-        }
-        
-        // Remove all tutorial-specific objects
+        // Traverse and collect all objects to remove
         const objectsToRemove = [];
         this.scene.traverse((child) => {
-            // Remove all meshes except player-related ones
-            if (child.isMesh && !child.userData.isPlayer) {
-                // Check if it's a tutorial-specific object
-                if (child.userData.isInquisitor || 
-                    child.userData.isMissile || 
-                    child.userData.isMissileHatch ||
-                    child.parent?.userData?.isInquisitor ||
-                    child.parent?.userData?.isMissile) {
-                    objectsToRemove.push(child);
-                }
+            // Keep the camera
+            if (child === this.game.camera) {
+                return;
+            }
+            
+            // Keep global lights (ambient and directional)
+            if (child.isAmbientLight || child.isDirectionalLight) {
+                return; // Keep global lighting
+            }
+            
+            // Keep objects specifically marked as persistent
+            if (child.userData && child.userData.persistent) {
+                return;
+            }
+            
+            // Remove everything else - all meshes, lights, groups created by tutorial
+            if (child.isMesh || child.isLight || child.isGroup) {
+                objectsToRemove.push(child);
             }
         });
         
-        // Remove collected objects
+        // Remove all collected objects
         objectsToRemove.forEach(obj => {
-            if (obj.parent) {
+            if (obj.parent && obj.parent !== this.scene) {
                 obj.parent.remove(obj);
-            } else {
+            } else if (obj.parent === this.scene) {
                 this.scene.remove(obj);
             }
         });
+        
+        // Clear any tutorial-specific references
+        this.missileGroup = null;
+        this.missileHatch = null;
+        this.inquisitorGroup = null;
+        
+        // Remove tutorial controls UI if it exists
+        const tutorialControls = document.getElementById('tutorialControls');
+        if (tutorialControls) {
+            tutorialControls.remove();
+        }
+        
+        console.log(`[TutorialLevel] Cleared ${objectsToRemove.length} objects from scene`);
     }
 }

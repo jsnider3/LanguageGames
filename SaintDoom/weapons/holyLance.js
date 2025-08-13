@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { THEME } from '../modules/config/theme.js';
 
 // Holy Lance Weapon
 // Medieval reach weapon with charging attack that pierces multiple enemies
@@ -41,10 +42,12 @@ export class HolyLance {
         
         // Shaft
         const shaftGeometry = new THREE.CylinderGeometry(0.03, 0.05, 2.5, 8);
-        const shaftMaterial = new THREE.MeshPhongMaterial({
+        const shaftMaterial = new THREE.MeshStandardMaterial({
             color: 0x8b4513,
             emissive: 0x442211,
-            emissiveIntensity: 0.1
+            emissiveIntensity: 0.1,
+            roughness: 0.8,
+            metalness: 0.1
         });
         const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
         shaft.position.y = -0.5;
@@ -52,9 +55,9 @@ export class HolyLance {
         
         // Lance tip
         const tipGeometry = new THREE.ConeGeometry(0.08, 0.4, 6);
-        const tipMaterial = new THREE.MeshPhongMaterial({
+        const tipMaterial = new THREE.MeshStandardMaterial({
             color: 0xcccccc,
-            emissive: 0xffffaa,
+            emissive: THEME.lights.point.holy,
             emissiveIntensity: 0.2,
             metalness: 0.9,
             roughness: 0.2
@@ -65,7 +68,7 @@ export class HolyLance {
         
         // Cross guard
         const guardGeometry = new THREE.BoxGeometry(0.4, 0.05, 0.05);
-        const guardMaterial = new THREE.MeshPhongMaterial({
+        const guardMaterial = new THREE.MeshStandardMaterial({
             color: 0xccaa00,
             metalness: 0.8,
             roughness: 0.3
@@ -76,7 +79,7 @@ export class HolyLance {
         
         // Holy inscription
         const inscriptionGeometry = new THREE.PlaneGeometry(0.3, 0.05);
-        const inscriptionMaterial = new THREE.MeshBasicMaterial({
+        const inscriptionMaterial = new THREE.MeshStandardMaterial({
             color: 0xffdd00,
             emissive: 0xffdd00,
             emissiveIntensity: 0.5,
@@ -100,6 +103,20 @@ export class HolyLance {
         this.updatePosition();
     }
     
+    show() {
+        if (this.player && this.player.camera && this.mesh) {
+            this.player.camera.add(this.mesh);
+            this.mesh.visible = true;
+        }
+    }
+
+    hide() {
+        if (this.player && this.player.camera && this.mesh) {
+            this.player.camera.remove(this.mesh);
+            this.mesh.visible = false;
+        }
+    }
+
     updatePosition() {
         if (!this.player || !this.player.camera || this.isThrown) return;
         
@@ -312,7 +329,7 @@ export class HolyLance {
     createEnergyWave(power) {
         const waveGeometry = new THREE.RingGeometry(0.5, 1, 16);
         const waveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             transparent: true,
             opacity: 0.6 * power,
             side: THREE.DoubleSide
@@ -356,7 +373,7 @@ export class HolyLance {
         
         const beamGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const beamMaterial = new THREE.LineBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             linewidth: 5,
             transparent: true,
             opacity: 0.8
@@ -368,7 +385,7 @@ export class HolyLance {
         // Add glow cylinder
         const glowGeometry = new THREE.CylinderGeometry(0.3, 0.1, beamLength, 8);
         const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             transparent: true,
             opacity: 0.3
         });
@@ -511,7 +528,7 @@ export class HolyLance {
         // Holy impact effect
         const impactGeometry = new THREE.SphereGeometry(0.5, 8, 6);
         const impactMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             transparent: true,
             opacity: 0.6
         });
@@ -540,7 +557,7 @@ export class HolyLance {
             const particle = new THREE.Mesh(
                 new THREE.SphereGeometry(0.05, 4, 4),
                 new THREE.MeshBasicMaterial({
-                    color: 0xffffaa,
+                    color: THEME.lights.point.holy,
                     transparent: true,
                     opacity: 1
                 })
@@ -609,7 +626,7 @@ export class HolyLance {
         const particle = new THREE.Mesh(
             new THREE.SphereGeometry(0.02, 4, 4),
             new THREE.MeshBasicMaterial({
-                color: 0xffffaa,
+                color: THEME.lights.point.holy,
                 transparent: true,
                 opacity: 1
             })

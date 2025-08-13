@@ -9,6 +9,32 @@ import { Player } from './Player.js';
 import { CollisionSystem } from './CollisionSystem.js';
 import { WeaponSystem } from './WeaponSystem.js';
 import { LevelFactory } from './LevelFactory.js';
+import { PoolManager } from './ObjectPool.js';
+import { LODManager } from './LODManager.js';
+import { AnimationManager } from './AnimationManager.js';
+import { ShadowOptimizer } from './ShadowOptimizer.js';
+import { GeometryBatcher } from './GeometryBatcher.js';
+import { TimerManager } from './TimerManager.js';
+import { PhysicsManager } from './PhysicsManager.js';
+import { ZoneManager } from './ZoneManager.js';
+import { TransitionZoneFactory } from './TransitionZones.js';
+import { AudioManager } from './Utils.js';
+import { Config } from './config/index.js';
+import { Hellhound } from '../enemies/hellhound.js';
+import { PossessedScientist } from '../enemies/possessedScientist.js';
+import { Imp } from '../enemies/imp.js';
+import { ZombieAgent } from '../enemies/zombieAgent.js';
+import { DemonKnight } from '../enemies/demonKnight.js';
+import { ShadowWraith } from '../enemies/shadowWraith.js';
+import { Succubus } from '../enemies/succubus.js';
+import { CorruptedDrone } from '../enemies/corruptedDrone.js';
+import { BrimstoneGolem } from '../enemies/brimstoneGolem.js';
+import { PossessedMechSuit } from '../enemies/possessedMechSuit.js';
+import { AlienHybrid } from '../enemies/alienHybrid.js';
+
+import { FacilityMap } from './FacilityMap.js';
+import { Level as FallbackLevel } from '../level.js';
+import { Pickup } from './Pickup.js';
 
 export class Game {
     constructor() {
@@ -33,6 +59,9 @@ export class Game {
         this.divineWrathUsed = false; // Track if divine wrath has been used after death
         this.respawnTimer = 0;
         this.score = 0;
+        this.damageQueued = 0;
+        this._lastHudUpdate = 0;
+        this._dom = null;
         
         // Store base player stats for resetting after divine wrath
         this.basePlayerStats = {
@@ -47,29 +76,111 @@ export class Game {
         
         // Initialize level factory
         this.levelFactory = null;
+        
+        // Performance optimization systems
+        this.poolManager = null;
+        this.lodManager = null;
+        this.animationManager = null;
+        this.shadowOptimizer = null;
+        this.geometryBatcher = null;
+        this.timerManager = null;
+        
+        // Performance monitoring
+        this.frameCount = 0;
+        this.fps = 60;
+        this.lastFPSUpdate = 0;
+        
+        // Debug mode
+        this.debugMode = false;
     }
 
     async init(levelName = 'tutorial') {
         this.currentLevel = levelName;
+        
+        // Initialize persistent level states
+        this.levelStates = new Map();
+        this.loadLevelStates();
+        
         this.setupRenderer();
         this.setupScene();
+        // Prepare debug overlay
+        this.ensureDebugOverlay();
+        
+        // Initialize performance systems with error handling
+        try {
+            this.poolManager = new PoolManager(this.scene);
+            this.lodManager = new LODManager(this.camera, this.scene);
+            // Tune LOD distances from config if available
+            try {
+                const d = Config?.engine?.PERFORMANCE?.LOD_DISTANCES;
+                if (Array.isArray(d) && d.length >= 3) {
+                    this.lodManager.setDistances(d[0], d[1], d[2]);
+                }
+            } catch (e) { /* no-op */ }
+            this.animationManager = new AnimationManager();
+            this.shadowOptimizer = new ShadowOptimizer(this.renderer, this.scene);
+            this.geometryBatcher = new GeometryBatcher(this.scene);
+            this.timerManager = new TimerManager();
+            this.physicsManager = new PhysicsManager(this.scene);
+            this.zoneManager = new ZoneManager(this);
+            
+            // Initialize Facility Map if available
+            if (this.zoneManager) {
+                this.facilityMap = new FacilityMap(this.zoneManager);
+            }
+            
+            if (this.debugMode) {
+                console.log('Performance systems initialized successfully');
+                this.updateDebugOverlay();
+            }
+        } catch (error) {
+            console.error('Error initializing performance systems:', error);
+            console.warn('Game will continue without performance optimizations');
+            
+            // Set all to null so the game can still run
+            this.poolManager = null;
+            this.lodManager = null;
+            this.animationManager = null;
+            this.shadowOptimizer = null;
+            this.geometryBatcher = null;
+            this.timerManager = null;
+        }
         
         // Initialize level factory
         this.levelFactory = new LevelFactory(this);
         
         this.clock = new THREE.Clock();
-        this.inputManager = new InputManager();
+        this.inputManager = new InputManager(this);
         this.collisionSystem = new CollisionSystem();
         this.collisionSystem.game = this;  // Pass game reference for chapel level check
         
         this.player = new Player(this.camera);
         this.player.game = this; // Set game reference
         this.scene.add(this.player.shadowMesh); // Add shadow-casting mesh to scene
+        
+        // Register player with physics system
+        if (this.physicsManager) {
+            this.physicsManager.registerEntity(this.player, {
+                hasGravity: true,
+                isFlying: false,
+                mass: 1,
+                radius: 0.4,
+                height: 1.8,
+                groundOffset: 1.7,  // Player position is at eye level (1.7), not at feet
+                friction: 0.95
+            });
+        }
+        
         this.weaponSystem = new WeaponSystem(this.player, this.scene, this.camera);
         
         // Initialize narrative system
-        if (window.NarrativeSystem) {
-            this.narrativeSystem = new window.NarrativeSystem(this);
+        try {
+            const module = await import('../narrative.js');
+            if (module && module.NarrativeSystem) {
+                this.narrativeSystem = new module.NarrativeSystem(this);
+            }
+        } catch (e) {
+            // Narrative system optional
         }
         
         // Show initial weapon (but not in tutorial)
@@ -99,7 +210,8 @@ export class Game {
         }
         
         // Initialize UI after level is loaded
-        this.updateHUD();
+        this.cacheDomElements();
+        this.updateHUD(true);
         
         // Start intro sequence only for tutorial level
         if (this.narrativeSystem && levelName === 'tutorial') {
@@ -115,17 +227,80 @@ export class Game {
         this.isRunning = true;
         this.animate();
     }
+
+    ensureDebugOverlay() {
+        if (document.getElementById('debugOverlay')) return;
+        const el = document.createElement('div');
+        el.id = 'debugOverlay';
+        el.style.cssText = [
+            'position:fixed',
+            'top:10px',
+            'left:10px',
+            'padding:8px 10px',
+            'background:rgba(0,0,0,0.6)',
+            'color:#0f0',
+            'font:12px/1.4 monospace',
+            'z-index:2000',
+            'pointer-events:none',
+            'white-space:pre',
+            'display:none'
+        ].join(';');
+        document.body.appendChild(el);
+    }
+
+    setDebugOverlayVisible(visible) {
+        const el = document.getElementById('debugOverlay');
+        if (el) el.style.display = visible ? 'block' : 'none';
+    }
+
+    cacheDomElements() {
+        this._dom = {
+            healthEl: document.getElementById('healthValue'),
+            armorEl: document.getElementById('armorValue'),
+            levelEl: document.getElementById('levelValue'),
+            scoreEl: document.getElementById('scoreValue'),
+            killsEl: document.getElementById('killsValue'),
+            rageBar: document.getElementById('rage'),
+            ammoEl: document.getElementById('ammo')
+        };
+    }
+
+    updateDebugOverlay() {
+        if (!this.debugMode) { this.setDebugOverlayVisible(false); return; }
+        this.setDebugOverlayVisible(true);
+        const el = document.getElementById('debugOverlay');
+        if (!el) return;
+        const info = this.getPerformanceReport();
+        const activeZones = this.zoneManager ? this.zoneManager.activeZones?.size || 0 : 0;
+        const perfMode = this.zoneManager ? this.zoneManager.performanceMode : 'n/a';
+        const bullets = info.poolStats?.bullets?.active ?? 0;
+        const particles = info.poolStats?.particles?.active ?? 0;
+        // Add player position
+        const playerPos = this.player ? 
+            `X:${this.player.position.x.toFixed(1)} Y:${this.player.position.y.toFixed(1)} Z:${this.player.position.z.toFixed(1)}` : 
+            'X:-- Y:-- Z:--';
+        
+        el.textContent =
+`FPS: ${info.fps}
+DrawCalls: ${info.drawCalls} Tris: ${info.triangles}
+Geoms: ${info.geometries} Tex: ${info.textures}
+Pools  bullets:${bullets} particles:${particles}
+Zones  active:${activeZones} mode:${perfMode}
+Player: ${playerPos}`;
+    }
     
     setupRenderer() {
         const canvas = document.getElementById('gameCanvas');
         this.renderer = new THREE.WebGLRenderer({ 
             canvas: canvas,
-            antialias: true 
+            antialias: true,
+            powerPreference: "high-performance"
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for performance
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.type = THREE.PCFShadowMap; // Slightly faster than PCFSoft
+        this.renderer.shadowMap.autoUpdate = false; // Manual control for optimization
     }
 
     setupScene() {
@@ -148,7 +323,7 @@ export class Game {
         
         const dirLight = new THREE.DirectionalLight(0xffffff, 1);
         dirLight.position.set(5, 10, 5);
-        dirLight.castShadow = true;
+        dirLight.castShadow = false; // Will be controlled by ShadowOptimizer
         dirLight.shadow.camera.near = 0.1;
         dirLight.shadow.camera.far = 50;
         dirLight.shadow.camera.left = -20;
@@ -156,6 +331,11 @@ export class Game {
         dirLight.shadow.camera.top = 20;
         dirLight.shadow.camera.bottom = -20;
         this.scene.add(dirLight);
+        
+        // Register with shadow optimizer (high priority for main light)
+        if (this.shadowOptimizer) {
+            this.shadowOptimizer.registerShadowLight(dirLight, 100);
+        }
     }
 
     animate() {
@@ -169,36 +349,145 @@ export class Game {
         this.renderer.render(this.scene, this.camera);
     }
 
-    spawnEnemy(x, y, z, type = 'scientist') {
+    spawnEnemy(x, y, z, type = 'possessed_scientist') {
         let enemy;
         const position = new THREE.Vector3(x, y, z);
         
-        if (type === 'hellhound') {
-            enemy = new window.Hellhound(this.scene, position);
-        } else if (type === 'possessed_scientist') {
-            // Always use PossessedScientist for this type
-            enemy = new window.PossessedScientist(this.scene, position);
-        } else {
-            enemy = new window.Enemy(this.scene, position);
+        // Handle all enemy types
+        switch(type.toLowerCase()) {
+            case 'hellhound':
+                enemy = new Hellhound(this.scene, position);
+                break;
+            case 'possessed_scientist':
+            case 'scientist':
+                enemy = new PossessedScientist(this.scene, position);
+                break;
+            case 'imp':
+                enemy = new Imp(this.scene, position);
+                break;
+            case 'zombie_agent':
+            case 'zombie':
+                enemy = new ZombieAgent(this.scene, position);
+                break;
+            case 'demon_knight':
+            case 'knight':
+                enemy = new DemonKnight(this.scene, position);
+                break;
+            case 'shadow_wraith':
+            case 'wraith':
+                enemy = new ShadowWraith(this.scene, position);
+                break;
+            case 'succubus':
+                enemy = new Succubus(this.scene, position);
+                break;
+            case 'corrupted_drone':
+            case 'drone':
+                enemy = new CorruptedDrone(this.scene, position);
+                break;
+            case 'brimstone_golem':
+            case 'golem':
+                enemy = new BrimstoneGolem(this.scene, position);
+                break;
+            case 'possessed_mech_suit':
+            case 'mech_suit':
+            case 'mech':
+                enemy = new PossessedMechSuit(this.scene, position);
+                break;
+            case 'alien_hybrid':
+            case 'hybrid':
+                enemy = new AlienHybrid(this.scene, position);
+                break;
+            default:
+                console.warn(`Unknown enemy type: ${type}, defaulting to PossessedScientist`);
+                enemy = new PossessedScientist(this.scene, position);
+                break;
+        }
+        // Provide back-reference to game for pooled effects, etc.
+        enemy.game = this;
+        
+        // Register with physics system if available
+        if (this.physicsManager) {
+            // Determine if enemy is flying based on type
+            const flyingTypes = ['imp', 'succubus', 'corrupted_drone', 'shadow_wraith'];
+            const isFlying = flyingTypes.includes(type.toLowerCase());
+            
+            this.physicsManager.registerEntity(enemy, {
+                isFlying: isFlying,
+                hasGravity: !isFlying,
+                mass: enemy.mass || 1,
+                radius: enemy.radius || 0.3,
+                height: enemy.height || 1.8,
+                groundOffset: 0.1 // Keep slightly above ground
+            });
         }
         
         this.enemies.push(enemy);
     }
     
     spawnPickup(x, y, z, type) {
-        const pickup = new window.Pickup(this.scene, new THREE.Vector3(x, y, z), type);
+        const pickup = new Pickup(this.scene, new THREE.Vector3(x, y, z), type);
         this.pickups.push(pickup);
     }
 
     update(deltaTime) {
         if (this.isPaused || this.gameOver) return;
         
-        this.updateComboTimer(deltaTime);
+        // Debug: Track player position changes
+        const oldPlayerX = this.player ? this.player.position.x : 0;
         
+        // Get input first since we need it for player movement
         const input = this.inputManager.getInput();
+        
+        // During zone transitions, only update essential systems
+        if (this.zoneManager && this.zoneManager.activeTransition) {
+            // Update player movement and physics during transitions
+            this.updatePlayer(deltaTime, input);
+            
+            // Update physics system so player can walk in transition zones
+            if (this.physicsManager && this.level && this.level.walls) {
+                this.physicsManager.update(deltaTime, this.level.walls);
+            }
+            
+            // Allow weapon usage during transitions
+            this.handleWeaponInput(input);
+            this.handleCombat(input, deltaTime);
+            
+            // Update weapon system
+            if (this.weaponSystem) {
+                this.weaponSystem.update(deltaTime, []);  // No enemies during transitions
+            }
+            
+            // Update camera effects
+            this.applyCameraEffects();
+            
+            // The corridor transition handles its own completion via E key
+            // Don't auto-complete based on position
+            
+            // Don't update enemies, pickups, etc during transitions
+            return;
+        }
+        
+        // Update zone manager predictive loading
+        if (this.zoneManager) {
+            this.zoneManager.updatePredictiveLoading();
+            this.zoneManager.updatePerformanceMode();
+        }
+        
+        // Update facility map
+        if (this.facilityMap) {
+            this.facilityMap.update();
+        }
+        
+        // Update performance monitoring
+        this.updatePerformanceStats(deltaTime);
+        if (this.debugMode) this.updateDebugOverlay();
+        
+        this.updateComboTimer(deltaTime);
         
         // Core game updates
         this.updatePlayer(deltaTime, input);
+        
+        
         this.handleWeaponInput(input);
         this.handleCombat(input, deltaTime);
         this.updateEnemies(deltaTime);
@@ -206,7 +495,22 @@ export class Game {
         this.updatePickups(deltaTime);
         this.checkLevelProgression();
         this.updateCollisions(deltaTime);
-        this.updateHUD();
+        
+        
+        // Throttle HUD updates to reduce DOM work
+        const nowMs = Date.now();
+        const hudInterval = (GAME_CONFIG && GAME_CONFIG.UI && GAME_CONFIG.UI.HUD_UPDATE_RATE) ? GAME_CONFIG.UI.HUD_UPDATE_RATE : 100;
+        if (nowMs - this._lastHudUpdate >= hudInterval) {
+            this.updateHUD();
+            this._lastHudUpdate = nowMs;
+        }
+        
+        // Update performance systems
+        if (this.poolManager) this.poolManager.update(deltaTime);
+        if (this.lodManager) this.lodManager.update(deltaTime);
+        if (this.animationManager) this.animationManager.update(deltaTime);
+        if (this.shadowOptimizer) this.shadowOptimizer.update(this.camera, deltaTime);
+        // Note: TimerManager doesn't need per-frame updates
         
         // Level-specific updates
         this.updateLevelSpecificLogic(deltaTime, input);
@@ -243,35 +547,33 @@ export class Game {
             }
         }
         
-        // Check door interaction
-        if (this.exitDoor) {
-            const doorPos = new THREE.Vector3(4.9, 0, -25);
+        // Check chapel exit door interaction
+        if (this.chapelLevel && this.chapelLevel.exitDoor) {
+            const doorPos = this.chapelLevel.exitDoor.position;
             const doorDistance = this.player.position.distanceTo(doorPos);
             
             // Show prompt when near door
-            if (doorDistance < 3 && !this.doorOpening) {
-                this.showInteractPrompt("Press E to enter the Armory");
+            if (doorDistance < 3) {
+                const door = this.chapelLevel.exitDoor;
                 
-                if (input.interact) {
-                    // Animate door opening
-                    if (this.exitDoorMesh && !this.doorOpening) {
-                        this.doorOpening = true;
-                        this.hideInteractPrompt();
-                        let rotation = 0;
-                        const openDoor = setInterval(() => {
-                            rotation += 0.05;
-                            this.exitDoorMesh.rotation.y = -rotation;
-                            if (rotation >= Math.PI / 2) {
-                                clearInterval(openDoor);
-                                // Transition to Chapter 2
-                                setTimeout(() => {
-                                    this.loadLevel('chapter2');
-                                }, 500);
-                            }
-                        }, 16);
+                if (door.userData.locked && door.userData.requiresCleansing) {
+                    this.showInteractPrompt("The door is sealed. Cleanse the chapel first.");
+                } else if (!door.userData.locked) {
+                    this.showInteractPrompt("Press E to enter the Armory");
+                    
+                    if (input.interact && !this.isTransitioning) {
+                        // Use zone transition instead of direct loading
+                        if (this.zoneManager) {
+                            this.isTransitioning = true;
+                            this.hideInteractPrompt();
+                            this.zoneManager.triggerTransition('chapel', 'armory', this.player);
+                        } else {
+                            // Fallback to direct loading
+                            this.loadLevel('armory');
+                        }
                     }
                 }
-            } else if (doorDistance >= 3) {
+            } else {
                 this.hideInteractPrompt();
             }
         }
@@ -315,9 +617,24 @@ export class Game {
         if (this.armoryLevel.updatePickups) {
             this.armoryLevel.updatePickups(deltaTime);
         }
-        // Check for level exit
-        if (this.armoryLevel.checkExitCollision && this.armoryLevel.checkExitCollision(this.player)) {
-            this.loadLevel('laboratory'); // Load the Laboratory Complex level
+        
+        // Check for return to chapel
+        if (this.armoryLevel.checkChapelDoorCollision) {
+            const returnLevel = this.armoryLevel.checkChapelDoorCollision(this.player);
+            if (returnLevel && returnLevel !== 'transition') {
+                // Only load level if not a transition (transition handles itself)
+                this.loadLevel(returnLevel); // Return to chapel
+                return;
+            }
+        }
+        
+        // Check for elevator interaction
+        if (this.armoryLevel && this.armoryLevel.checkElevatorInteraction) {
+            const result = this.armoryLevel.checkElevatorInteraction(this.player);
+            if (result === true) {
+                this.loadLevel('laboratory'); // Load the Laboratory Complex level
+            }
+            // If result is 'transition', the ZoneManager handles it
         }
     }
     
@@ -335,69 +652,57 @@ export class Game {
     }
     
     handleChapelCleansing(input) {
-        if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
-            // Check if all enemies are dead
-            if (this.enemies.length === 0) {
-                // Enemies defeated, now check if player is near altar to cleanse it
-                const altarPos = new THREE.Vector3(0, 0, -48);
-                const distanceToAltar = this.player.position.distanceTo(altarPos);
-                
-                if (!this.altarCanBeCleansed) {
-                    this.altarCanBeCleansed = true;
-                    if (this.narrativeSystem) {
-                        this.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
-                        this.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
-                    }
+        // Skip if no chapel level or if in transition
+        if (!this.chapelLevel) return;
+        if (this.zoneManager && this.zoneManager.activeTransition) return;
+        
+        if (this.chapelLevel) {
+            // Let the chapel level handle its own exit door
+            if (this.chapelLevel.checkExitDoorCollision) {
+                const transitionLevel = this.chapelLevel.checkExitDoorCollision(this.player);
+                if (transitionLevel && transitionLevel !== 'transition') {
+                    // Only load level if not a transition (transition handles itself)
+                    this.loadLevel(transitionLevel);
+                    return;
                 }
-                
-                // Show interaction prompt when close to altar
-                if (distanceToAltar < 5) {
-                    this.showInteractPrompt("Press E to cleanse the altar");
+            }
+            
+            // Original cleansing logic
+            if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
+                // Check if all enemies are dead
+                if (this.enemies.length === 0) {
+                    // Enemies defeated, now check if player is near altar to cleanse it
+                    const altarPos = new THREE.Vector3(0, 0, -48);
+                    const distanceToAltar = this.player.position.distanceTo(altarPos);
                     
-                    // Check if player is pressing E (use the input we already got)
-                    if (input.interact) {
-                        this.cleanseAltar();
+                    if (!this.altarCanBeCleansed) {
+                        this.altarCanBeCleansed = true;
+                        if (this.narrativeSystem) {
+                            this.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
+                            this.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
+                        }
+                    }
+                
+                    // Show interaction prompt when close to altar
+                    if (distanceToAltar < 5) {
+                        this.showInteractPrompt("Press E to cleanse the altar");
+                        
+                        // Check if player is pressing E (use the input we already got)
+                        if (input.interact) {
+                            this.cleanseAltar();
+                            this.hideInteractPrompt();
+                        }
+                    } else {
                         this.hideInteractPrompt();
                     }
-                } else {
-                    this.hideInteractPrompt();
                 }
             }
         }
     }
     
     handleDoorInteraction(input) {
-        if (this.exitDoor) {
-            const doorPos = new THREE.Vector3(4.9, 0, -25);
-            const doorDistance = this.player.position.distanceTo(doorPos);
-            
-            // Show prompt when near door
-            if (doorDistance < 3 && !this.doorOpening) {
-                this.showInteractPrompt("Press E to enter the Armory");
-                
-                if (input.interact) {
-                    // Animate door opening
-                    if (this.exitDoorMesh && !this.doorOpening) {
-                        this.doorOpening = true;
-                        this.hideInteractPrompt();
-                        let rotation = 0;
-                        const openDoor = setInterval(() => {
-                            rotation += 0.05;
-                            this.exitDoorMesh.rotation.y = -rotation;
-                            if (rotation >= Math.PI / 2) {
-                                clearInterval(openDoor);
-                                // Transition to Chapter 2
-                                setTimeout(() => {
-                                    this.loadLevel('chapter2');
-                                }, 500);
-                            }
-                        }, 16);
-                    }
-                }
-            } else if (doorDistance >= 3) {
-                this.hideInteractPrompt();
-            }
-        }
+        // This method is no longer needed for chapel door as it's handled in update
+        // Keep it for other door interactions if needed
     }
     
     cleanupDeadAndInvalidEnemies() {
@@ -492,6 +797,12 @@ export class Game {
     
     cleanupEnemy(enemy) {
         // Helper function to properly clean up an enemy
+        
+        // Unregister from physics system
+        if (this.physicsManager && this.physicsManager.unregisterEntity) {
+            this.physicsManager.unregisterEntity(enemy);
+        }
+        
         if (enemy.destroy) {
             enemy.destroy();
         }
@@ -539,11 +850,11 @@ export class Game {
         this.addScore(enemy.scoreValue || 100);
         
         // Play death sound and voice line
-        if (window.AudioManager) {
-            window.AudioManager.playDeath();
+        if (AudioManager) {
+            AudioManager.playDeath();
             // Occasionally play a voice line
             if (Math.random() < 0.3) {
-                window.AudioManager.playVoiceLine('demonKill');
+                AudioManager.playVoiceLine('demonKill');
             }
         }
         
@@ -556,25 +867,41 @@ export class Game {
     }
     
     updateEnemies(deltaTime) {
+        // Get current level walls
+        const level = this.currentLevelInstance || this.level || this.armoryLevel || this.chapelLevel;
+        const walls = level ? level.walls || [] : [];
+        
+        // Update physics for all registered entities first
+        if (this.physicsManager) {
+            this.physicsManager.update(deltaTime, walls);
+        }
+        
         this.enemies.forEach(enemy => {
+            
+            // Then update enemy AI
             enemy.update(deltaTime, this.player);
-            this.collisionSystem.checkEnemyWallCollisions(enemy, this.level.walls, deltaTime, this.level);
+            
+            // Then check collisions
+            this.collisionSystem.checkEnemyWallCollisions(enemy, walls, deltaTime, level);
         });
     }
     
     handlePlayerDamage() {
-        if (window.playerDamaged) {
-            // Add screen shake based on damage amount
-            this.cameraShake = Math.min(0.5, window.playerDamaged * GAME_CONFIG.COMBAT.CAMERA_SHAKE_MULTIPLIER);
-            
+        if (this.damageQueued > 0) {
+            // Add screen shake based on accumulated damage
+            this.cameraShake = Math.min(0.5, this.damageQueued * GAME_CONFIG.COMBAT.CAMERA_SHAKE_MULTIPLIER);
             // Red flash effect
             this.createDamageFlash();
-            
             // Play hurt sound
             this.playHurtSound();
-            
-            window.playerDamaged = 0;
+            // Reset queue
+            this.damageQueued = 0;
         }
+    }
+
+    queuePlayerDamage(amount) {
+        if (!amount || isNaN(amount)) return;
+        this.damageQueued += amount;
     }
     
     updatePickups(deltaTime) {
@@ -607,12 +934,21 @@ export class Game {
     
     updateCollisions(deltaTime) {
         // Check all collisions (walls and enemies)
-        if (!this.level) {
+        // Use currentLevelInstance for all levels, or fall back to this.level for tutorial
+        const level = this.currentLevelInstance || this.level || this.armoryLevel || this.chapelLevel;
+        
+        if (!level) {
             console.warn('Level not initialized in updateCollisions');
             return;
         }
-        const walls = this.level.walls || [];
-        this.collisionSystem.checkPlayerWallCollisions(this.player, walls, deltaTime, this.level, this.enemies);
+        
+        // Skip collision checking during transitions
+        if (this.skipCollisionCheck) {
+            return;
+        }
+        
+        const walls = level.walls || [];
+        this.collisionSystem.checkPlayerWallCollisions(this.player, walls, deltaTime, level, this.enemies);
         // Still do separation if overlapping
         this.collisionSystem.checkEnemyPlayerCollisions(this.enemies, this.player);
     }
@@ -713,7 +1049,9 @@ export class Game {
     
     spawnBossEnemy() {
         // Spawn boss enemy (stronger variant)
-        const boss = new window.Enemy(this.scene, new THREE.Vector3(0, 0, -10));
+        // TODO: Replace with a proper boss class
+        const boss = new PossessedScientist(this.scene, new THREE.Vector3(0, 0, -10));
+        boss.game = this;
         boss.health = 500;
         boss.maxHealth = 500;
         boss.damage = 30;
@@ -792,6 +1130,7 @@ export class Game {
     }
     
     showInteractPrompt(text) {
+        this.interactPromptText = text; // Store for checking later
         let prompt = document.getElementById('interactPrompt');
         if (!prompt) {
             prompt = document.createElement('div');
@@ -949,13 +1288,15 @@ export class Game {
             this.narrativeSystem.advanceChapter();
         }
         
-        // Create exit door to Chapter 2
-        this.createExitDoor();
+        // Unlock the existing exit door to Armory (don't create a new one)
+        if (this.chapelLevel && this.chapelLevel.unlockExitDoor) {
+            this.chapelLevel.unlockExitDoor();
+        }
         
-        // Unlock Chapter 2 in level select
-        const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapter1"]');
-        if (!unlockedLevels.includes('chapter2')) {
-            unlockedLevels.push('chapter2');
+        // Unlock Armory in level select
+        const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapel"]');
+        if (!unlockedLevels.includes('armory')) {
+            unlockedLevels.push('armory');
             localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
         }
         
@@ -1129,6 +1470,11 @@ export class Game {
         this.gameOver = false;
         this.isPaused = false; // Make sure game is unpaused
         
+        // Reset input manager to clear any stuck states
+        if (this.inputManager && this.inputManager.reset) {
+            this.inputManager.reset();
+        }
+        
         // Hide any pause menus that might be visible
         const pauseMenu = document.getElementById('pauseMenu');
         if (pauseMenu) pauseMenu.style.display = 'none';
@@ -1144,7 +1490,8 @@ export class Game {
                 if (this.renderer && this.renderer.domElement) {
                     // Only request pointer lock if death screen is gone
                     if (!document.getElementById('deathScreen')) {
-                        this.renderer.domElement.requestPointerLock().catch(err => {
+                        // Use document.body for consistency
+                        document.body.requestPointerLock().catch(err => {
                             // Silently ignore - user can click to re-capture
                             console.log('Click game area to resume');
                         });
@@ -1208,8 +1555,18 @@ export class Game {
             // Normal respawn with small health penalty
             this.player.health = Math.max(50, this.player.maxHealth - (this.deathCount * 10));
             
+            // Fix ammo if it was corrupted
+            if (!this.player.ammo || typeof this.player.ammo !== 'object') {
+                this.player.ammo = {
+                    shells: GAME_CONFIG.PLAYER.AMMO.INITIAL_SHELLS || 8,
+                    bullets: GAME_CONFIG.PLAYER.AMMO.INITIAL_BULLETS || 50,
+                    rockets: 0,
+                    cells: 0
+                };
+            }
+            
             // Give some ammo on respawn
-            this.player.ammo.shells = Math.max(4, this.player.ammo.shells);
+            this.player.ammo.shells = Math.max(4, this.player.ammo.shells || 0);
         }
         
         // Create holy light effect on respawn
@@ -1257,7 +1614,7 @@ export class Game {
     }
     
     playDeathSound() {
-        const audioContext = window.AudioManager.getContext();
+        const audioContext = AudioManager.getContext();
         if (!audioContext) return; // Exit if no audio context
         
         // Low ominous tone
@@ -1304,7 +1661,7 @@ export class Game {
     }
     
     playHurtSound() {
-        const audioContext = window.AudioManager.getContext();
+        const audioContext = AudioManager.getContext();
         if (!audioContext) return; // Exit if no audio context
         
         // Pain grunt sound
@@ -1331,7 +1688,7 @@ export class Game {
     }
     
     playRespawnSound() {
-        const audioContext = window.AudioManager.getContext();
+        const audioContext = AudioManager.getContext();
         
         // Heavenly choir sound
         const frequencies = [261.63, 329.63, 392.00, 523.25]; // C major with octave
@@ -1362,29 +1719,59 @@ export class Game {
     }
     
     updateHUD() {
+        if (!this._dom) {
+            this.cacheDomElements();
+        }
+        
+        // Create/update coordinates display
+        let coordsEl = document.getElementById('coordinates');
+        if (!coordsEl) {
+            coordsEl = document.createElement('div');
+            coordsEl.id = 'coordinates';
+            coordsEl.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                color: #00ff00;
+                font-family: monospace;
+                font-size: 16px;
+                background: rgba(0,0,0,0.8);
+                padding: 8px;
+                border: 1px solid #00ff00;
+                z-index: 1000;
+                text-shadow: 0 0 3px #00ff00;
+            `;
+            document.body.appendChild(coordsEl);
+        }
+        
+        // Update coordinates
+        if (this.player && coordsEl) {
+            coordsEl.innerHTML = `X: ${this.player.position.x.toFixed(1)}<br>Z: ${this.player.position.z.toFixed(1)}`;
+        }
+        
         // Safely update health value
-        const healthEl = document.getElementById('healthValue');
+        const healthEl = this._dom.healthEl || document.getElementById('healthValue');
         if (healthEl) healthEl.textContent = Math.max(0, Math.floor(this.player.health));
         
         // Safely update armor value
-        const armorEl = document.getElementById('armorValue');
+        const armorEl = this._dom.armorEl || document.getElementById('armorValue');
         if (armorEl) armorEl.textContent = Math.floor(this.player.armor);
         
         // Update level display
-        const levelEl = document.getElementById('levelValue');
+        const levelEl = this._dom.levelEl || document.getElementById('levelValue');
         if (levelEl && this.level) levelEl.textContent = this.level.levelNumber;
         
         // Update score display
-        const scoreEl = document.getElementById('scoreValue');
+        const scoreEl = this._dom.scoreEl || document.getElementById('scoreValue');
         if (scoreEl) scoreEl.textContent = this.score;
         
         // Update kills display
-        const killsEl = document.getElementById('killsValue');
+        const killsEl = this._dom.killsEl || document.getElementById('killsValue');
         if (killsEl) killsEl.textContent = this.kills;
         
         // Update rage display
         const ragePercent = Math.floor((this.player.rage / this.player.maxRage) * 100);
-        const rageBar = document.getElementById('rage');
+        const rageBar = this._dom.rageBar || document.getElementById('rage');
         
         if (rageBar) {
             if (this.player.isRaging) {
@@ -1400,7 +1787,7 @@ export class Game {
         }
         
         // Update ammo display
-        const ammoEl = document.getElementById('ammo');
+        const ammoEl = this._dom.ammoEl || document.getElementById('ammo');
         if (ammoEl) {
             switch(this.player.currentWeapon) {
                 case 'shotgun':
@@ -1449,7 +1836,11 @@ export class Game {
         } else {
             pauseMenu.style.display = 'none';
             document.getElementById('settingsPanel').style.display = 'none';
-            // Show click to resume message briefly
+            // Attempt to reacquire pointer lock immediately on resume
+            if (document.body.requestPointerLock) {
+                try { document.body.requestPointerLock(); } catch (e) {}
+            }
+            // Show click to resume message briefly (in case lock was denied)
             if (clickToResume) {
                 clickToResume.style.display = 'block';
                 setTimeout(() => {
@@ -1482,7 +1873,7 @@ export class Game {
         document.getElementById('settingsPanel').style.display = 'none';
         this.isPaused = false;
         this.gameOver = false;
-        this.renderer.domElement.requestPointerLock();
+        document.body.requestPointerLock();
     }
     
     respawnPlayer() {
@@ -1525,19 +1916,30 @@ export class Game {
         this.pickups.forEach(pickup => this.cleanupPickup(pickup));
         this.pickups = [];
         
-        // Hide all menus and show start screen
-        document.getElementById('pauseMenu').style.display = 'none';
-        document.getElementById('settingsPanel').style.display = 'none';
-        document.getElementById('deathScreen').style.display = 'none';
-        document.getElementById('hud').style.display = 'none';
-        document.getElementById('instructions').style.display = 'none';
-        document.getElementById('startScreen').style.display = 'flex';
+        // Hide all menus and show start screen (with null checks)
+        const pauseMenu = document.getElementById('pauseMenu');
+        if (pauseMenu) pauseMenu.style.display = 'none';
+        
+        const settingsPanel = document.getElementById('settingsPanel');
+        if (settingsPanel) settingsPanel.style.display = 'none';
+        
+        const deathScreen = document.getElementById('deathScreen');
+        if (deathScreen) deathScreen.style.display = 'none';
+        
+        const hud = document.getElementById('hud');
+        if (hud) hud.style.display = 'none';
+        
+        const instructions = document.getElementById('instructions');
+        if (instructions) instructions.style.display = 'none';
+        
+        const startScreen = document.getElementById('startScreen');
+        if (startScreen) startScreen.style.display = 'flex';
         
         // Exit pointer lock
         document.exitPointerLock();
         
-        // Reset game state
-        this.currentLevel = 1;
+        // Reset game state  
+        this.currentLevel = 'tutorial';
         this.deathCount = 0;
         this.martyrdomMode = false;
         this.divineWrathUsed = false;
@@ -1724,8 +2126,10 @@ export class Game {
             // Random loading messages based on level
             const loadingMessages = {
                 'tutorial': ['Blessing weapons...', 'Preparing holy water...', 'Loading sacred texts...'],
-                'chapter1': ['Sanctifying the chapel...', 'Summoning divine protection...', 'Preparing for battle...'],
-                'chapter2': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
+                'chapel': ['Sanctifying the chapel...', 'Summoning divine protection...', 'Preparing for battle...'],
+                'armory': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
+                // Backward-compatible aliases
+                'armory': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
                 'laboratory': ['Analyzing specimens...', 'Securing keycards...', 'Initializing containment...'],
                 'containment': ['Securing perimeter...', 'Loading emergency protocols...', 'Preparing evacuation routes...'],
                 'tunnels': ['Mapping tunnel network...', 'Activating emergency lighting...', 'Scanning for threats...'],
@@ -1793,7 +2197,10 @@ export class Game {
         }
     }
     
-    async loadLevel(levelName) {
+    async loadLevel(levelName, options = {}) {
+        // Store options for level setup
+        this.levelLoadOptions = options;
+        
         // Show loading screen immediately and ensure it's visible
         this.showLoadingScreen(levelName);
         
@@ -1809,6 +2216,11 @@ export class Game {
     }
     
     async loadLevelActual(levelName) {
+        // Save current level state before leaving
+        if (this.currentLevel && this.currentLevel !== levelName) {
+            this.saveLevelState();
+        }
+        
         // Clear existing level
         if (this.currentLevelInstance) {
             if (this.currentLevelInstance.clearLevel) {
@@ -1816,10 +2228,14 @@ export class Game {
             }
         }
         
+        // Clean up performance systems
+        this.cleanupPerformanceSystems();
+        
         // Clear all level-specific references
         this.tutorialLevel = null;
         this.chapelLevel = null;
         this.armoryLevel = null;
+        this.laboratoryLevel = null;
         this.exitDoor = null;
         this.exitDoorMesh = null;
         this.doorOpening = false;
@@ -1871,20 +2287,64 @@ export class Game {
         
         if (levelInstance) {
             this.currentLevelInstance = levelInstance;
-            console.log(`[Game] Successfully loaded level: ${levelName}`);
-        } else {
-            console.error(`[Game] Failed to load level: ${levelName}, falling back to test level`);
-            // Create fallback test level
-            this.level = new window.Level(this.scene);
-            if (this.level.createTestLevel) {
-                this.level.createTestLevel();
+            
+            // Also set specific level references for compatibility
+            if (levelName === 'chapel') {
+                this.chapelLevel = levelInstance;
+                // If returning from armory, position near the door (door is at x=5, z=-20)
+                if (this.returningFromArmory) {
+                    this.player.position.set(4, 1.7, -20);  // Spawn near the door on corridor side
+                    this.returningFromArmory = false;
+                }
+            } else if (levelName === 'armory') {
+                this.armoryLevel = levelInstance;
+                // Check if coming from laboratory
+                if (this.levelLoadOptions && this.levelLoadOptions.fromLaboratory) {
+                    // Spawn near the elevator exit (at the far end)
+                    this.player.position.set(0, 1.7, -45);  // Near elevator at exit end
+                    this.player.yaw = Math.PI;  // Face back towards armory
+                    // Open the elevator doors
+                    if (levelInstance.openElevatorForReturn) {
+                        levelInstance.openElevatorForReturn();
+                    }
+                } else if (this.previousLevel === 'chapel') {
+                    // Coming from chapel, spawn at entrance
+                    this.player.position.set(0, 1.7, 5);  // Near entrance from chapel
+                }
+            } else if (levelName === 'laboratory' || levelName === 'lab') {
+                this.laboratoryLevel = levelInstance;
+                // Spawn player outside elevator, facing into laboratory
+                this.player.position.set(0, 1.7, 15);  // Outside elevator, in lab entrance
+                this.player.yaw = 0;  // Face forward into lab
             }
-            this.player.position.set(0, 1.7, 0);
+            
+            console.log(`[Game] Successfully loaded level: ${levelName}`);
+            
+            // Restore level state if returning
+            this.restoreLevelState(levelName);
+        } else {
+            const errorMsg = `[Game] Failed to load level: ${levelName}`;
+            console.error(errorMsg);
+            this.hideLoadingScreen();
+            
+            // Show error to user
+            if (this.narrativeSystem) {
+                this.narrativeSystem.displaySubtitle(`ERROR: Failed to load ${levelName}`);
+            }
+            
+            throw new Error(errorMsg);
         }
         
         // Reset player state
         this.player.velocity.set(0, 0, 0);
         this.player.health = 100;
+        
+        // Update current level tracking
+        this.previousLevel = this.currentLevel;
+        this.currentLevel = levelName;
+        
+        // Optimize level geometry after loading
+        this.optimizeLevelGeometry();
         
         // Hide loading screen after a short delay
         setTimeout(() => {
@@ -1894,7 +2354,7 @@ export class Game {
     
     restartGame() {
         // Reset all game state
-        this.currentLevel = 1;
+        this.currentLevel = 'tutorial';
         this.deathCount = 0;
         this.martyrdomMode = false;
         this.divineWrathUsed = false;
@@ -1931,11 +2391,287 @@ export class Game {
         
         // Re-capture pointer lock
         setTimeout(() => {
-            if (this.renderer && this.renderer.domElement) {
-                this.renderer.domElement.requestPointerLock().catch(err => {
-                    // Ignore pointer lock errors
-                });
+            document.body.requestPointerLock().catch(err => {
+                // Ignore pointer lock errors
+            });
+        }, 100);
+    }
+    
+    /**
+     * Update performance statistics
+     */
+    updatePerformanceStats(deltaTime) {
+        this.frameCount++;
+        
+        // Update FPS every second
+        const now = Date.now();
+        if (now - this.lastFPSUpdate >= 1000) {
+            this.fps = this.frameCount;
+            this.frameCount = 0;
+            this.lastFPSUpdate = now;
+            
+            // Show debug info if enabled (F3 key toggles)
+            if (this.debugMode) {
+                this.showDebugInfo();
+            }
+            
+            // Adjust quality based on FPS
+            if (this.fps < 30 && this.shadowOptimizer) {
+                // Reduce quality if performance is poor
+                this.shadowOptimizer.setShadowQuality('low');
+            } else if (this.fps > 50 && this.shadowOptimizer) {
+                // Increase quality if performance is good
+                this.shadowOptimizer.setShadowQuality('medium');
+            }
+
+            // Dynamically adjust shadow distance for point lights based on FPS
+            if (this.shadowOptimizer) {
+                const target = (Config && Config.engine && Config.engine.PERFORMANCE && Config.engine.PERFORMANCE.TARGET_FPS) || 60;
+                this.shadowOptimizer.adjustShadowDistance(this.camera, target, this.fps);
+            }
+        }
+    }
+    
+    showDebugInfo() {
+        const report = this.getPerformanceReport();
+        console.log(`=== Performance Stats ===`);
+        console.log(`FPS: ${report.fps}`);
+        console.log(`Draw Calls: ${report.drawCalls}`);
+        console.log(`Triangles: ${report.triangles}`);
+        if (report.poolStats) {
+            console.log(`Bullets: ${report.poolStats.bullets?.active || 0} active`);
+            console.log(`Particles: ${report.poolStats.particles?.active || 0} active`);
+        }
+        if (report.lodStats) {
+            console.log(`LOD Objects: ${report.lodStats.total} (H:${report.lodStats.high} M:${report.lodStats.medium} L:${report.lodStats.low})`);
+        }
+        this.updateDebugOverlay();
+    }
+    
+    /**
+     * Optimize level after loading
+     */
+    optimizeLevelGeometry() {
+        if (!this.geometryBatcher) return;
+        
+        // Batch static geometry
+        if (this.level && this.level.walls) {
+            this.geometryBatcher.batchWalls(this.level.walls);
+        }
+        
+        // Optimize shadows for the level
+        if (this.shadowOptimizer && this.level) {
+            const floors = [];
+            this.scene.traverse(child => {
+                if (child.isMesh && child.name && child.name.includes('floor')) {
+                    floors.push(child);
+                }
+            });
+            
+            this.shadowOptimizer.optimizeLevel(
+                this.level.walls || [],
+                floors,
+                this.enemies
+            );
+        }
+        
+        // Update shadow map after optimization
+        if (this.renderer) {
+            this.renderer.shadowMap.needsUpdate = true;
+        }
+    }
+    
+    /**
+     * Clean up performance systems when switching levels
+     */
+    cleanupPerformanceSystems() {
+        if (this.poolManager) this.poolManager.clearAll();
+        if (this.lodManager) this.lodManager.clear();
+        if (this.animationManager) this.animationManager.clear();
+        if (this.shadowOptimizer) this.shadowOptimizer.clear();
+        if (this.geometryBatcher) this.geometryBatcher.clear();
+        if (this.timerManager) this.timerManager.clearAll();
+    }
+    
+    /**
+     * Save current level state before leaving
+     */
+    saveLevelState() {
+        if (!this.currentLevel || !this.currentLevelInstance) return;
+        
+        const state = {
+            level: this.currentLevel,
+            timestamp: Date.now(),
+            objectives: {},
+            enemiesKilled: [],
+            pickupsCollected: []
+        };
+        
+        // Save Chapel specific state
+        if (this.currentLevel === 'chapel' && this.chapelLevel) {
+            state.objectives.chapelReached = this.chapelLevel.chapelReached || false;
+            state.objectives.chapelCleansed = this.chapelLevel.chapelCleansed || false;
+            // Don't respawn enemies in chapel if cleansed
+            if (this.chapelLevel.chapelCleansed) {
+                state.enemiesCleared = true;
+            }
+        }
+        
+        // Save Armory specific state
+        if (this.currentLevel === 'armory' && this.armoryLevel) {
+            state.objectives.weaponsCollected = this.armoryLevel.weaponsCollected || 0;
+            state.objectives.cacheLock = this.armoryLevel.cacheLock ? true : false;
+            state.objectives.sealedDoorUnlocked = this.armoryLevel.sealedDoor && !this.armoryLevel.sealedDoor.userData.locked;
+            // Track collected weapons
+            if (this.armoryLevel.collectedWeapons) {
+                state.pickupsCollected = [...this.armoryLevel.collectedWeapons];
+            }
+        }
+        
+        // Save Laboratory specific state
+        if (this.currentLevel === 'laboratory' && this.laboratoryLevel) {
+            state.objectives.keycards = {...(this.laboratoryLevel.keycards || {})};
+            state.objectives.exitPortalActive = this.laboratoryLevel.exitPortal ? true : false;
+        }
+        
+        // Save Containment specific state
+        if (this.currentLevel === 'containment' && this.currentLevelInstance) {
+            state.objectives.systemsRestored = this.currentLevelInstance.systemsRestored || 0;
+            state.objectives.emergencyProtocolActive = this.currentLevelInstance.emergencyProtocolActive || false;
+        }
+        
+        // Store in memory and localStorage
+        this.levelStates.set(this.currentLevel, state);
+        this.saveLevelStatesToStorage();
+    }
+    
+    /**
+     * Restore level state when returning
+     */
+    restoreLevelState(levelName) {
+        const state = this.levelStates.get(levelName);
+        if (!state) return;
+        
+        console.log(`[Game] Restoring state for level: ${levelName}`, state);
+        
+        // Wait for level to be fully loaded
+        setTimeout(() => {
+            // Restore Chapel state
+            if (levelName === 'chapel' && this.chapelLevel) {
+                if (state.objectives.chapelReached) {
+                    this.chapelLevel.chapelReached = true;
+                }
+                if (state.objectives.chapelCleansed) {
+                    this.chapelLevel.chapelCleansed = true;
+                    // Don't spawn enemies if chapel is cleansed
+                    console.log('[Game] Chapel already cleansed - not spawning enemies');
+                } else if (state.objectives.chapelReached) {
+                    // Chapel reached but not cleansed - spawn enemies
+                    this.chapelLevel.spawnChapelEnemies();
+                }
+            }
+            
+            // Restore Armory state
+            if (levelName === 'armory' && this.armoryLevel) {
+                if (state.objectives.weaponsCollected) {
+                    this.armoryLevel.weaponsCollected = state.objectives.weaponsCollected;
+                }
+                if (state.objectives.sealedDoorUnlocked && this.armoryLevel.sealedDoor) {
+                    this.armoryLevel.sealedDoor.userData.locked = false;
+                    // Update elevator visuals
+                    if (this.armoryLevel.elevatorButton) {
+                        this.armoryLevel.elevatorButton.material.emissive.setHex(0x00ff00);
+                    }
+                    if (this.armoryLevel.elevatorDisplay) {
+                        this.armoryLevel.elevatorDisplay.material.emissive.setHex(0x003300);
+                    }
+                }
+                // Hide already collected pickups
+                if (state.pickupsCollected && this.armoryLevel.pickups) {
+                    this.armoryLevel.pickups.forEach(pickup => {
+                        if (state.pickupsCollected.includes(pickup.userData.weaponType)) {
+                            pickup.visible = false;
+                            pickup.userData.collected = true;
+                        }
+                    });
+                }
+            }
+            
+            // Restore Laboratory state
+            if (levelName === 'laboratory' && this.laboratoryLevel) {
+                if (state.objectives.keycards) {
+                    this.laboratoryLevel.keycards = {...state.objectives.keycards};
+                    // Open corresponding doors
+                    Object.keys(state.objectives.keycards).forEach(color => {
+                        if (state.objectives.keycards[color]) {
+                            this.laboratoryLevel.openSecurityDoor(color);
+                        }
+                    });
+                }
+                if (state.objectives.exitPortalActive) {
+                    this.laboratoryLevel.createExitPortal();
+                }
+            }
+            
+            // Restore Containment state
+            if (levelName === 'containment' && this.currentLevelInstance) {
+                if (state.objectives.systemsRestored) {
+                    this.currentLevelInstance.systemsRestored = state.objectives.systemsRestored;
+                }
+                if (state.objectives.emergencyProtocolActive) {
+                    this.currentLevelInstance.emergencyProtocolActive = true;
+                }
             }
         }, 100);
+    }
+    
+    /**
+     * Save level states to localStorage
+     */
+    saveLevelStatesToStorage() {
+        try {
+            const states = {};
+            this.levelStates.forEach((value, key) => {
+                states[key] = value;
+            });
+            localStorage.setItem('saintdoom_levelStates', JSON.stringify(states));
+        } catch (e) {
+            console.error('Failed to save level states:', e);
+        }
+    }
+    
+    /**
+     * Load level states from localStorage
+     */
+    loadLevelStates() {
+        try {
+            const saved = localStorage.getItem('saintdoom_levelStates');
+            if (saved) {
+                const states = JSON.parse(saved);
+                Object.keys(states).forEach(key => {
+                    this.levelStates.set(key, states[key]);
+                });
+                console.log('[Game] Loaded level states:', this.levelStates);
+            }
+        } catch (e) {
+            console.error('Failed to load level states:', e);
+        }
+    }
+    
+    /**
+     * Get performance report
+     */
+    getPerformanceReport() {
+        return {
+            fps: this.fps,
+            drawCalls: this.renderer.info.render.calls,
+            triangles: this.renderer.info.render.triangles,
+            geometries: this.renderer.info.memory.geometries,
+            textures: this.renderer.info.memory.textures,
+            poolStats: this.poolManager ? this.poolManager.getAllStats() : null,
+            lodStats: this.lodManager ? this.lodManager.getStats() : null,
+            shadowStats: this.shadowOptimizer ? this.shadowOptimizer.getStats() : null,
+            batchingStats: this.geometryBatcher ? this.geometryBatcher.getStats() : null
+        };
     }
 }

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BaseWeapon } from '../core/BaseWeapon.js';
+import { THEME } from '../modules/config/theme.js';
+
 
 export class NeuralScrambler extends BaseWeapon {
     constructor() {
@@ -20,6 +22,7 @@ export class NeuralScrambler extends BaseWeapon {
         this.mindControlDuration = 5000; // 5 seconds
         this.confusionRadius = 8;
         this.panicRadius = 12;
+        this.activeEffects = [];
     }
 
     createWeaponModel() {
@@ -116,7 +119,7 @@ export class NeuralScrambler extends BaseWeapon {
         const indicatorGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8);
         const indicatorMaterial = new THREE.MeshStandardMaterial({
             color: 0x00ff41,
-            emissive: 0x004411,
+            emissive: 0x004400,
             emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.8
@@ -287,20 +290,12 @@ export class NeuralScrambler extends BaseWeapon {
         wave.lookAt(position.clone().add(direction));
         scene.add(wave);
 
-        // Animate wave
-        let scale = 1;
-        let opacity = 0.6;
-        const waveInterval = setInterval(() => {
-            scale += 0.8;
-            opacity -= 0.08;
-            wave.scale.setScalar(scale);
-            wave.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                scene.remove(wave);
-                clearInterval(waveInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: wave,
+            type: 'mind_wave',
+            duration: 625,
+            currentTime: 0
+        });
     }
 
     createMindControlWave(scene, position) {
@@ -368,26 +363,13 @@ export class NeuralScrambler extends BaseWeapon {
         controlGroup.position.copy(position);
         scene.add(controlGroup);
 
-        // Animate mind control effect
-        let time = 0;
-        const controlInterval = setInterval(() => {
-            time += 50;
-            
-            // Rotating spirals
-            controlGroup.children.forEach((child, index) => {
-                if (index > 0 && index < 5) { // Spiral rings
-                    child.rotation.z += 0.05 * (index % 2 === 0 ? 1 : -1);
-                }
-            });
-
-            // Swirling particles
-            particles.rotation.y += 0.02;
-
-            if (time > this.mindControlDuration) {
-                scene.remove(controlGroup);
-                clearInterval(controlInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: controlGroup,
+            type: 'mind_control_wave',
+            duration: this.mindControlDuration,
+            currentTime: 0,
+            particles: particles
+        });
 
         return controlGroup;
     }
@@ -429,29 +411,13 @@ export class NeuralScrambler extends BaseWeapon {
         panicGroup.position.copy(position);
         scene.add(panicGroup);
 
-        // Animate panic wave
-        let time = 0;
-        const panicInterval = setInterval(() => {
-            time += 50;
-            
-            // Pulsing aura
-            const pulse = 1 + Math.sin(time * 0.01) * 0.2;
-            aura.scale.setScalar(pulse);
-
-            // Floating fragments
-            panicGroup.children.forEach((child, index) => {
-                if (index > 0) {
-                    child.rotation.x += 0.02;
-                    child.rotation.y += 0.03;
-                    child.position.y += Math.sin(time * 0.01 + index) * 0.01;
-                }
-            });
-
-            if (time > 8000) {
-                scene.remove(panicGroup);
-                clearInterval(panicInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: panicGroup,
+            type: 'panic_wave',
+            duration: 8000,
+            currentTime: 0,
+            aura: aura
+        });
 
         return panicGroup;
     }
@@ -461,15 +427,15 @@ export class NeuralScrambler extends BaseWeapon {
         if (this.psychicAmplifier < this.maxAmplifier) {
             this.psychicAmplifier = Math.min(
                 this.maxAmplifier,
-                this.psychicAmplifier + (this.rechargeRate * deltaTime / 1000)
+                this.psychicAmplifier + (this.rechargeRate * deltaTime)
             );
         }
 
         // Animate psychic fields
         if (this.psychicFields) {
             this.psychicFields.forEach((field, index) => {
-                field.rotation.z += deltaTime * 0.0005 * (index + 1);
-                field.rotation.y += deltaTime * 0.001;
+                field.rotation.z += deltaTime * 0.5 * (index + 1);
+                field.rotation.y += deltaTime * 1;
             });
         }
 
@@ -487,11 +453,53 @@ export class NeuralScrambler extends BaseWeapon {
             if (amplifierPercent > 0.6) {
                 this.amplifierIndicator.material.color.setHex(0x00ff41);
             } else if (amplifierPercent > 0.3) {
-                this.amplifierIndicator.material.color.setHex(0xffff00);
+                this.amplifierIndicator.material.color.setHex(THEME.ui.health.medium);
             } else {
-                this.amplifierIndicator.material.color.setHex(0xff0000);
+                this.amplifierIndicator.material.color.setHex(THEME.ui.health.low);
             }
         }
+
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'mind_wave':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + 80 * deltaTime);
+                    effect.mesh.material.opacity -= 0.08;
+                    break;
+                case 'mind_control_wave':
+                    effect.mesh.children.forEach((child, index) => {
+                        if (index > 0 && index < 5) { // Spiral rings
+                            child.rotation.z += 0.05 * (index % 2 === 0 ? 1 : -1);
+                        }
+                    });
+                    effect.particles.rotation.y += 0.02;
+                    break;
+                case 'panic_wave':
+                    const pulse = 1 + Math.sin(effect.currentTime * 10) * 0.2;
+                    effect.aura.scale.setScalar(pulse);
+                    effect.mesh.children.forEach((child, index) => {
+                        if (index > 0) {
+                            child.rotation.x += 0.02;
+                            child.rotation.y += 0.03;
+                            child.position.y += Math.sin(effect.currentTime * 10 + index) * 0.01;
+                        }
+                    });
+                    break;
+            }
+
+            return true;
+        });
     }
 
     updateProjectile(projectile, deltaTime, scene) {
@@ -504,23 +512,23 @@ export class NeuralScrambler extends BaseWeapon {
         }
 
         // Move projectile
-        const movement = userData.velocity.clone().multiplyScalar(deltaTime / 1000);
+        const movement = userData.velocity.clone().multiplyScalar(deltaTime);
         projectile.position.add(movement);
 
         // Animate effects
-        projectile.children[0].rotation.x += deltaTime * 0.02;
-        projectile.children[0].rotation.y += deltaTime * 0.03;
+        projectile.children[0].rotation.x += deltaTime * 20;
+        projectile.children[0].rotation.y += deltaTime * 30;
 
         // Lightning effects
         for (let i = 1; i < 7; i++) {
             if (projectile.children[i]) {
-                projectile.children[i].rotation.z += deltaTime * 0.01;
+                projectile.children[i].rotation.z += deltaTime * 10;
             }
         }
 
         // Particle system rotation
         if (projectile.children[7]) {
-            projectile.children[7].rotation.y += deltaTime * 0.005;
+            projectile.children[7].rotation.y += deltaTime * 5;
         }
 
         return true;

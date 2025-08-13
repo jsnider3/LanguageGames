@@ -1,10 +1,9 @@
 import * as THREE from 'three';
+import { Entity } from '../modules/Entity.js';
 
-export class Enemy {
+export class BaseEnemy extends Entity {
     constructor(scene, position) {
-        this.scene = scene;
-        this.position = position.clone();
-        this.velocity = new THREE.Vector3(0, 0, 0);
+        super(scene, position);
         
         // Stats
         this.health = 50;
@@ -27,75 +26,20 @@ export class Enemy {
         this.radius = 0.3;
         this.height = 1.8;
         
-        // Visual
-        this.createMesh();
-        
         // Animation
         this.bobAmount = 0;
         this.hurtTime = 0;
+
+        this.team = 'enemy';
     }
     
     createMesh() {
-        // Create a simple possessed scientist model
-        const group = new THREE.Group();
-        
-        // Body
-        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.3);
-        const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0x444444, // Dark grey lab coat
-            roughness: 0.8
-        });
-        this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        this.bodyMesh.position.y = 0.6;
-        this.bodyMesh.castShadow = true;
-        this.bodyMesh.receiveShadow = true;
-        group.add(this.bodyMesh);
-        
-        // Head
-        const headGeometry = new THREE.SphereGeometry(0.2, 8, 6);
-        const headMaterial = new THREE.MeshStandardMaterial({
-            color: 0x88aa88, // Sickly green skin
-            roughness: 0.6,
-            emissive: 0x002200,
-            emissiveIntensity: 0.2
-        });
-        this.headMesh = new THREE.Mesh(headGeometry, headMaterial);
-        this.headMesh.position.y = 1.4;
-        this.headMesh.castShadow = true;
-        group.add(this.headMesh);
-        
-        // Glowing eyes
-        const eyeGeometry = new THREE.SphereGeometry(0.03, 4, 4);
-        const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000
-        });
-        
-        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.07, 1.4, -0.15);
-        group.add(leftEye);
-        
-        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.07, 1.4, -0.15);
-        group.add(rightEye);
-        
-        // Arms (simple cylinders)
-        const armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8);
-        const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
-        leftArm.position.set(-0.35, 0.6, 0);
-        leftArm.castShadow = true;
-        group.add(leftArm);
-        
-        const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
-        rightArm.position.set(0.35, 0.6, 0);
-        rightArm.castShadow = true;
-        group.add(rightArm);
-        
-        this.mesh = group;
-        this.mesh.position.copy(this.position);
-        this.scene.add(this.mesh);
+        // This method should be overridden by subclasses
     }
     
     update(deltaTime, player) {
+        super.update(deltaTime);
+
         if (this.health <= 0) {
             this.state = 'dead';
             return;
@@ -120,7 +64,9 @@ export class Enemy {
         }
         
         // Update mesh position
-        this.mesh.position.copy(this.position);
+        if (this.mesh) {
+            this.mesh.position.copy(this.position);
+        }
         
         // Make enemy face player when chasing or attacking
         if ((this.state === 'chasing' || this.state === 'attacking') && this.target) {
@@ -142,10 +88,12 @@ export class Enemy {
         // Hurt flash effect
         if (this.hurtTime > 0) {
             this.hurtTime -= deltaTime;
-            const flashIntensity = Math.sin(this.hurtTime * 20) * 0.5 + 0.5;
-            this.bodyMesh.material.emissive = new THREE.Color(flashIntensity, 0, 0);
-            this.bodyMesh.material.emissiveIntensity = flashIntensity;
-        } else {
+            if (this.bodyMesh) {
+                const flashIntensity = Math.sin(this.hurtTime * 20) * 0.5 + 0.5;
+                this.bodyMesh.material.emissive = new THREE.Color(flashIntensity, 0, 0);
+                this.bodyMesh.material.emissiveIntensity = flashIntensity;
+            }
+        } else if (this.bodyMesh) {
             this.bodyMesh.material.emissive = new THREE.Color(0, 0, 0);
             this.bodyMesh.material.emissiveIntensity = 0;
         }
@@ -247,45 +195,19 @@ export class Enemy {
     }
     
     takeDamage(amount) {
-        this.health -= amount;
-        this.health = Math.max(0, this.health);
-        
+        super.takeDamage(amount);
         if (this.health > 0) {
-            // Enter hurt state
             this.state = 'hurt';
-            this.hurtTime = 0.3; // Stun duration
-            
-            // Flash red
-            this.bodyMesh.material.emissive = new THREE.Color(1, 0, 0);
-            this.bodyMesh.material.emissiveIntensity = 1;
-        } else {
-            this.onDeath();
-        }
-    }
-    
-    applyKnockback(force) {
-        // Validate force vector
-        if (!force || isNaN(force.x) || isNaN(force.y) || isNaN(force.z)) {
-            return;
-        }
-        
-        // Apply knockback force (clone to avoid modifying the original)
-        this.position.add(force.clone());
-        
-        // Also push the velocity for smoother movement (use a clone)
-        this.velocity.add(force.clone().multiplyScalar(0.5));
-        
-        // Validate position after knockback
-        if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
-            // Reset to a valid position
-            this.position.set(0, 1, 0);
+            this.hurtTime = 0.3;
+            if (this.bodyMesh) {
+                this.bodyMesh.material.emissive = new THREE.Color(1, 0, 0);
+                this.bodyMesh.material.emissiveIntensity = 1;
+            }
         }
     }
     
     onDeath() {
-        this.state = 'dead';
-        this.isDead = true;  // Set isDead flag for kill counting
-        
+        super.onDeath();
         // Death animation - fall over
         if (this.mesh) {
             const fallAnimation = () => {
@@ -303,51 +225,36 @@ export class Enemy {
     }
     
     createDeathParticles() {
-        // Create blood/demon essence particles
-        const particleCount = 20;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.05 + Math.random() * 0.05, 4, 4);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: Math.random() > 0.5 ? 0x880000 : 0x004400, // Mix of red and green
-                transparent: true,
-                opacity: 1
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.copy(this.position);
-            particle.position.y += 0.5;
-            
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 5,
-                Math.random() * 5,
-                (Math.random() - 0.5) * 5
-            );
-            
-            this.scene.add(particle);
-            
-            // Animate particle
-            const animateParticle = () => {
-                particle.position.add(velocity.clone().multiplyScalar(0.02));
-                velocity.y -= 0.2; // Gravity
-                
-                particle.material.opacity -= 0.02;
-                
-                if (particle.material.opacity > 0 && particle.position.y > -1) {
-                    requestAnimationFrame(animateParticle);
-                } else {
-                    this.scene.remove(particle);
-                }
-            };
-            
-            animateParticle();
+        // Prefer pooled particles if available
+        const poolMgr = (this.game && this.game.poolManager)
+            ? this.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr ? poolMgr.getPool('particles') : null;
+
+        if (pool && pool.burst) {
+            const pos = this.position.clone();
+            pos.y += 0.5;
+            // Burst mixed colors: run twice with different colors
+            pool.burst(pos, 12, 0x880000, 5);
+            pool.burst(pos, 10, 0x004400, 5);
+            return;
         }
-    }
-    
-    destroy() {
-        // Remove from scene
-        if (this.mesh) {
-            this.scene.remove(this.mesh);
+        // Fallback simple effect if pool not available
+        const sphere = new THREE.SphereGeometry(0.05, 4, 4);
+        for (let i = 0; i < 10; i++) {
+            const mat = new THREE.MeshBasicMaterial({ color: 0x880000, transparent: true, opacity: 1 });
+            const p = new THREE.Mesh(sphere, mat);
+            p.position.copy(this.position);
+            p.position.y += 0.5;
+            const vel = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3);
+            this.scene.add(p);
+            const step = () => {
+                p.position.add(vel.clone().multiplyScalar(0.02));
+                vel.y -= 0.2;
+                mat.opacity -= 0.03;
+                if (mat.opacity > 0) requestAnimationFrame(step); else this.scene.remove(p);
+            };
+            step();
         }
     }
 }

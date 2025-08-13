@@ -3,60 +3,10 @@ import * as THREE from 'three';
 
 export class FinalArenaLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        this.name = "Final Arena";
-        this.description = "Face the ultimate evil in the depths of Hell itself";
-        this.backgroundColor = new THREE.Color(0x1a0000);
-        
-        this.arenaRadius = 50;
-        this.currentPhase = 0;
-        this.maxPhases = 5;
-        this.phaseTransitions = [];
-        
-        // Arena components
-        this.centralPlatform = null;
-        this.outerRings = [];
-        this.bridgePlatforms = [];
-        this.lavaFields = [];
-        this.hellPortals = [];
-        this.sacrificialAltars = [];
-        this.demoniPillars = [];
-        
-        // Environmental effects
-        this.hellfire = [];
-        this.soulOrbs = [];
-        this.corruptionZones = [];
-        this.realityRifts = [];
-        
-        // Boss battle mechanics
-        this.bossSpawnPoint = null;
-        this.playerSafeZones = [];
-        this.weaponUpgradeStations = [];
-        this.holyRelicPedestals = [];
-        
-        // Phase-specific features
-        this.movingPlatforms = [];
-        this.fallingDebris = [];
-        this.energyBarriers = [];
-        this.temporalDistortions = [];
-        
-        this.arenaDestroyed = false;
-        this.finalBossDefeated = false;
-        this.apocalypseStarted = false;
-        
-        this.init();
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Return required data structure for Game.js

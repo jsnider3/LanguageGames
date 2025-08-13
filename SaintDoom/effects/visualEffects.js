@@ -1,3 +1,5 @@
+
+import { THEME } from '../modules/config/theme.js';
 import * as THREE from 'three';
 import { resourcePool } from '../modules/ResourcePool.js';
 // Visual Effects System for SaintDoom
@@ -27,7 +29,7 @@ export class VisualEffects {
             const particle = new THREE.Mesh(
                 resourcePool.getGeometry('sphere', 0.1, 4, 4),
                 resourcePool.getMaterial('basic', {
-                    color: 0xffffaa,
+                    color: THEME.lights.point.holy,
                     transparent: true,
                     opacity: 0
                 })
@@ -47,7 +49,7 @@ export class VisualEffects {
             const particle = new THREE.Mesh(
                 resourcePool.getGeometry('box', 0.15, 0.15, 0.15),
                 resourcePool.getMaterial('basic', {
-                    color: 0xff0000,
+                    color: THEME.effects.blood.human,
                     transparent: true,
                     opacity: 0
                 })
@@ -67,7 +69,7 @@ export class VisualEffects {
             const particle = new THREE.Mesh(
                 new THREE.SphereGeometry(0.08, 3, 3),
                 new THREE.MeshBasicMaterial({
-                    color: 0x660000,
+                    color: THEME.effects.blood.demon,
                     transparent: true,
                     opacity: 0
                 })
@@ -88,7 +90,7 @@ export class VisualEffects {
     
     createHolyBurst(position, intensity = 1) {
         // Central flash
-        const flash = new THREE.PointLight(0xffffaa, intensity * 5, 20);
+        const flash = new THREE.PointLight(THEME.lights.point.holy, intensity * 5, 20);
         flash.position.copy(position);
         this.scene.add(flash);
         
@@ -96,7 +98,7 @@ export class VisualEffects {
         const ring = new THREE.Mesh(
             new THREE.RingGeometry(0, 0.5, 32),
             new THREE.MeshBasicMaterial({
-                color: 0xffffaa,
+                color: THEME.lights.point.holy,
                 transparent: true,
                 opacity: 0.8,
                 side: THREE.DoubleSide
@@ -106,28 +108,15 @@ export class VisualEffects {
         ring.rotation.x = -Math.PI / 2;
         this.scene.add(ring);
         
-        // Animate expansion
-        let radius = 0.5;
-        let opacity = 0.8;
-        
-        const expand = setInterval(() => {
-            radius += 0.3;
-            opacity -= 0.02;
-            flash.intensity *= 0.9;
-            
-            // Dispose old geometry before creating new one
-            if (ring.geometry && ring.geometry.dispose) {
-                ring.geometry.dispose();
-            }
-            ring.geometry = resourcePool.getGeometry('ring', radius - 0.2, radius, 32);
-            ring.material.opacity = opacity;
-            
-            if (opacity <= 0) {
-                clearInterval(expand);
-                this.scene.remove(ring);
-                this.scene.remove(flash);
-            }
-        }, 16);
+        this.activeEffects.push({
+            type: 'holy_burst',
+            mesh: ring,
+            light: flash,
+            duration: 1000,
+            currentTime: 0,
+            radius: 0.5,
+            opacity: 0.8
+        });
         
         // Spawn holy particles
         this.spawnParticleBurst(position, 'holy', 20, intensity);
@@ -141,7 +130,7 @@ export class VisualEffects {
         
         const beamGeometry = new THREE.CylinderGeometry(0.2, 0.2, distance, 8);
         const beamMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             transparent: true,
             opacity: 0.6
         });
@@ -157,33 +146,17 @@ export class VisualEffects {
         this.scene.add(beam);
         
         // Add glow
-        const glowLight = new THREE.PointLight(0xffffaa, 2, distance * 1.5);
+        const glowLight = new THREE.PointLight(THEME.lights.point.holy, 2, distance * 1.5);
         glowLight.position.copy(midpoint);
         this.scene.add(glowLight);
         
-        // Pulse animation
-        let time = 0;
-        const pulse = setInterval(() => {
-            time += 50;
-            beam.material.opacity = 0.6 + Math.sin(time * 0.01) * 0.3;
-            beam.scale.x = beam.scale.z = 1 + Math.sin(time * 0.02) * 0.2;
-            
-            if (time >= duration) {
-                clearInterval(pulse);
-                
-                // Fade out
-                const fade = setInterval(() => {
-                    beam.material.opacity -= 0.05;
-                    glowLight.intensity -= 0.1;
-                    
-                    if (beam.material.opacity <= 0) {
-                        clearInterval(fade);
-                        this.scene.remove(beam);
-                        this.scene.remove(glowLight);
-                    }
-                }, 50);
-            }
-        }, 50);
+        this.activeEffects.push({
+            type: 'holy_beam',
+            mesh: beam,
+            light: glowLight,
+            duration: duration,
+            currentTime: 0
+        });
     }
     
     createBlessingAura(target, duration = 3000) {
@@ -215,30 +188,13 @@ export class VisualEffects {
             this.scene.add(particle);
         }
         
-        let elapsed = 0;
-        const animateAura = setInterval(() => {
-            elapsed += 16;
-            
-            auraParticles.forEach((particle, i) => {
-                particle.userData.angle += particle.userData.speed * 0.02;
-                
-                particle.position.x = target.position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
-                particle.position.z = target.position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
-                particle.position.y = target.position.y + Math.sin(elapsed * 0.001 * particle.userData.verticalSpeed) * 0.5 + 1;
-                
-                // Fade in/out
-                if (elapsed < 300) {
-                    particle.material.opacity = (elapsed / 300) * 0.6;
-                } else if (elapsed > duration - 300) {
-                    particle.material.opacity = ((duration - elapsed) / 300) * 0.6;
-                }
-            });
-            
-            if (elapsed >= duration) {
-                clearInterval(animateAura);
-                auraParticles.forEach(p => this.scene.remove(p));
-            }
-        }, 16);
+        this.activeEffects.push({
+            type: 'blessing_aura',
+            particles: auraParticles,
+            target: target,
+            duration: duration,
+            currentTime: 0
+        });
     }
     
     // ============= DEMONIC EFFECTS =============
@@ -280,7 +236,7 @@ export class VisualEffects {
             const particle = new THREE.Mesh(
                 new THREE.BoxGeometry(0.1, 0.1, 0.1),
                 new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
+                    color: THEME.effects.blood.human,
                     transparent: true,
                     opacity: 0.7
                 })
@@ -297,43 +253,20 @@ export class VisualEffects {
             this.scene.add(particle);
         }
         
-        // Animate portal
-        const animatePortal = setInterval(() => {
-            portal.rotation.z += 0.02;
-            vortex.rotation.y += 0.05;
-            
-            particles.forEach(particle => {
-                particle.userData.angle += particle.userData.speed * 0.05;
-                particle.userData.height += 0.05;
-                
-                if (particle.userData.height > 5) {
-                    particle.userData.height = 0;
-                    particle.userData.radius = Math.random() * radius;
-                }
-                
-                particle.position.x = position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
-                particle.position.z = position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
-                particle.position.y = position.y + particle.userData.height;
-                
-                particle.material.opacity = 0.7 * (1 - particle.userData.height / 5);
-            });
-        }, 16);
-        
-        // Store for cleanup
-        this.activeEffects.push({
+        const effect = {
             type: 'portal',
             elements: [portal, vortex, ...particles],
-            interval: animatePortal
-        });
-        
-        return {
+            duration: Infinity, // Lasts until removed
+            currentTime: 0,
             remove: () => {
-                clearInterval(animatePortal);
-                this.scene.remove(portal);
-                this.scene.remove(vortex);
-                particles.forEach(p => this.scene.remove(p));
+                effect.elements.forEach(el => this.scene.remove(el));
+                const index = this.activeEffects.indexOf(effect);
+                if (index > -1) this.activeEffects.splice(index, 1);
             }
         };
+        
+        this.activeEffects.push(effect);
+        return effect;
     }
     
     createCorruption(position, radius = 5, duration = 5000) {
@@ -352,32 +285,13 @@ export class VisualEffects {
         corruption.rotation.x = -Math.PI / 2;
         this.scene.add(corruption);
         
-        // Grow corruption
-        let currentRadius = 0.1;
-        const growSpeed = radius / (duration / 100);
-        
-        const grow = setInterval(() => {
-            currentRadius += growSpeed;
-            corruption.geometry = new THREE.CircleGeometry(currentRadius, 32);
-            
-            if (currentRadius >= radius) {
-                clearInterval(grow);
-                
-                // Start shrinking after delay
-                setTimeout(() => {
-                    const shrink = setInterval(() => {
-                        currentRadius -= growSpeed * 2;
-                        corruption.geometry = new THREE.CircleGeometry(Math.max(0, currentRadius), 32);
-                        corruption.material.opacity = 0.6 * (currentRadius / radius);
-                        
-                        if (currentRadius <= 0) {
-                            clearInterval(shrink);
-                            this.scene.remove(corruption);
-                        }
-                    }, 50);
-                }, 1000);
-            }
-        }, 100);
+        this.activeEffects.push({
+            type: 'corruption',
+            mesh: corruption,
+            duration: duration,
+            currentTime: 0,
+            radius: radius
+        });
         
         // Emit corruption particles
         this.spawnParticleBurst(position, 'demonic', 10, 0.5);
@@ -391,7 +305,7 @@ export class VisualEffects {
             const claw = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.2, 3),
                 new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
+                    color: THEME.effects.blood.human,
                     transparent: true,
                     opacity: 0.8,
                     side: THREE.DoubleSide
@@ -406,20 +320,12 @@ export class VisualEffects {
             clawMarks.push(claw);
         }
         
-        // Animate slash
-        let opacity = 0.8;
-        const fade = setInterval(() => {
-            opacity -= 0.05;
-            clawMarks.forEach(claw => {
-                claw.material.opacity = opacity;
-                claw.scale.y *= 0.95;
-            });
-            
-            if (opacity <= 0) {
-                clearInterval(fade);
-                clawMarks.forEach(claw => this.scene.remove(claw));
-            }
-        }, 50);
+        this.activeEffects.push({
+            type: 'demonic_claw',
+            elements: clawMarks,
+            duration: 1000,
+            currentTime: 0
+        });
     }
     
     // ============= COMBAT EFFECTS =============
@@ -443,7 +349,7 @@ export class VisualEffects {
     
     createImpactSpark(position, normal) {
         // Bright flash at impact point
-        const flash = new THREE.PointLight(0xffff00, 3, 5);
+        const flash = new THREE.PointLight(THEME.effects.explosion.holy, 3, 5);
         flash.position.copy(position);
         this.scene.add(flash);
         
@@ -452,7 +358,7 @@ export class VisualEffects {
             const spark = new THREE.Mesh(
                 new THREE.BoxGeometry(0.05, 0.05, 0.2),
                 new THREE.MeshBasicMaterial({
-                    color: 0xffff00,
+                    color: THEME.effects.explosion.holy,
                     transparent: true,
                     opacity: 1
                 })
@@ -468,17 +374,13 @@ export class VisualEffects {
             
             this.scene.add(spark);
             
-            // Animate spark
-            const animateSpark = setInterval(() => {
-                spark.position.add(velocity.clone().multiplyScalar(0.016));
-                velocity.y -= 0.3; // Gravity
-                spark.material.opacity -= 0.05;
-                
-                if (spark.material.opacity <= 0) {
-                    clearInterval(animateSpark);
-                    this.scene.remove(spark);
-                }
-            }, 16);
+            this.activeEffects.push({
+                type: 'impact_spark',
+                mesh: spark,
+                velocity: velocity,
+                duration: 1000,
+                currentTime: 0
+            });
         }
         
         // Remove flash
@@ -487,7 +389,7 @@ export class VisualEffects {
     
     createMuzzleFlash(position, direction) {
         // Flash light
-        const flash = new THREE.PointLight(0xffaa00, 5, 10);
+        const flash = new THREE.PointLight(THEME.effects.explosion.fire, 5, 10);
         flash.position.copy(position);
         this.scene.add(flash);
         
@@ -495,7 +397,7 @@ export class VisualEffects {
         const flashMesh = new THREE.Mesh(
             new THREE.SphereGeometry(0.3, 8, 4),
             new THREE.MeshBasicMaterial({
-                color: 0xffff00,
+                color: THEME.effects.explosion.holy,
                 transparent: true,
                 opacity: 0.8
             })
@@ -515,26 +417,13 @@ export class VisualEffects {
         smoke.position.copy(position);
         this.scene.add(smoke);
         
-        // Animate
-        let scale = 1;
-        const animate = setInterval(() => {
-            scale += 0.1;
-            flashMesh.scale.set(scale, scale, scale);
-            flashMesh.material.opacity -= 0.1;
-            
-            smoke.scale.set(scale * 1.5, scale * 1.5, scale * 1.5);
-            smoke.material.opacity -= 0.05;
-            smoke.position.add(direction.clone().multiplyScalar(0.05));
-            
-            flash.intensity *= 0.7;
-            
-            if (flashMesh.material.opacity <= 0) {
-                clearInterval(animate);
-                this.scene.remove(flash);
-                this.scene.remove(flashMesh);
-                this.scene.remove(smoke);
-            }
-        }, 16);
+        this.activeEffects.push({
+            type: 'muzzle_flash',
+            elements: [flash, flashMesh, smoke],
+            direction: direction,
+            duration: 1000,
+            currentTime: 0
+        });
     }
     
     // ============= ENVIRONMENTAL EFFECTS =============
@@ -652,17 +541,112 @@ export class VisualEffects {
                 }
             });
         });
+
+        // Update active effects
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                if (effect.type === 'portal') {
+                    effect.remove();
+                } else {
+                    this.scene.remove(effect.mesh || effect.elements[0].parent);
+                }
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'holy_burst':
+                    effect.radius += 0.3;
+                    effect.opacity -= 0.02;
+                    effect.light.intensity *= 0.9;
+                    effect.mesh.geometry.dispose();
+                    effect.mesh.geometry = resourcePool.getGeometry('ring', effect.radius - 0.2, effect.radius, 32);
+                    effect.mesh.material.opacity = effect.opacity;
+                    break;
+                case 'holy_beam':
+                    effect.mesh.material.opacity = 0.6 + Math.sin(effect.currentTime * 10) * 0.3;
+                    effect.mesh.scale.x = effect.mesh.scale.z = 1 + Math.sin(effect.currentTime * 20) * 0.2;
+                    if (progress > 0.8) {
+                        effect.light.intensity -= 0.1;
+                    }
+                    break;
+                case 'blessing_aura':
+                    effect.particles.forEach(particle => {
+                        particle.userData.angle += particle.userData.speed * 0.02;
+                        particle.position.x = effect.target.position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
+                        particle.position.z = effect.target.position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
+                        particle.position.y = effect.target.position.y + Math.sin(effect.currentTime * particle.userData.verticalSpeed) * 0.5 + 1;
+                        if (effect.currentTime < 300) {
+                            particle.material.opacity = (effect.currentTime / 300) * 0.6;
+                        } else if (effect.currentTime > effect.duration - 300) {
+                            particle.material.opacity = ((effect.duration - effect.currentTime) / 300) * 0.6;
+                        }
+                    });
+                    break;
+                case 'portal':
+                    effect.elements[0].rotation.z += 0.02;
+                    effect.elements[1].rotation.y += 0.05;
+                    effect.elements.slice(2).forEach(particle => {
+                        particle.userData.angle += particle.userData.speed * 0.05;
+                        particle.userData.height += 0.05;
+                        if (particle.userData.height > 5) {
+                            particle.userData.height = 0;
+                            particle.userData.radius = Math.random() * 3;
+                        }
+                        particle.position.x = effect.elements[0].position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
+                        particle.position.z = effect.elements[0].position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
+                        particle.position.y = effect.elements[0].position.y + particle.userData.height;
+                        particle.material.opacity = 0.7 * (1 - particle.userData.height / 5);
+                    });
+                    break;
+                case 'corruption':
+                    const currentRadius = effect.radius * progress;
+                    effect.mesh.geometry.dispose();
+                    effect.mesh.geometry = new THREE.CircleGeometry(currentRadius, 32);
+                    if (progress > 0.8) {
+                        effect.mesh.material.opacity = 0.6 * (1 - (progress - 0.8) / 0.2);
+                    }
+                    break;
+                case 'demonic_claw':
+                    effect.elements.forEach(claw => {
+                        claw.material.opacity -= 0.05;
+                        claw.scale.y *= 0.95;
+                    });
+                    break;
+                case 'impact_spark':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.velocity.y -= 0.3;
+                    effect.mesh.material.opacity -= 0.05;
+                    break;
+                case 'muzzle_flash':
+                    effect.elements[1].scale.x += 0.1;
+                    effect.elements[1].scale.y += 0.1;
+                    effect.elements[1].scale.z += 0.1;
+                    effect.elements[1].material.opacity -= 0.1;
+                    effect.elements[2].scale.multiplyScalar(1.05);
+                    effect.elements[2].material.opacity -= 0.05;
+                    effect.elements[2].position.add(effect.direction.clone().multiplyScalar(0.05));
+                    effect.elements[0].intensity *= 0.7;
+                    break;
+            }
+            return true;
+        });
     }
     
     cleanup() {
         // Clean up all active effects
         this.activeEffects.forEach(effect => {
-            if (effect.interval) {
-                clearInterval(effect.interval);
+            if (effect.type === 'portal') {
+                effect.remove();
+            } else if (effect.elements) {
+                effect.elements.forEach(element => {
+                    this.scene.remove(element);
+                });
+            } else if (effect.mesh) {
+                this.scene.remove(effect.mesh);
             }
-            effect.elements.forEach(element => {
-                this.scene.remove(element);
-            });
         });
         this.activeEffects = [];
     }

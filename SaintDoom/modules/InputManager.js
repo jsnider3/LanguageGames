@@ -2,7 +2,7 @@
 // Handles all keyboard and mouse input for the game
 
 export class InputManager {
-    constructor() {
+    constructor(gameRef = null) {
         this.keys = {};
         this.mouseX = 0;
         this.mouseY = 0;
@@ -10,13 +10,30 @@ export class InputManager {
         this.mouseDeltaY = 0;
         this.mouseButtons = {};
         this.isPointerLocked = false;
+        this.gameRef = gameRef;
         
         this.setupEventListeners();
+    }
+    
+    setGame(gameRef) {
+        this.gameRef = gameRef;
     }
     
     setupEventListeners() {
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
+            
+            // F3 toggles debug mode
+            if (e.code === 'F3') {
+                e.preventDefault();
+                const game = this.gameRef || (typeof window !== 'undefined' ? window.currentGame : null);
+                if (game) {
+                    game.debugMode = !game.debugMode;
+                    console.log(`Debug mode: ${game.debugMode ? 'ON' : 'OFF'}`);
+                    if (game.debugMode) game.showDebugInfo();
+                }
+            }
+            
             // E key handled silently
             if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyE'].includes(e.code)) {
                 e.preventDefault();
@@ -29,14 +46,6 @@ export class InputManager {
         
         window.addEventListener('mousedown', (e) => {
             this.mouseButtons[e.button] = true;
-            
-            // Request pointer lock if game is running and not paused
-            if (!this.isPointerLocked) {
-                const game = window.currentGame; // We'll set this reference
-                if (game && game.isRunning && !game.isPaused) {
-                    document.body.requestPointerLock();
-                }
-            }
         });
         
         window.addEventListener('mouseup', (e) => {
@@ -51,7 +60,10 @@ export class InputManager {
         });
         
         document.addEventListener('pointerlockchange', () => {
-            this.isPointerLocked = document.pointerLockElement === document.body;
+            // Check both document.body and the canvas element for pointer lock
+            this.isPointerLocked = document.pointerLockElement === document.body || 
+                                  document.pointerLockElement === document.getElementById('gameCanvas') ||
+                                  document.pointerLockElement !== null;
             if (!this.isPointerLocked) {
                 this.mouseDeltaX = 0;
                 this.mouseDeltaY = 0;
@@ -86,11 +98,12 @@ export class InputManager {
         
         this.mouseDeltaX = 0;
         this.mouseDeltaY = 0;
-        this.mouseButtons[0] = false;
         
         // Clear weapon switch and rage inputs after reading
         this.keys['Digit1'] = false;
         this.keys['Digit2'] = false;
+        this.keys['Digit3'] = false;
+        this.keys['Digit4'] = false;
         this.keys['KeyR'] = false;
         // Don't clear KeyE here - let it be handled naturally
         

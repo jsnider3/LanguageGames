@@ -1,28 +1,22 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
+import { THEME } from '../modules/config/theme.js';
 // Laboratory Complex Level - Fixed version with connected rooms
 // High-tech research facility with keycard access system
 
 export class LaboratoryLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
         
         this.levelName = 'Laboratory Complex';
         this.levelNumber = 3;
         
-        // Storage arrays are already initialized in BaseLevel
-        // walls, enemies, pickups, etc.
+        // Initialize arrays if not already done by BaseLevel
+        if (!this.walls) this.walls = [];
+        if (!this.enemies) this.enemies = [];
         this.pickups = [];
         this.doors = [];
         
@@ -48,19 +42,19 @@ export class LaboratoryLevel extends BaseLevel {
         
         // Materials
         const concreteMaterial = new THREE.MeshStandardMaterial({
-            color: 0x808080,
+            color: THEME.materials.wall.laboratory,
             roughness: 0.9,
             metalness: 0.1
         });
         
         const metalMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,
+            color: THEME.materials.metal.default,
             roughness: 0.3,
             metalness: 0.8
         });
         
         const glassMaterial = new THREE.MeshStandardMaterial({
-            color: 0x88ccff,
+            color: THEME.materials.glass.default,
             transparent: true,
             opacity: 0.3,
             metalness: 0.1,
@@ -76,6 +70,13 @@ export class LaboratoryLevel extends BaseLevel {
         // Add lighting
         this.createLaboratoryLighting();
         
+        // Set appropriate fog for indoor laboratory
+        if (this.scene && this.scene.fog) {
+            this.scene.fog.near = 1;
+            this.scene.fog.far = 60; // Slightly longer view distance for lab
+            this.scene.fog.color = new THREE.Color(0x101020); // Slight blue tint
+        }
+        
         // Spawn initial enemies
         this.spawnInitialEnemies();
         
@@ -85,11 +86,8 @@ export class LaboratoryLevel extends BaseLevel {
             this.game.narrativeSystem.displaySubtitle("Laboratory Complex - Find the research data");
         }
         
-        // Return level data for collision system
-        return {
-            walls: this.walls,
-            enemies: this.enemies
-        };
+        // Return walls for collision system
+        return this.walls;
     }
     
     createConnectedLayout(concreteMaterial, glassMaterial, metalMaterial) {
@@ -107,16 +105,20 @@ export class LaboratoryLevel extends BaseLevel {
         ceiling.position.set(0, 4, -30);
         this.scene.add(ceiling);
         
-        // Create outer walls
+        // Create outer walls - properly enclosed laboratory
         this.createWall(-40, 2, -30, 0.5, 4, 100, concreteMaterial); // Left outer wall
         this.createWall(40, 2, -30, 0.5, 4, 100, concreteMaterial);  // Right outer wall
-        this.createWall(0, 2, 20, 80, 4, 0.5, concreteMaterial);     // Front wall
-        this.createWall(0, 2, -80, 80, 4, 0.5, concreteMaterial);    // Back wall
+        this.createWall(0, 2, -80, 80, 4, 0.5, concreteMaterial);    // Back wall (solid)
         
-        // Create entrance opening in front wall
-        this.createWall(-40, 2, 20, 35, 4, 0.5, concreteMaterial);   // Left of entrance
-        this.createWall(40, 2, 20, 35, 4, 0.5, concreteMaterial);    // Right of entrance
-        this.createWall(0, 3.5, 20, 10, 1, 0.5, concreteMaterial);   // Above entrance
+        // Front wall with elevator shaft opening (6x6 for elevator)
+        this.createWall(-37, 2, 20, 6, 4, 0.5, concreteMaterial);    // Far left of entrance
+        this.createWall(-25, 2, 20, 10, 4, 0.5, concreteMaterial);   // Left of elevator
+        this.createWall(25, 2, 20, 10, 4, 0.5, concreteMaterial);    // Right of elevator
+        this.createWall(37, 2, 20, 6, 4, 0.5, concreteMaterial);     // Far right of entrance
+        this.createWall(0, 3.5, 20, 6, 1, 0.5, concreteMaterial);    // Above elevator (door header)
+        
+        // Create elevator shaft room (small room at entrance)
+        this.createElevatorShaft(concreteMaterial, metalMaterial);
         
         // Create main corridor down the middle with door openings (4 units wide)
         // Wall segments: createWall(x, y, z_center, width, height, depth)
@@ -161,12 +163,120 @@ export class LaboratoryLevel extends BaseLevel {
         this.decorateContainmentArea(22.5, -30, metalMaterial);
         this.decorateResearchWing(-22.5, -60, glassMaterial, metalMaterial);
         
-        // Add reception desk near entrance
+        // Add reception desk near entrance (moved to avoid elevator)
         const deskGeometry = new THREE.BoxGeometry(6, 1.5, 3);
         const desk = new THREE.Mesh(deskGeometry, concreteMaterial);
-        desk.position.set(-8, 0.75, 10);
+        desk.position.set(-8, 0.75, 5);
         desk.castShadow = true;
         this.scene.add(desk);
+    }
+    
+    createElevatorShaft(concreteMaterial, metalMaterial) {
+        // Create functional elevator to return to armory
+        const elevatorGroup = new THREE.Group();
+        
+        // Elevator shaft back wall with doorway opening
+        this.createWall(-3, 2, 17, 3, 4, 0.5, concreteMaterial);  // Left of doorway
+        this.createWall(3, 2, 17, 3, 4, 0.5, concreteMaterial);   // Right of doorway
+        this.createWall(0, 3.5, 17, 6, 1, 0.5, concreteMaterial); // Above doorway
+        
+        // Elevator shaft side walls (alcove)
+        this.createWall(-3, 2, 18.5, 0.5, 4, 3, metalMaterial);  // Left wall
+        this.createWall(3, 2, 18.5, 0.5, 4, 3, metalMaterial);   // Right wall
+        
+        // Elevator floor
+        const floorGeometry = new THREE.BoxGeometry(6, 0.2, 3);
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x444444,
+            metalness: 0.3,
+            roughness: 0.7
+        });
+        const elevatorFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+        elevatorFloor.position.set(0, 0.1, 18.5);
+        elevatorGroup.add(elevatorFloor);
+        
+        // Create elevator doors (open by default - player just exited)
+        const doorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        
+        // Left elevator door (slid open)
+        const leftDoorGeometry = new THREE.BoxGeometry(3, 3.5, 0.2);
+        const leftDoor = new THREE.Mesh(leftDoorGeometry, doorMaterial);
+        leftDoor.position.set(-3.5, 1.75, 19.8);  // Slid to the left
+        elevatorGroup.add(leftDoor);
+        this.leftElevatorDoor = leftDoor;
+        
+        // Right elevator door (slid open)
+        const rightDoor = new THREE.Mesh(leftDoorGeometry, doorMaterial);
+        rightDoor.position.set(3.5, 1.75, 19.8);  // Slid to the right
+        elevatorGroup.add(rightDoor);
+        this.rightElevatorDoor = rightDoor;
+        
+        // Elevator call button panel (green - ready to use)
+        const panelGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.1);
+        const panelMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333,
+            metalness: 0.5,
+            roughness: 0.6
+        });
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+        panel.position.set(3.5, 1.2, 19);
+        elevatorGroup.add(panel);
+        
+        // Call button (green - ready)
+        const buttonGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16);
+        const buttonMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.8
+        });
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.rotation.x = Math.PI / 2;
+        button.position.set(3.5, 1.2, 19.1);
+        button.userData = {
+            isElevatorButton: true,
+            destination: 'armory'
+        };
+        elevatorGroup.add(button);
+        this.elevatorButton = button;
+        
+        // "TO ARMORY" sign
+        const signGeometry = new THREE.PlaneGeometry(2, 0.5);
+        const signMaterial = new THREE.MeshStandardMaterial({
+            color: 0x444444,
+            metalness: 0.4,
+            roughness: 0.6
+        });
+        const sign = new THREE.Mesh(signGeometry, signMaterial);
+        sign.position.set(0, 3.2, 19.9);
+        elevatorGroup.add(sign);
+        
+        // Interior lighting
+        const elevatorLight = new THREE.PointLight(0xffffff, 0.5, 6);
+        elevatorLight.position.set(0, 3, 18.5);
+        this.scene.add(elevatorLight);
+        
+        this.scene.add(elevatorGroup);
+        this.elevatorGroup = elevatorGroup;
+        
+        // Add floor indicator above elevator
+        const indicatorGeometry = new THREE.PlaneGeometry(2, 0.5);
+        const indicatorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            emissive: 0x00ff00,
+            emissiveIntensity: 0.2
+        });
+        const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+        indicator.position.set(0, 3.7, 19.9);
+        this.scene.add(indicator);
+        
+        // Add additional elevator shaft light
+        const elevatorShaftLight = new THREE.PointLight(0xffffcc, 0.6, 5);
+        elevatorShaftLight.position.set(0, 3, 18.5);
+        this.scene.add(elevatorShaftLight);
     }
     
     decorateTestingLab(centerX, centerZ, glassMaterial) {
@@ -591,6 +701,11 @@ export class LaboratoryLevel extends BaseLevel {
     }
     
     update(deltaTime) {
+        // Check elevator interaction first
+        if (this.game && this.game.player) {
+            this.checkElevatorInteraction();
+        }
+        
         // Update pickups animation
         const time = Date.now() * 0.002;
         this.pickups.forEach(pickup => {
@@ -676,5 +791,83 @@ export class LaboratoryLevel extends BaseLevel {
             blue: false,
             yellow: false
         };
+    }
+    
+    checkElevatorInteraction() {
+        if (!this.elevatorButton || !this.game || !this.game.player) return;
+        
+        const playerPos = this.game.player.position;
+        const buttonPos = this.elevatorButton.position;
+        const distance = Math.sqrt(
+            Math.pow(playerPos.x - buttonPos.x, 2) +
+            Math.pow(playerPos.y - buttonPos.y, 2) +
+            Math.pow(playerPos.z - buttonPos.z, 2)
+        );
+        
+        // Check if player is near button and pressing E
+        if (distance < 3) {
+            // Show interaction prompt
+            if (!this.elevatorPromptShown) {
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Press E to use elevator");
+                }
+                this.elevatorPromptShown = true;
+            }
+            
+            // Check for E key press
+            if (this.game.inputManager && this.game.inputManager.keys['KeyE']) {
+                // Prevent multiple triggers
+                if (!this.elevatorActivated) {
+                    this.elevatorActivated = true;
+                    this.game.inputManager.keys['KeyE'] = false;
+                    
+                    // Change button to red
+                    this.elevatorButton.material.emissive.setHex(0xff0000);
+                    
+                    // Close doors and transition
+                    this.animateElevatorClose();
+                }
+            }
+        } else {
+            this.elevatorPromptShown = false;
+        }
+    }
+    
+    animateElevatorClose() {
+        if (!this.leftElevatorDoor || !this.rightElevatorDoor) return;
+        
+        let progress = 0;
+        const animationDuration = 1500; // 1.5 seconds
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            progress = Math.min(elapsed / animationDuration, 1);
+            
+            // Slide doors closed
+            this.leftElevatorDoor.position.x = -3.5 + (3.5 * progress);  // Move from -3.5 to 0
+            this.rightElevatorDoor.position.x = 3.5 - (3.5 * progress);  // Move from 3.5 to 0
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Doors closed, transition to armory
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.displaySubtitle("Returning to Armory...");
+                }
+                
+                // Wait a moment then load armory
+                setTimeout(() => {
+                    if (this.game.loadLevel) {
+                        // Pass a flag to indicate we're coming from laboratory
+                        this.game.loadLevel('armory', { fromLaboratory: true });
+                    } else {
+                        console.error('Cannot load armory level - loadLevel method not found');
+                    }
+                }, 500);
+            }
+        };
+        
+        animate();
     }
 }

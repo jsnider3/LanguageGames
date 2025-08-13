@@ -2,20 +2,12 @@ import * as THREE from 'three';
 // Shadow Wraith Enemy Type
 // Phase shift ability - vulnerable only during attack frames
 
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class ShadowWraith extends Enemy {
+export class ShadowWraith extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        
-        // Override stats
-        this.health = 80;
-        this.maxHealth = 80;
-        this.moveSpeed = 5;
-        this.damage = 25;
-        this.attackRange = 2;
-        this.sightRange = 25;
-        this.type = 'shadow_wraith';
         
         // Phase shift properties
         this.isPhased = true; // Start phased
@@ -49,7 +41,7 @@ export class ShadowWraith extends Enemy {
         // Ethereal body
         const bodyGeometry = new THREE.ConeGeometry(0.4, 1.8, 8);
         const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             emissive: 0x220044,
             emissiveIntensity: 0.3,
             transparent: true,
@@ -63,7 +55,7 @@ export class ShadowWraith extends Enemy {
         // Hooded head
         const headGeometry = new THREE.SphereGeometry(0.25, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.7);
         const headMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             emissive: 0x110022,
             emissiveIntensity: 0.2,
             transparent: true,
@@ -95,7 +87,7 @@ export class ShadowWraith extends Enemy {
             const angle = (i / cloakCount) * Math.PI * 2;
             const tatteredGeometry = new THREE.PlaneGeometry(0.3, 0.5);
             const tatteredMaterial = new THREE.MeshPhongMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: this.baseOpacity * 0.5,
                 side: THREE.DoubleSide
@@ -130,7 +122,7 @@ export class ShadowWraith extends Enemy {
         // Dark mist around the wraith
         const auraGeometry = new THREE.SphereGeometry(1, 8, 6);
         const auraMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.1,
             side: THREE.BackSide
@@ -316,7 +308,7 @@ export class ShadowWraith extends Enemy {
         // Check hit
         const distance = this.position.distanceTo(this.target.position);
         if (distance <= this.attackRange) {
-            this.target.takeDamage(this.damage);
+            this.target.takeDamage(this.damage, "Shadow Wraith Phase Strike");
             
             // Life drain effect
             this.createLifeDrainEffect();
@@ -652,7 +644,7 @@ export class ShadowWraith extends Enemy {
         for (let i = 0; i < fragmentCount; i++) {
             const fragmentGeometry = new THREE.TetrahedronGeometry(0.1 + Math.random() * 0.1);
             const fragmentMaterial = new THREE.MeshBasicMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: 0.8
             });

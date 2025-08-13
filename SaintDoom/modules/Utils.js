@@ -224,6 +224,55 @@ export class AudioManager {
         
         noise.start();
     }
+
+    // Added for gameplay calls expecting these helpers
+    static playDeath() {
+        const context = this.getContext();
+        if (!context) return;
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(60, context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, context.currentTime + 1.5);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        gain.gain.setValueAtTime(0.25, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 1.5);
+        osc.start();
+        osc.stop(context.currentTime + 1.6);
+    }
+
+    static playRageSound() {
+        const context = this.getContext();
+        if (!context) return;
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, context.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        gain.gain.setValueAtTime(0.2, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.4);
+        osc.start();
+        osc.stop(context.currentTime + 0.4);
+    }
+
+    static playVoiceLine(category) {
+        // Placeholder: no-op or simple blip to acknowledge call
+        const context = this.getContext();
+        if (!context) return;
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1100, context.currentTime);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        gain.gain.setValueAtTime(0.1, context.currentTime);
+        gain.gain.setValueAtTime(0.0, context.currentTime + 0.05);
+        osc.start();
+        osc.stop(context.currentTime + 0.06);
+    }
 }
 
 export class GeometryCache {

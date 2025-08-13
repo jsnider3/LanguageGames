@@ -2,15 +2,11 @@ import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
 
 export class SecretArchive extends BaseLevel {
-    constructor(game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 3) {
-            // Old signature: (scene, camera, player)
-            super(arguments[0], arguments[1], arguments[2]);
-        } else {
-            // New signature: (game)
-            super(game);
-        }
+    constructor(scene, game) {
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
         
         this.name = 'The Forbidden Archive';
         this.description = 'Ancient Vatican archives containing dangerous knowledge and sealed artifacts';
@@ -857,7 +853,7 @@ export class SecretArchive extends BaseLevel {
                         const now = Date.now();
                         if (now - librarian.lastAttack > 2000) {
                             if (this.player.takeDamage) {
-                                this.player.takeDamage(librarian.damage);
+                                this.player.takeDamage(librarian.damage, "Corrupted Librarian");
                             }
                             librarian.lastAttack = now;
                             

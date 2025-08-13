@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Systems Test - SaintDoom</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: monospace;
+            background: #111;
+            color: #0f0;
+        }
+        #stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border: 1px solid #0f0;
+            z-index: 1000;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            background: #333;
+            color: #0f0;
+            border: 1px solid #0f0;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #444;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #0f0;
+            height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="stats">
+        <h3>Performance Test Suite</h3>
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Draw Calls: <span id="drawCalls">0</span></div>
+        <div>Triangles: <span id="triangles">0</span></div>
+        <div>Pool Stats: <span id="poolStats">N/A</span></div>
+        <div>LOD Stats: <span id="lodStats">N/A</span></div>
+        <div>Shadow Stats: <span id="shadowStats">N/A</span></div>
+    </div>
+    
+    <div style="margin-top: 150px;">
+        <button onclick="testObjectPool()">Test Object Pool</button>
+        <button onclick="testLOD()">Test LOD System</button>
+        <button onclick="testShadows()">Test Shadow Optimizer</button>
+        <button onclick="testBatching()">Test Geometry Batching</button>
+        <button onclick="testPhysics()">Test Physics Manager</button>
+        <button onclick="testAnimations()">Test Animation Manager</button>
+        <button onclick="runFullTest()">Run Full Performance Test</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="log"></div>
+    
+    <canvas id="testCanvas" style="position: fixed; bottom: 0; right: 0; width: 400px; height: 300px; border: 1px solid #0f0;"></canvas>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PoolManager } from './modules/ObjectPool.js';
+        import { LODManager } from './modules/LODManager.js';
+        import { AnimationManager } from './modules/AnimationManager.js';
+        import { ShadowOptimizer } from './modules/ShadowOptimizer.js';
+        import { GeometryBatcher } from './modules/GeometryBatcher.js';
+        import { PhysicsManager } from './modules/PhysicsManager.js';
+        
+        // Setup test scene
+        const canvas = document.getElementById('testCanvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(400, 300);
+        renderer.shadowMap.enabled = true;
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 400/300, 0.1, 1000);
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+        
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 5);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        
+        // Initialize systems
+        const poolManager = new PoolManager(scene);
+        const lodManager = new LODManager(camera, scene);
+        const animationManager = new AnimationManager();
+        const shadowOptimizer = new ShadowOptimizer(renderer, scene);
+        const geometryBatcher = new GeometryBatcher(scene);
+        const physicsManager = new PhysicsManager(scene);
+        
+        // Register main light with shadow optimizer
+        shadowOptimizer.registerShadowLight(dirLight, 100);
+        
+        // Logging function
+        window.log = function(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            logDiv.innerHTML += `<div style="color: ${color}">[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+        
+        // Test functions
+        window.testObjectPool = function() {
+            log('Testing Object Pool System...');
+            
+            const bulletPool = poolManager.getPool('bullets');
+            const particlePool = poolManager.getPool('particles');
+            
+            // Fire bullets
+            for (let i = 0; i < 10; i++) {
+                const bullet = bulletPool.fire(
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(Math.random() - 0.5, Math.random(), Math.random() - 0.5).normalize(),
+                    10,
+                    10,
+                    null
+                );
+            }
+            
+            // Spawn particles
+            particlePool.burst(new THREE.Vector3(0, 2, 0), 20, 0xff0000, 5);
+            
+            const stats = poolManager.getAllStats();
+            log(`Bullets: ${stats.bullets.active} active, ${stats.bullets.available} available`, 'success');
+            log(`Particles: ${stats.particles.active} active, ${stats.particles.available} available`, 'success');
+            document.getElementById('poolStats').textContent = JSON.stringify(stats);
+        };
+        
+        window.testLOD = function() {
+            log('Testing LOD System...');
+            
+            // Create test enemies with LOD
+            for (let i = 0; i < 5; i++) {
+                const position = new THREE.Vector3(i * 3 - 6, 0, 0);
+                const lodGroup = lodManager.createEnemyLOD('hellhound', position);
+                scene.add(lodGroup);
+            }
+            
+            const stats = lodManager.getStats();
+            log(`LOD Objects: ${stats.total} total, ${stats.high} high, ${stats.medium} medium, ${stats.low} low`, 'success');
+            document.getElementById('lodStats').textContent = JSON.stringify(stats);
+        };
+        
+        window.testShadows = function() {
+            log('Testing Shadow Optimizer...');
+            
+            // Add more lights to test priority system
+            for (let i = 0; i < 5; i++) {
+                const light = new THREE.PointLight(0xffffff, 0.5, 10);
+                light.position.set(Math.random() * 10 - 5, 5, Math.random() * 10 - 5);
+                light.castShadow = true;
+                scene.add(light);
+                shadowOptimizer.registerShadowLight(light, 50 - i * 10);
+            }
+            
+            shadowOptimizer.updateShadowCasters();
+            const stats = shadowOptimizer.getStats();
+            log(`Shadow Lights: ${stats.totalLights} total, ${stats.activeShadowCasters} active`, 'success');
+            document.getElementById('shadowStats').textContent = JSON.stringify(stats);
+        };
+        
+        window.testBatching = function() {
+            log('Testing Geometry Batching...');
+            
+            // Create test walls
+            const walls = [];
+            for (let i = 0; i < 10; i++) {
+                const geometry = new THREE.BoxGeometry(1, 2, 0.1);
+                const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
+                const wall = new THREE.Mesh(geometry, material);
+                wall.position.set(i - 5, 1, -5);
+                scene.add(wall);
+                walls.push({ mesh: wall });
+            }
+            
+            // Batch walls
+            geometryBatcher.batchWalls(walls);
+            
+            const stats = geometryBatcher.getStats();
+            log(`Batched Meshes: ${stats.totalBatchedMeshes} in ${stats.batchGroups} groups`, 'success');
+        };
+        
+        window.testPhysics = function() {
+            log('Testing Physics Manager...');
+            
+            // Create test entities
+            for (let i = 0; i < 5; i++) {
+                const entity = {
+                    position: new THREE.Vector3(Math.random() * 4 - 2, 5, Math.random() * 4 - 2),
+                    velocity: new THREE.Vector3(0, 0, 0),
+                    health: 100
+                };
+                
+                // Create visual representation
+                const mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0xff0000 })
+                );
+                mesh.position.copy(entity.position);
+                scene.add(mesh);
+                entity.mesh = mesh;
+                
+                physicsManager.registerEntity(entity, {
+                    hasGravity: true,
+                    isFlying: false,
+                    mass: 1
+                });
+            }
+            
+            // Apply explosion force
+            physicsManager.applyExplosionForce(new THREE.Vector3(0, 0, 0), 5, 10);
+            
+            const stats = physicsManager.getStats();
+            log(`Physics Entities: ${stats.totalEntities} total, ${stats.grounded} grounded, ${stats.airborne} airborne`, 'success');
+        };
+        
+        window.testAnimations = function() {
+            log('Testing Animation Manager...');
+            
+            // Create test objects and animate them
+            const testObjects = [];
+            for (let i = 0; i < 5; i++) {
+                const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: new THREE.Color().setHSL(i / 5, 1, 0.5) 
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.set(i - 2, 1, 0);
+                scene.add(cube);
+                testObjects.push(cube);
+            }
+            
+            // Apply different animations
+            animationManager.startAnimation(testObjects[0], 'float', { amplitude: 0.5, speed: 2 });
+            animationManager.startAnimation(testObjects[1], 'rotate', { axis: 'y', speed: 2 });
+            animationManager.startAnimation(testObjects[2], 'pulse', { speed: 3, intensity: 0.3 });
+            animationManager.startAnimation(testObjects[3], 'bob', { speed: 1, amplitude: 0.2 });
+            
+            const stats = animationManager.getStats();
+            log(`Active Animations: ${stats.total}`, 'success');
+        };
+        
+        window.runFullTest = function() {
+            log('Running Full Performance Test...', 'info');
+            testObjectPool();
+            setTimeout(() => testLOD(), 500);
+            setTimeout(() => testShadows(), 1000);
+            setTimeout(() => testBatching(), 1500);
+            setTimeout(() => testPhysics(), 2000);
+            setTimeout(() => testAnimations(), 2500);
+            setTimeout(() => {
+                log('Full test complete!', 'success');
+                log(`Renderer Info: ${renderer.info.render.calls} draw calls, ${renderer.info.render.triangles} triangles`, 'info');
+            }, 3000);
+        };
+        
+        window.clearLog = function() {
+            document.getElementById('log').innerHTML = '';
+        };
+        
+        // Animation loop
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const now = performance.now();
+            const deltaTime = (now - lastTime) / 1000;
+            lastTime = now;
+            
+            // Update systems
+            poolManager.update(deltaTime);
+            lodManager.update(deltaTime);
+            animationManager.update(deltaTime);
+            shadowOptimizer.update(camera, deltaTime);
+            physicsManager.update(deltaTime);
+            
+            // Rotate camera
+            const time = now * 0.0005;
+            camera.position.x = Math.cos(time) * 8;
+            camera.position.z = Math.sin(time) * 8;
+            camera.lookAt(0, 0, 0);
+            
+            renderer.render(scene, camera);
+            
+            // Update FPS
+            frameCount++;
+            if (frameCount % 30 === 0) {
+                fps = Math.round(1 / deltaTime);
+                document.getElementById('fps').textContent = fps;
+                document.getElementById('drawCalls').textContent = renderer.info.render.calls;
+                document.getElementById('triangles').textContent = renderer.info.render.triangles;
+            }
+        }
+        
+        animate();
+        
+        log('Performance test suite loaded. Click buttons to test systems.', 'success');
+    </script>
+</body>
+</html>

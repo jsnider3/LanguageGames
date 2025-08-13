@@ -1,16 +1,11 @@
-import * as THREE from 'three';
-import { Enemy } from '../enemies/enemy.js';
 
-export class TheIronTyrant extends Enemy {
+import * as THREE from 'three';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
+
+export class TheIronTyrant extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'The Iron Tyrant';
-        this.health = 1000;
-        this.maxHealth = 1000;
-        this.speed = 0.6; // Slow but devastating
-        this.damage = 80;
-        this.attackRange = 10;
-        this.detectionRange = 60;
         
         // Boss specific properties
         this.destructibleParts = {
@@ -52,6 +47,8 @@ export class TheIronTyrant extends Enemy {
         this.demonicEnergy = 100;
         this.maxDemonicEnergy = 100;
         
+        this.activeEffects = [];
+
         this.createMesh();
         this.initializeSystemStatus();
     }
@@ -85,8 +82,8 @@ export class TheIronTyrant extends Enemy {
         // Demonic eyes in cockpit
         const eyeGeometry = new THREE.SphereGeometry(0.3, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            emissive: 0x660000,
+            color: THEME.ui.health.low,
+            emissive: THEME.bosses.belial.primary,
             emissiveIntensity: 1.5
         });
         
@@ -391,8 +388,8 @@ export class TheIronTyrant extends Enemy {
         for (let i = 0; i < 12; i++) {
             const runeGeometry = new THREE.PlaneGeometry(0.5, 0.5);
             const runeMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
-                emissive: 0x440000,
+                color: THEME.ui.health.low,
+                emissive: THEME.materials.robeEmissive,
                 emissiveIntensity: 0.6,
                 transparent: true,
                 opacity: 0.8
@@ -524,6 +521,80 @@ export class TheIronTyrant extends Enemy {
         if (this.mesh) {
             this.mesh.position.copy(this.position);
         }
+        
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                if (effect.onEnd) {
+                    effect.onEnd();
+                }
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'minigun_bullet':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    break;
+                case 'cannon_shell':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.mesh.rotation.x += 0.1;
+                    break;
+                case 'rocket':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    break;
+                case 'explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'laser_impact':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'ground_crack':
+                    effect.mesh.scale.x += effect.scaleRate * deltaTime;
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'shockwave':
+                    effect.innerRadius += effect.radiusRate * deltaTime;
+                    effect.outerRadius += effect.radiusRate * deltaTime;
+                    effect.mesh.geometry.dispose();
+                    effect.mesh.geometry = new THREE.RingGeometry(effect.innerRadius, effect.outerRadius, 32);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'berserk_aura':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'smoke':
+                    effect.mesh.position.y += 0.1;
+                    effect.mesh.scale.multiplyScalar(1.05);
+                    effect.mesh.material.opacity -= 0.02;
+                    break;
+                case 'damage_spark':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.velocity.y -= 9.8 * deltaTime;
+                    effect.mesh.scale.multiplyScalar(0.95);
+                    break;
+                case 'falling_arm':
+                    effect.mesh.position.y -= 0.2;
+                    effect.mesh.rotation.x += 0.05;
+                    effect.mesh.rotation.z += 0.03;
+                    break;
+                case 'death_explosion':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+            }
+
+            return true;
+        });
     }
 
     updateSystemStatus() {
@@ -605,7 +676,7 @@ export class TheIronTyrant extends Enemy {
         // Create cannon shell
         const shellGeometry = new THREE.CylinderGeometry(0.2, 0.25, 1, 8);
         const shellMaterial = new THREE.MeshLambertMaterial({
-            color: 0x666666,
+            color: THEME.materials.wall.armory,
             metalness: 0.8
         });
         const shell = new THREE.Mesh(shellGeometry, shellMaterial);
@@ -620,17 +691,15 @@ export class TheIronTyrant extends Enemy {
         const speed = 30;
         const velocity = direction.multiplyScalar(speed);
         
-        shell.userData = {
-            type: 'cannon_shell',
-            velocity: velocity,
-            damage: this.weaponSystems.cannon.damage,
-            explosive: true,
-            life: 3000,
-            birthTime: Date.now()
-        };
-        
         this.scene.add(shell);
-        this.animateCannonShell(shell);
+        this.activeEffects.push({
+            mesh: shell,
+            type: 'cannon_shell',
+            duration: 3000,
+            currentTime: 0,
+            velocity: velocity,
+            onEnd: () => this.createExplosion(shell.position)
+        });
         
         // Muzzle flash
         this.createMuzzleFlash(cannonPosition);
@@ -669,7 +738,7 @@ export class TheIronTyrant extends Enemy {
     createMinigunBullet(startPos, targetPos) {
         const bulletGeometry = new THREE.SphereGeometry(0.05, 6, 6);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             emissive: 0x444400,
             emissiveIntensity: 0.8
         });
@@ -689,28 +758,14 @@ export class TheIronTyrant extends Enemy {
         const speed = 50;
         const velocity = direction.multiplyScalar(speed);
         
-        bullet.userData = {
-            type: 'minigun_bullet',
-            velocity: velocity,
-            damage: this.weaponSystems.minigun.damage,
-            life: 2000,
-            birthTime: Date.now()
-        };
-        
         this.scene.add(bullet);
-        
-        // Animate bullet
-        const bulletInterval = setInterval(() => {
-            const age = Date.now() - bullet.userData.birthTime;
-            if (age > bullet.userData.life) {
-                this.scene.remove(bullet);
-                clearInterval(bulletInterval);
-                return;
-            }
-            
-            const movement = bullet.userData.velocity.clone().multiplyScalar(16 / 1000);
-            bullet.position.add(movement);
-        }, 16);
+        this.activeEffects.push({
+            mesh: bullet,
+            type: 'minigun_bullet',
+            duration: 2000,
+            currentTime: 0,
+            velocity: velocity
+        });
     }
 
     launchRocketSalvo(player) {
@@ -732,7 +787,7 @@ export class TheIronTyrant extends Enemy {
     createRocket(startPos, targetPos, index) {
         const rocketGeometry = new THREE.CylinderGeometry(0.1, 0.15, 1.2, 8);
         const rocketMaterial = new THREE.MeshLambertMaterial({
-            color: 0x888888,
+            color: THEME.materials.metal.default,
             metalness: 0.7
         });
         const rocket = new THREE.Mesh(rocketGeometry, rocketMaterial);
@@ -768,17 +823,15 @@ export class TheIronTyrant extends Enemy {
         const speed = 20;
         const velocity = direction.multiplyScalar(speed);
         
-        rocket.userData = {
-            type: 'rocket',
-            velocity: velocity,
-            damage: this.weaponSystems.rockets.damage,
-            explosiveRadius: 5,
-            life: 4000,
-            birthTime: Date.now()
-        };
-        
         this.scene.add(rocket);
-        this.animateRocket(rocket);
+        this.activeEffects.push({
+            mesh: rocket,
+            type: 'rocket',
+            duration: 4000,
+            currentTime: 0,
+            velocity: velocity,
+            onEnd: () => this.createExplosion(rocket.position)
+        });
     }
 
     fireLaserBeam(player) {
@@ -813,7 +866,7 @@ export class TheIronTyrant extends Enemy {
         
         // Damage player
         if (player.takeDamage) {
-            player.takeDamage(this.weaponSystems.laser.damage);
+            player.takeDamage(this.weaponSystems.laser.damage, "Iron Tyrant Plasma Beam");
         }
         
         // Animate laser lens
@@ -844,7 +897,7 @@ export class TheIronTyrant extends Enemy {
             // Ground crack effect
             const crackGeometry = new THREE.PlaneGeometry(10, 0.5);
             const crackMaterial = new THREE.MeshBasicMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: 0.8
             });
@@ -857,23 +910,21 @@ export class TheIronTyrant extends Enemy {
                 crack.rotation.z = (i / 8) * Math.PI * 2;
                 this.scene.add(crack);
                 
-                // Animate cracks spreading
-                const crackInterval = setInterval(() => {
-                    crack.scale.x += 0.5;
-                    crack.material.opacity -= 0.02;
-                    
-                    if (crack.material.opacity <= 0) {
-                        this.scene.remove(crack);
-                        clearInterval(crackInterval);
-                    }
-                }, 50);
+                this.activeEffects.push({
+                    mesh: crack,
+                    type: 'ground_crack',
+                    duration: 2500,
+                    currentTime: 0,
+                    scaleRate: 0.5 / 0.05,
+                    opacityRate: 0.02 / 0.05
+                });
             }
             
             // Damage if player is close
             const distance = this.position.distanceTo(player.position || player.mesh.position);
             if (distance <= this.weaponSystems.stomp.range) {
                 if (player.takeDamage) {
-                    player.takeDamage(this.weaponSystems.stomp.damage);
+                    player.takeDamage(this.weaponSystems.stomp.damage, "Iron Tyrant Ground Stomp");
                 }
                 
                 // Knockback
@@ -895,7 +946,7 @@ export class TheIronTyrant extends Enemy {
         // Massive shockwave in berserk mode
         const shockwaveGeometry = new THREE.RingGeometry(2, 4, 32);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -906,32 +957,24 @@ export class TheIronTyrant extends Enemy {
         shockwave.rotation.x = -Math.PI / 2;
         this.scene.add(shockwave);
         
-        // Animate shockwave expansion
-        let innerRadius = 2;
-        let outerRadius = 4;
-        let opacity = 0.8;
-        const shockwaveInterval = setInterval(() => {
-            innerRadius += 1.5;
-            outerRadius += 1.5;
-            opacity -= 0.05;
-            
-            shockwave.geometry.dispose();
-            shockwave.geometry = new THREE.RingGeometry(innerRadius, outerRadius, 32);
-            shockwave.material.opacity = opacity;
-            
-            // Check collision with player
-            const distance = this.position.distanceTo(player.position || player.mesh.position);
-            if (distance >= innerRadius && distance <= outerRadius) {
-                if (player.takeDamage) {
-                    player.takeDamage(this.weaponSystems.shockwave.damage);
+        this.activeEffects.push({
+            mesh: shockwave,
+            type: 'shockwave',
+            duration: 2000,
+            currentTime: 0,
+            innerRadius: 2,
+            outerRadius: 4,
+            radiusRate: 1.5 / 0.1,
+            opacityRate: 0.05 / 0.1,
+            update: (effect, deltaTime) => {
+                const distance = effect.mesh.position.distanceTo(player.position || player.mesh.position);
+                if (distance >= effect.innerRadius && distance <= effect.outerRadius) {
+                    if (player.takeDamage) {
+                        player.takeDamage(this.weaponSystems.shockwave.damage * deltaTime, "Iron Tyrant EMP Shockwave");
+                    }
                 }
             }
-            
-            if (opacity <= 0 || outerRadius > 30) {
-                this.scene.remove(shockwave);
-                clearInterval(shockwaveInterval);
-            }
-        }, 100);
+        });
     }
 
     activateBerserkMode() {
@@ -941,7 +984,7 @@ export class TheIronTyrant extends Enemy {
         
         // Visual berserk effect
         if (this.mechParts.chassis) {
-            this.mechParts.chassis.material.emissive = new THREE.Color(0x440000);
+            this.mechParts.chassis.material.emissive = new THREE.Color(THEME.materials.robeEmissive);
             this.mechParts.chassis.material.emissiveIntensity = 0.5;
         }
         
@@ -957,7 +1000,7 @@ export class TheIronTyrant extends Enemy {
     createBerserkEffect() {
         const berserkGeometry = new THREE.SphereGeometry(12, 32, 32);
         const berserkMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.6,
             wireframe: true
@@ -966,20 +1009,14 @@ export class TheIronTyrant extends Enemy {
         berserk.position.copy(this.position);
         this.scene.add(berserk);
         
-        // Animate berserk aura
-        let scale = 0.1;
-        let opacity = 0.6;
-        const berserkInterval = setInterval(() => {
-            scale += 0.2;
-            opacity -= 0.03;
-            berserk.scale.setScalar(scale);
-            berserk.material.opacity = opacity;
-            
-            if (opacity <= 0) {
-                this.scene.remove(berserk);
-                clearInterval(berserkInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: berserk,
+            type: 'berserk_aura',
+            duration: 1666,
+            currentTime: 0,
+            scaleRate: 0.2 / 0.05,
+            opacityRate: 0.03 / 0.05
+        });
     }
 
     mechMovement(playerPosition, distance, deltaTime) {
@@ -992,7 +1029,7 @@ export class TheIronTyrant extends Enemy {
                 .subVectors(playerPosition, this.position)
                 .normalize();
             
-            this.position.add(direction.multiplyScalar(moveSpeed * deltaTime / 1000));
+            this.position.add(direction.multiplyScalar(moveSpeed * deltaTime));
         } else {
             // Tactical positioning
             let direction = new THREE.Vector3();
@@ -1011,7 +1048,7 @@ export class TheIronTyrant extends Enemy {
                 ).normalize();
             }
             
-            this.position.add(direction.multiplyScalar(moveSpeed * deltaTime / 1000));
+            this.position.add(direction.multiplyScalar(moveSpeed * deltaTime));
         }
         
         // Face player
@@ -1028,7 +1065,7 @@ export class TheIronTyrant extends Enemy {
     createFootstepEffect() {
         const stepGeometry = new THREE.RingGeometry(1.5, 2.5, 16);
         const stepMaterial = new THREE.MeshBasicMaterial({
-            color: 0x666666,
+            color: THEME.materials.wall.armory,
             transparent: true,
             opacity: 0.5,
             side: THREE.DoubleSide
@@ -1048,7 +1085,7 @@ export class TheIronTyrant extends Enemy {
     updateHeatManagement(deltaTime) {
         // Heat dissipation
         if (this.heatLevel > 0) {
-            this.heatLevel = Math.max(0, this.heatLevel - (20 * deltaTime / 1000));
+            this.heatLevel = Math.max(0, this.heatLevel - (20 * deltaTime));
         }
         
         // Overheating
@@ -1074,7 +1111,7 @@ export class TheIronTyrant extends Enemy {
         this.smokeEmitters.forEach(vent => {
             const smokeGeometry = new THREE.SphereGeometry(0.3, 6, 6);
             const smokeMaterial = new THREE.MeshBasicMaterial({
-                color: 0x888888,
+                color: THEME.materials.metal.default,
                 transparent: true,
                 opacity: 0.6
             });
@@ -1083,17 +1120,12 @@ export class TheIronTyrant extends Enemy {
             smoke.position.add(this.position);
             this.scene.add(smoke);
             
-            // Animate smoke
-            const smokeInterval = setInterval(() => {
-                smoke.position.y += 0.1;
-                smoke.scale.multiplyScalar(1.05);
-                smoke.material.opacity -= 0.02;
-                
-                if (smoke.material.opacity <= 0) {
-                    this.scene.remove(smoke);
-                    clearInterval(smokeInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: smoke,
+                type: 'smoke',
+                duration: 2500,
+                currentTime: 0
+            });
         });
     }
 
@@ -1124,7 +1156,7 @@ export class TheIronTyrant extends Enemy {
     updatePowerCore(deltaTime) {
         // Power management
         if (this.berserkMode) {
-            this.powerCore = Math.max(0, this.powerCore - (30 * deltaTime / 1000));
+            this.powerCore = Math.max(0, this.powerCore - (30 * deltaTime));
             
             if (this.powerCore <= 0) {
                 // Emergency shutdown
@@ -1136,7 +1168,7 @@ export class TheIronTyrant extends Enemy {
             }
         } else if (this.powerCore < this.maxPowerCore) {
             this.powerCore = Math.min(this.maxPowerCore,
-                this.powerCore + (15 * deltaTime / 1000));
+                this.powerCore + (15 * deltaTime));
         }
         
         // Update power core visual
@@ -1157,12 +1189,12 @@ export class TheIronTyrant extends Enemy {
         
         // Minigun barrel rotation when firing
         if (this.minigunBarrels && this.weaponSystems.minigun.spinUp) {
-            this.minigunBarrels.rotation.x += deltaTime * 0.05;
+            this.minigunBarrels.rotation.x += deltaTime * 50;
         }
         
         // Damage sparks
         if (this.damageParticles) {
-            this.damageParticles.rotation.y += deltaTime * 0.002;
+            this.damageParticles.rotation.y += deltaTime * 2;
         }
         
         // Servo movements
@@ -1219,41 +1251,10 @@ export class TheIronTyrant extends Enemy {
         }
     }
 
-    animateCannonShell(shell) {
-        const shellInterval = setInterval(() => {
-            const age = Date.now() - shell.userData.birthTime;
-            if (age > shell.userData.life) {
-                this.createExplosion(shell.position);
-                this.scene.remove(shell);
-                clearInterval(shellInterval);
-                return;
-            }
-            
-            const movement = shell.userData.velocity.clone().multiplyScalar(16 / 1000);
-            shell.position.add(movement);
-            shell.rotation.x += 0.1;
-        }, 16);
-    }
-
-    animateRocket(rocket) {
-        const rocketInterval = setInterval(() => {
-            const age = Date.now() - rocket.userData.birthTime;
-            if (age > rocket.userData.life) {
-                this.createExplosion(rocket.position);
-                this.scene.remove(rocket);
-                clearInterval(rocketInterval);
-                return;
-            }
-            
-            const movement = rocket.userData.velocity.clone().multiplyScalar(16 / 1000);
-            rocket.position.add(movement);
-        }, 16);
-    }
-
     createExplosion(position) {
         const explosionGeometry = new THREE.SphereGeometry(4, 16, 16);
         const explosionMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: THEME.effects.explosion.fire,
             transparent: true,
             opacity: 0.9
         });
@@ -1261,26 +1262,20 @@ export class TheIronTyrant extends Enemy {
         explosion.position.copy(position);
         this.scene.add(explosion);
         
-        // Animate explosion
-        let scale = 0.1;
-        let opacity = 0.9;
-        const explosionInterval = setInterval(() => {
-            scale += 0.5;
-            opacity -= 0.08;
-            explosion.scale.setScalar(scale);
-            explosion.material.opacity = opacity;
-            
-            if (opacity <= 0) {
-                this.scene.remove(explosion);
-                clearInterval(explosionInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: explosion,
+            type: 'explosion',
+            duration: 1125,
+            currentTime: 0,
+            scaleRate: 0.5 / 0.05,
+            opacityRate: 0.08 / 0.05
+        });
     }
 
     createMuzzleFlash(position) {
         const flashGeometry = new THREE.SphereGeometry(1, 8, 8);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             transparent: true,
             opacity: 0.8
         });
@@ -1296,7 +1291,7 @@ export class TheIronTyrant extends Enemy {
     createLaserImpact(position) {
         const impactGeometry = new THREE.SphereGeometry(1, 12, 12);
         const impactMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
+            color: THEME.effects.explosion.plasma,
             transparent: true,
             opacity: 0.8
         });
@@ -1304,20 +1299,14 @@ export class TheIronTyrant extends Enemy {
         impact.position.copy(position);
         this.scene.add(impact);
         
-        // Animate impact
-        let scale = 1;
-        let opacity = 0.8;
-        const impactInterval = setInterval(() => {
-            scale += 0.4;
-            opacity -= 0.08;
-            impact.scale.setScalar(scale);
-            impact.material.opacity = opacity;
-            
-            if (opacity <= 0) {
-                this.scene.remove(impact);
-                clearInterval(impactInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: impact,
+            type: 'laser_impact',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.4 / 0.05,
+            opacityRate: 0.08 / 0.05
+        });
     }
 
     takeDamage(amount, damageType, hitPart) {
@@ -1349,7 +1338,7 @@ export class TheIronTyrant extends Enemy {
         // Flash red
         if (this.mechParts.chassis) {
             const originalColor = this.mechParts.chassis.material.color.getHex();
-            this.mechParts.chassis.material.color.setHex(0xff0000);
+            this.mechParts.chassis.material.color.setHex(THEME.ui.health.low);
             
             setTimeout(() => {
                 this.mechParts.chassis.material.color.setHex(originalColor);
@@ -1371,17 +1360,12 @@ export class TheIronTyrant extends Enemy {
             fallingArm.position.copy(part.position.clone().add(this.position));
             this.scene.add(fallingArm);
             
-            // Animate falling
-            const fallInterval = setInterval(() => {
-                fallingArm.position.y -= 0.2;
-                fallingArm.rotation.x += 0.05;
-                fallingArm.rotation.z += 0.03;
-                
-                if (fallingArm.position.y < -10) {
-                    this.scene.remove(fallingArm);
-                    clearInterval(fallInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: fallingArm,
+                type: 'falling_arm',
+                duration: 10000,
+                currentTime: 0
+            });
             
             // Remove from mech
             this.mesh.remove(part);
@@ -1397,7 +1381,7 @@ export class TheIronTyrant extends Enemy {
             // Core now glows brighter and is vulnerable
             if (this.powerCoreVisual) {
                 this.powerCoreVisual.material.emissiveIntensity = 1.5;
-                this.powerCoreVisual.material.color.setHex(0xff0000);
+                this.powerCoreVisual.material.color.setHex(THEME.ui.health.low);
             }
         }
     }
@@ -1421,8 +1405,8 @@ export class TheIronTyrant extends Enemy {
         for (let i = 0; i < sparkCount; i++) {
             const sparkGeometry = new THREE.SphereGeometry(0.08, 4, 4);
             const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
-                emissive: 0xffaa00,
+                color: THEME.items.weapons.legendary,
+                emissive: THEME.items.weapons.legendary,
                 emissiveIntensity: 1.0
             });
             const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
@@ -1434,23 +1418,17 @@ export class TheIronTyrant extends Enemy {
             ));
             this.scene.add(spark);
             
-            // Animate sparks
-            const sparkVelocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 8,
-                Math.random() * 8,
-                (Math.random() - 0.5) * 8
-            );
-            
-            const sparkInterval = setInterval(() => {
-                spark.position.add(sparkVelocity.multiplyScalar(0.05));
-                sparkVelocity.y -= 0.1; // Gravity
-                spark.scale.multiplyScalar(0.95);
-                
-                if (spark.scale.x < 0.1) {
-                    this.scene.remove(spark);
-                    clearInterval(sparkInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: spark,
+                type: 'damage_spark',
+                duration: 1000,
+                currentTime: 0,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 8,
+                    Math.random() * 8,
+                    (Math.random() - 0.5) * 8
+                )
+            });
         }
     }
 
@@ -1468,7 +1446,7 @@ export class TheIronTyrant extends Enemy {
             .subVectors(this.patrolTarget, this.position)
             .normalize();
         
-        this.position.add(direction.multiplyScalar(this.speed * 0.3 * deltaTime / 1000));
+        this.position.add(direction.multiplyScalar(this.speed * 0.3 * deltaTime));
         
         // Face patrol direction
         if (this.mesh) {
@@ -1503,7 +1481,7 @@ export class TheIronTyrant extends Enemy {
         setTimeout(() => {
             const finalExplosionGeometry = new THREE.SphereGeometry(20, 32, 32);
             const finalExplosionMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
+                color: THEME.ui.health.low,
                 transparent: true,
                 opacity: 1.0
             });
@@ -1511,20 +1489,14 @@ export class TheIronTyrant extends Enemy {
             finalExplosion.position.copy(this.position);
             this.scene.add(finalExplosion);
             
-            // Animate final explosion
-            let scale = 0.1;
-            let opacity = 1.0;
-            const finalInterval = setInterval(() => {
-                scale += 0.3;
-                opacity -= 0.03;
-                finalExplosion.scale.setScalar(scale);
-                finalExplosion.material.opacity = opacity;
-                
-                if (opacity <= 0) {
-                    this.scene.remove(finalExplosion);
-                    clearInterval(finalInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: finalExplosion,
+                type: 'death_explosion',
+                duration: 1666,
+                currentTime: 0,
+                scaleRate: 0.3 / 0.05,
+                opacityRate: 0.03 / 0.05
+            });
         }, 5000);
     }
 

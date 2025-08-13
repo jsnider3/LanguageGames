@@ -1,27 +1,21 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
+import { THEME } from '../modules/config/theme.js';
 // Chapter 2 - The Armory
 // Deep underground weapons cache with demonic infestation
 
 export class ArmoryLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.scene = arguments[0].scene;
-            this.game = arguments[0];
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
         
         this.levelNumber = 2;  // Chapter 2
         this.levelName = "The Armory";
         this.armoryReached = false;
         this.weaponsCollected = 0;
+        this.collectedWeapons = [];  // Track specific collected weapons
         this.doorOpened = false;
         // pickups and walls are already initialized in BaseLevel
     }
@@ -32,20 +26,20 @@ export class ArmoryLevel extends BaseLevel {
         
         // Materials
         const concreteMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,
+            color: THEME.materials.wall.armory,
             roughness: 0.95,
             metalness: 0.05
         });
         
         const metalMaterial = new THREE.MeshStandardMaterial({
-            color: 0x404040,
+            color: THEME.materials.metal.dark,
             roughness: 0.3,
             metalness: 0.9
         });
         
         const warningMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffff00,
-            emissive: 0xffff00,
+            color: THEME.items.keycards.yellow,
+            emissive: THEME.items.keycards.yellow,
             emissiveIntensity: 0.1
         });
         
@@ -75,11 +69,37 @@ export class ArmoryLevel extends BaseLevel {
         
         // Add environmental details
         this.addEnvironmentalDetails(warningMaterial);
+
+        // Add instanced decorations for performance (single draw per type)
+        this.addInstancedDecorations();
         
         // Spawn initial enemies
         this.spawnArmoryEnemies();
         
         return this.walls;
+    }
+
+    addInstancedDecorations() {
+        if (!this.game || !this.game.geometryBatcher) return;
+        const positions = [];
+        const cratePositions = [];
+        // Place barrels along the armory room perimeter (avoid blocking paths)
+        const z = -20; // armory room center Z
+        for (let x = -12; x <= 12; x += 4) {
+            positions.push(new THREE.Vector3(x, 0.5, z - 13.5)); // back wall row
+        }
+        for (let x = -12; x <= 12; x += 4) {
+            positions.push(new THREE.Vector3(x, 0.5, z + 13.5)); // front row
+        }
+        // Crates near corners
+        cratePositions.push(new THREE.Vector3(-13, 0.5, z - 13));
+        cratePositions.push(new THREE.Vector3(13, 0.5, z - 13));
+        cratePositions.push(new THREE.Vector3(-13, 0.5, z + 13));
+        cratePositions.push(new THREE.Vector3(13, 0.5, z + 13));
+
+        // Create instanced meshes (barrels and crates)
+        this.game.geometryBatcher.createInstancedDecorations('barrel', positions);
+        this.game.geometryBatcher.createInstancedDecorations('crate', cratePositions);
     }
     
     createEntryCorridor(material) {
@@ -102,15 +122,23 @@ export class ArmoryLevel extends BaseLevel {
         corridorCeiling.position.set(0, 3, 2.5);
         this.scene.add(corridorCeiling);
         
-        // Walls
-        this.createWall(-3, 1.5, 2.5, 0.5, 3, 15, material);  // Left wall
-        this.createWall(3, 1.5, 2.5, 0.5, 3, 15, material);   // Right wall
+        // Walls (thicker to prevent clipping)
+        this.createWall(-3, 1.5, 2.5, 1, 3, 15, material);  // Left wall (thicker)
+        this.createWall(3, 1.5, 2.5, 1, 3, 15, material);   // Right wall (thicker)
         
-        // Entry door frame (connects to chapel door)
-        this.createWall(0, 1.5, 10, 6, 3, 0.5, material);
+        // Entry door frame (connects to chapel door) - with door opening
+        // Left side of door frame
+        this.createWall(-2, 1.5, 10, 2, 3, 0.5, material);
+        // Right side of door frame  
+        this.createWall(2, 1.5, 10, 2, 3, 0.5, material);
+        // Top of door frame
+        this.createWall(0, 2.75, 10, 2, 0.5, 0.5, material);
         
-        // Create door from chapel
-        this.createDoor(0, 1.5, 10, 'fromChapel');
+        // Add wall behind door to prevent walking into void
+        this.createWall(0, 1.5, 10.5, 2, 3, 0.2, material);
+        
+        // Create door from chapel (visible in the opening)
+        this.createDoor(0, 1.5, 9.8, 'fromChapel');
     }
     
     createConnectingCorridor(material) {
@@ -133,9 +161,9 @@ export class ArmoryLevel extends BaseLevel {
         corridorCeiling.position.set(0, 3, -10);
         this.scene.add(corridorCeiling);
         
-        // Walls
-        this.createWall(-3, 1.5, -10, 0.5, 3, 10, material);  // Left wall
-        this.createWall(3, 1.5, -10, 0.5, 3, 10, material);   // Right wall
+        // Walls (thicker to prevent clipping)
+        this.createWall(-3, 1.5, -10, 1, 3, 10, material);  // Left wall (thicker)
+        this.createWall(3, 1.5, -10, 1, 3, 10, material);   // Right wall (thicker)
     }
 
     createArmoryRoom(z, concreteMaterial, metalMaterial) {
@@ -158,18 +186,21 @@ export class ArmoryLevel extends BaseLevel {
         armoryCeiling.position.set(0, 5, z);
         this.scene.add(armoryCeiling);
         
-        // Walls (with opening at back for exit)
-        this.createWall(-15, 2.5, z, 0.5, 5, 30, concreteMaterial);  // Left
-        this.createWall(15, 2.5, z, 0.5, 5, 30, concreteMaterial);   // Right
-        // Back wall with exit opening
-        this.createWall(-12, 2.5, z - 15, 6, 5, 0.5, concreteMaterial); // Left of exit
-        this.createWall(12, 2.5, z - 15, 6, 5, 0.5, concreteMaterial);  // Right of exit
-        this.createWall(0, 4, z - 15, 6, 2, 0.5, concreteMaterial);     // Above exit
+        // Walls (thicker to prevent clipping)
+        this.createWall(-15, 2.5, z, 1, 5, 30, concreteMaterial);  // Left (thicker)
+        this.createWall(15, 2.5, z, 1, 5, 30, concreteMaterial);   // Right (thicker)
+        // Back wall with exit opening (6-unit wide gap for hallway from x=-3 to x=3)
+        this.createWall(-9, 2.5, z - 15, 12, 5, 1, concreteMaterial); // Left of exit (ends at x=-3)
+        this.createWall(9, 2.5, z - 15, 12, 5, 1, concreteMaterial);  // Right of exit (starts at x=3)
+        this.createWall(0, 4, z - 15, 6, 2, 1, concreteMaterial);     // Above exit (6 units wide)
         
-        // Front wall with large entrance opening (no walls blocking entry from corridor)
-        this.createWall(-12, 2.5, z + 15, 6, 5, 0.5, concreteMaterial);  // Left of entrance
-        this.createWall(12, 2.5, z + 15, 6, 5, 0.5, concreteMaterial);   // Right of entrance
-        this.createWall(0, 4, z + 15, 6, 2, 0.5, concreteMaterial);      // Above entrance
+        // Front wall with entrance from connecting corridor (thicker)
+        // Left of entrance
+        this.createWall(-9, 2.5, z + 15, 12, 5, 1, concreteMaterial);
+        // Right of entrance  
+        this.createWall(9, 2.5, z + 15, 12, 5, 1, concreteMaterial);
+        // Above entrance
+        this.createWall(0, 4, z + 15, 6, 2, 1, concreteMaterial);
         
         // Support pillars
         for (let x = -10; x <= 10; x += 10) {
@@ -358,13 +389,14 @@ export class ArmoryLevel extends BaseLevel {
         this.createWall(-4, 1.5, -47, 0.5, 3, 10, material);  // Left
         this.createWall(4, 1.5, -47, 0.5, 3, 10, material);   // Right
         
-        // Back wall with doorway gap - create two wall sections on either side of door
-        // Door is 4 units wide, so walls go from -4 to -2 and from 2 to 4
-        this.createWall(-3, 1.5, -52, 2, 3, 0.5, material);   // Back wall left side (2 units wide)
-        this.createWall(3, 1.5, -52, 2, 3, 0.5, material);    // Back wall right side (2 units wide)
+        // Back wall is at the end of exit area (z=-52)
+        // Create wall sections around door opening
+        this.createWall(-3, 1.5, -52, 2, 3, 0.5, material);   // Left of door
+        this.createWall(3, 1.5, -52, 2, 3, 0.5, material);    // Right of door
+        this.createWall(0, 4, -52, 6, 2, 0.5, material);      // Above door
         
-        // Sealed door in the doorway gap
-        this.createSealedDoor(0, 1.5, -52);  // Door aligned with back wall
+        // Sealed door flush with back wall at z=-52
+        this.createSealedDoor(0, 1.5, -51.5);  // Slightly in front of wall to be visible
         
         // Add arrow pointing down at the door
         const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);  // Made it 8-sided for smoother look
@@ -398,46 +430,143 @@ export class ArmoryLevel extends BaseLevel {
         
         if (type === 'fromChapel') {
             this.chapelDoor = door;
+            // Make door blue to indicate it's a return path
+            door.material.color.setHex(0x4444ff);
+            door.material.emissive = new THREE.Color(0x0000ff);
+            door.material.emissiveIntensity = 0.2;
+            door.userData.targetLevel = 'chapel'; // Goes back to chapel
+            
+            // Add door to walls for collision detection
+            this.walls.push(door);
         }
     }
     
     createSealedDoor(x, y, z) {
-        const doorGeometry = new THREE.BoxGeometry(4, 3, 0.5);  // Door thickness matches wall
+        // Create realistic elevator doors
+        const elevatorGroup = new THREE.Group();
+        
+        // Elevator frame (metallic border)
+        const frameGeometry = new THREE.BoxGeometry(5, 4, 0.4);
+        const frameMaterial = new THREE.MeshStandardMaterial({
+            color: 0x555555,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+        frame.position.set(x, y, z);
+        elevatorGroup.add(frame);
+        
+        // Cut out center for doors
+        const cutoutGeometry = new THREE.BoxGeometry(4.2, 3.2, 0.5);
+        const cutoutMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000
+        });
+        const cutout = new THREE.Mesh(cutoutGeometry, cutoutMaterial);
+        cutout.position.set(x, y, z);
+        elevatorGroup.add(cutout);
+        
+        // Left elevator door
+        const doorGeometry = new THREE.BoxGeometry(2, 3, 0.2);
         const doorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x404040,  // Lighter gray so it's more visible
-            metalness: 0.7,
-            roughness: 0.3,
-            emissive: 0xff0000,
-            emissiveIntensity: 0.5  // Stronger red glow
+            color: 0x888888,
+            metalness: 0.9,
+            roughness: 0.1,
+            emissive: 0x000000,
+            emissiveIntensity: 0
         });
         
-        const door = new THREE.Mesh(doorGeometry, doorMaterial);
-        door.position.set(x, y, z);  // Door flush with wall
-        door.userData = { 
-            isSealedDoor: true,
-            isExitDoor: true,  // Mark as the exit door
-            locked: true
-        };
+        const leftDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+        leftDoor.position.set(x - 1, y, z + 0.2);
+        elevatorGroup.add(leftDoor);
+        this.leftDoor = leftDoor;
         
-        // Warning sign with text
-        const signGeometry = new THREE.PlaneGeometry(3, 1);
+        const rightDoor = new THREE.Mesh(doorGeometry, doorMaterial.clone());
+        rightDoor.position.set(x + 1, y, z + 0.2);
+        elevatorGroup.add(rightDoor);
+        this.rightDoor = rightDoor;
+        
+        // Elevator call button panel
+        const panelGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.1);
+        const panelMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333,
+            metalness: 0.5,
+            roughness: 0.6
+        });
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+        panel.position.set(x + 3, y, z);
+        elevatorGroup.add(panel);
+        
+        // Call button (red when locked)
+        const buttonGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16);
+        const buttonMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.8
+        });
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.rotation.x = Math.PI / 2;
+        button.position.set(x + 3, y, z + 0.1);
+        elevatorGroup.add(button);
+        this.elevatorButton = button;
+        
+        // Floor indicator above doors
+        const displayGeometry = new THREE.BoxGeometry(1.5, 0.4, 0.1);
+        const displayMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            emissive: 0x330000,
+            emissiveIntensity: 0.3
+        });
+        const display = new THREE.Mesh(displayGeometry, displayMaterial);
+        display.position.set(x, y + 2.5, z + 0.2);
+        elevatorGroup.add(display);
+        this.elevatorDisplay = display;
+        
+        // "FREIGHT ELEVATOR" sign
+        const signGeometry = new THREE.PlaneGeometry(3, 0.5);
         const signMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffff00,
-            emissive: 0xffff00,
-            emissiveIntensity: 0.5
+            color: 0x444444,
+            metalness: 0.4,
+            roughness: 0.6
         });
         const sign = new THREE.Mesh(signGeometry, signMaterial);
-        sign.position.set(x, y + 2, z + 0.3);  // Sign in front of door
+        sign.position.set(x, y + 3.2, z + 0.3);
+        elevatorGroup.add(sign);
         
-        // Add a point light to make the door more visible
-        const doorLight = new THREE.PointLight(0xff0000, 0.5, 10);
-        doorLight.position.set(x, y, z + 2);  // Light in front of door
-        this.scene.add(doorLight);
-        this.doorLight = doorLight;
+        // Add back wall inside elevator shaft to prevent walking through
+        const backWallGeometry = new THREE.BoxGeometry(4.8, 3.8, 0.2);
+        const backWallMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333,
+            metalness: 0.4,
+            roughness: 0.7
+        });
+        const backWall = new THREE.Mesh(backWallGeometry, backWallMaterial);
+        backWall.position.set(x, y, z - 2);  // Place it 2 units behind the doors
+        elevatorGroup.add(backWall);
         
-        this.scene.add(door);
-        this.scene.add(sign);
-        this.sealedDoor = door;
+        // Add collision wall to physically block passage
+        this.createWall(x, y, z - 2, 4.8, 3.8, 0.2, backWallMaterial);
+        
+        // Interior lighting (dim initially)
+        const elevatorLight = new THREE.PointLight(0xffff99, 0.2, 6);
+        elevatorLight.position.set(x, y + 1, z + 1);
+        this.scene.add(elevatorLight);
+        this.doorLight = elevatorLight;
+        
+        this.scene.add(elevatorGroup);
+        this.elevatorGroup = elevatorGroup;
+        
+        // Use left door as main collision reference
+        this.sealedDoor = leftDoor;
+        leftDoor.userData = { 
+            isSealedDoor: true,
+            isExitDoor: true,
+            locked: true
+        };
+        rightDoor.userData = { 
+            isSealedDoor: true,
+            isExitDoor: true,
+            locked: true
+        };
     }
     
     // createWall method is now inherited from BaseLevel
@@ -473,12 +602,12 @@ export class ArmoryLevel extends BaseLevel {
         
         // Emergency red lighting at exit
         const emergencyLight = new THREE.PointLight(0xff0000, 0.3, 20);
-        emergencyLight.position.set(0, 2, -47);
+        emergencyLight.position.set(0, 2, -47);  // In exit area
         this.scene.add(emergencyLight);
         
         // Bright light on the green exit door
         const exitDoorLight = new THREE.PointLight(0x00ff00, 1.2, 12);
-        exitDoorLight.position.set(0, 2, -49);
+        exitDoorLight.position.set(0, 2, -49);  // In front of door at z=-51.5
         this.scene.add(exitDoorLight);
     }
     
@@ -553,6 +682,13 @@ export class ArmoryLevel extends BaseLevel {
         // Check proximity to weapon pickups using direct array access
         if (!playerPosition) return;
         
+        // Throttle collection checks to every 100ms for performance
+        const now = Date.now();
+        if (this.lastCollectionCheck && now - this.lastCollectionCheck < 100) {
+            return;
+        }
+        this.lastCollectionCheck = now;
+        
         for (let i = this.pickups.length - 1; i >= 0; i--) {
             const pickup = this.pickups[i];
             
@@ -564,21 +700,37 @@ export class ArmoryLevel extends BaseLevel {
                 pickup.userData.collected = true;
                 this.weaponsCollected++;
                 
+                // Track which weapon was collected
+                const weaponType = pickup.userData.weaponType || pickup.userData.type;
+                if (!this.collectedWeapons.includes(weaponType)) {
+                    this.collectedWeapons.push(weaponType);
+                }
+                
                 // Actually give the weapon to the player
                 if (this.game && this.game.player) {
                     const weaponType = pickup.userData.type;
-                    if (weaponType === 'Rifle') {
+                    if (weaponType === 'rifle' || weaponType === 'Rifle') {
                         this.game.player.weapons.push('rifle');
                         this.game.player.hasRifle = true;
-                    } else if (weaponType === 'Shotgun') {
+                    } else if (weaponType === 'shotgun' || weaponType === 'Shotgun') {
                         this.game.player.weapons.push('shotgun');
                         this.game.player.hasShotgun = true;
-                    } else if (weaponType === 'Holy Water') {
+                    } else if (weaponType === 'Holy Water' || weaponType === 'holyWater') {
                         this.game.player.weapons.push('holyWater');
                         this.game.player.hasHolyWater = true;
-                    } else if (weaponType === 'Crucifix Launcher') {
+                    } else if (weaponType === 'Crucifix Launcher' || weaponType === 'crucifix') {
                         this.game.player.weapons.push('crucifix');
                         this.game.player.hasCrucifix = true;
+                    } else if (weaponType === 'pistol') {
+                        // Pistol ammo
+                        if (this.game.player.ammo && this.game.player.ammo.bullets !== undefined) {
+                            this.game.player.ammo.bullets += 15;
+                        }
+                    } else if (weaponType === 'ammo') {
+                        // Generic ammo
+                        if (this.game.player.ammo && this.game.player.ammo.shells !== undefined) {
+                            this.game.player.ammo.shells += 10;
+                        }
                     }
                 }
                 
@@ -586,14 +738,20 @@ export class ArmoryLevel extends BaseLevel {
                     this.game.narrativeSystem.displaySubtitle(`Collected ${pickup.userData.type}! (${this.weaponsCollected}/4 weapons)`);
                 }
                 
-                // Remove from scene and tracking array
-                if (this.scene && this.scene.remove) {
-                    this.scene.remove(pickup);
+                // Hide instead of remove for better performance
+                pickup.visible = false;
+                if (pickup.userData.light) {
+                    pickup.userData.light.visible = false;
                 }
-                this.pickups.splice(i, 1);
+                
+                // Mark for cleanup later
+                pickup.userData.pendingRemoval = true;
                 
                 // Check exit condition immediately after collecting
                 this.checkExitCondition();
+                
+                // Only process one pickup per frame to reduce lag
+                break;
             }
         }
         
@@ -620,66 +778,169 @@ export class ArmoryLevel extends BaseLevel {
     }
     
     checkExitCondition() {
-        // Open sealed door after collecting all weapons
+        // Open elevator after collecting all weapons
         if (this.weaponsCollected >= 4 && this.sealedDoor && this.sealedDoor.userData.locked) {
             this.sealedDoor.userData.locked = false;
-            this.sealedDoor.material.emissive.setHex(0x00ff00);
-            this.sealedDoor.material.emissiveIntensity = 1.0;  // Bright green glow
             
-            // Make door translucent to show it can be passed through
-            this.sealedDoor.material.transparent = true;
-            this.sealedDoor.material.opacity = 0.3;
-            
-            // Change door light to green
-            if (this.doorLight) {
-                this.doorLight.color.setHex(0x00ff00);
-                this.doorLight.intensity = 1.0;
+            // Change button to green
+            if (this.elevatorButton) {
+                this.elevatorButton.material.emissive.setHex(0x00ff00);
+                this.elevatorButton.material.emissiveIntensity = 1.0;
             }
+            
+            // Change display to show "READY"
+            if (this.elevatorDisplay) {
+                this.elevatorDisplay.material.emissive.setHex(0x00ff00);
+                this.elevatorDisplay.material.emissiveIntensity = 0.5;
+            }
+            
+            // Brighten elevator interior light
+            if (this.doorLight) {
+                this.doorLight.color.setHex(0xffffff);
+                this.doorLight.intensity = 0.8;
+            }
+            
+            // Remove doors from collision walls
+            const leftIndex = this.walls.indexOf(this.leftDoor);
+            if (leftIndex !== -1) {
+                this.walls.splice(leftIndex, 1);
+            }
+            const rightIndex = this.walls.indexOf(this.rightDoor);
+            if (rightIndex !== -1) {
+                this.walls.splice(rightIndex, 1);
+            }
+            console.log('[ArmoryLevel] Elevator doors unlocked');
             
             if (this.game.narrativeSystem) {
-                this.game.narrativeSystem.setObjective("Walk through the GREEN GLOWING DOOR at the far end");
-                this.game.narrativeSystem.displaySubtitle("The armory door unseals. Walk STRAIGHT BACK through the corridors to the green door.");
+                this.game.narrativeSystem.setObjective("Take the FREIGHT ELEVATOR to the Laboratory");
+                this.game.narrativeSystem.displaySubtitle("Elevator is ready. Proceed to the Laboratory level.");
             }
             
-            // Animate door sliding up
+            // Animate elevator doors opening
             this.animateDoorOpening();
         }
     }
     
-    animateDoorOpening() {
-        if (!this.sealedDoor) return;
-        
-        // Don't animate the door sliding up - just make it passable
-        // The transparency and green color already indicate it's open
-        // This prevents the floating door issue
-        
-        // Keep the door visible but transparent so players can see it
-        // Don't fade it completely
-        const fadeOut = () => {
-            if (this.sealedDoor.material.opacity > 0.3) {
-                this.sealedDoor.material.opacity -= 0.01;
-                requestAnimationFrame(fadeOut);
+    openElevatorForReturn() {
+        // Open elevator doors immediately when returning from Laboratory
+        if (this.leftDoor && this.rightDoor) {
+            // Store original positions if not already stored
+            if (!this.leftDoor.userData.originalX) {
+                this.leftDoor.userData.originalX = -1;
+                this.rightDoor.userData.originalX = 1;
             }
-            // Don't make it invisible - keep it at 30% opacity
+            
+            // Set doors to fully open position
+            this.leftDoor.position.x = -1 - 1.8;  // Original position - maxOpen
+            this.rightDoor.position.x = 1 + 1.8;   // Original position + maxOpen
+            
+            // Update button to green (active)
+            if (this.elevatorButton) {
+                this.elevatorButton.material.emissive.setHex(0x00ff00);
+                this.elevatorButton.material.emissiveIntensity = 0.8;
+            }
+            
+            // Update display to show "LAB"
+            if (this.elevatorDisplay) {
+                this.elevatorDisplay.material.emissive.setHex(0x003300);
+                this.elevatorDisplay.material.emissiveIntensity = 0.5;
+            }
+            
+            // Brighten elevator light
+            if (this.doorLight) {
+                this.doorLight.intensity = 1.0;
+            }
+            
+            // Doors are now open
+            if (this.leftDoor.userData) this.leftDoor.userData.locked = false;
+            if (this.rightDoor.userData) this.rightDoor.userData.locked = false;
+        }
+    }
+    
+    animateDoorOpening() {
+        if (!this.leftDoor || !this.rightDoor) return;
+        
+        // Animate elevator doors sliding open
+        const openSpeed = 0.02;
+        const maxOpen = 1.8;  // How far doors slide apart
+        
+        const animateOpen = () => {
+            let stillOpening = false;
+            
+            // Slide left door left
+            if (this.leftDoor.position.x > this.leftDoor.userData.originalX - maxOpen) {
+                this.leftDoor.position.x -= openSpeed;
+                stillOpening = true;
+            }
+            
+            // Slide right door right
+            if (this.rightDoor.position.x < this.rightDoor.userData.originalX + maxOpen) {
+                this.rightDoor.position.x += openSpeed;
+                stillOpening = true;
+            }
+            
+            if (stillOpening) {
+                requestAnimationFrame(animateOpen);
+            } else {
+                // Doors fully open - play a ding sound if available
+                console.log('[ArmoryLevel] Elevator doors open');
+            }
         };
-        // Start fade after a short delay so player sees the green change first
-        setTimeout(fadeOut, 1000);
+        
+        // Store original positions
+        if (!this.leftDoor.userData.originalX) {
+            this.leftDoor.userData.originalX = this.leftDoor.position.x;
+            this.rightDoor.userData.originalX = this.rightDoor.position.x;
+        }
+        
+        // Start animation after a short delay
+        setTimeout(animateOpen, 500);
+    }
+    
+    update(deltaTime) {
+        // Call parent update
+        if (super.update) {
+            super.update(deltaTime);
+        }
+        
+        // Update objective based on enemy count
+        if (!this.centralCacheUnlocked && this.game && this.game.enemies) {
+            const enemyCount = this.game.enemies.length;
+            
+            if (enemyCount > 0 && this.lastEnemyCount !== enemyCount) {
+                // Update enemy count in objective
+                if (this.game.narrativeSystem) {
+                    this.game.narrativeSystem.setObjective(`Clear the armory - defeat all enemies (${enemyCount} remaining)`);
+                }
+                this.lastEnemyCount = enemyCount;
+            }
+        }
+        
+        // Update pickups
+        this.updatePickups(deltaTime);
     }
     
     updatePickups(deltaTime) {
         // Animate all weapon pickups efficiently using direct array access
         const time = Date.now() * 0.002;
         
+        // Batch cleanup of removed pickups every second
+        const now = Date.now();
+        if (!this.lastPickupCleanup || now - this.lastPickupCleanup > 1000) {
+            this.lastPickupCleanup = now;
+            this.cleanupRemovedPickups();
+        }
+        
         for (let i = this.pickups.length - 1; i >= 0; i--) {
             const pickup = this.pickups[i];
             
-            // Remove collected or invalid pickups from tracking
-            if (!pickup || !pickup.parent || pickup.userData.collected) {
-                this.pickups.splice(i, 1);
+            // Skip collected pickups
+            if (!pickup || pickup.userData.collected) {
                 continue;
             }
             
-            if (pickup.userData.baseY !== undefined) {
+            // Only animate visible pickups
+            if (pickup.visible && pickup.userData.baseY !== undefined) {
                 // Floating animation
                 pickup.position.y = pickup.userData.baseY + Math.sin(time + pickup.userData.animationTime) * 0.2;
                 pickup.rotation.y += 0.02;
@@ -687,27 +948,47 @@ export class ArmoryLevel extends BaseLevel {
         }
     }
     
-    createBoundaryWalls(material) {
-        // Create invisible boundary walls to prevent walking out of the level
-        const boundaries = [
-            // Far perimeter walls
-            { x: 0, y: 2.5, z: 15, width: 40, height: 5, depth: 0.5 },      // North boundary
-            { x: 0, y: 2.5, z: -60, width: 40, height: 5, depth: 0.5 },     // South boundary  
-            { x: -20, y: 2.5, z: -22, width: 0.5, height: 5, depth: 80 },   // West boundary
-            { x: 20, y: 2.5, z: -22, width: 0.5, height: 5, depth: 80 }     // East boundary
-        ];
-        
-        boundaries.forEach(boundary => {
-            this.createWall(
-                boundary.x, boundary.y, boundary.z,
-                boundary.width, boundary.height, boundary.depth,
-                material
-            );
-        });
+    cleanupRemovedPickups() {
+        // Clean up pickups marked for removal
+        for (let i = this.pickups.length - 1; i >= 0; i--) {
+            const pickup = this.pickups[i];
+            if (pickup && pickup.userData.pendingRemoval) {
+                // Remove from scene
+                if (this.scene && pickup.parent) {
+                    this.scene.remove(pickup);
+                }
+                // Remove light if exists
+                if (pickup.userData.light && pickup.userData.light.parent) {
+                    this.scene.remove(pickup.userData.light);
+                }
+                // Remove from array
+                this.pickups.splice(i, 1);
+            }
+        }
     }
     
-    checkExitCollision(player) {
-        // Check if player has reached the exit door
+    createBoundaryWalls(material) {
+        // Create front wall for the armory entrance area
+        // The armory room itself already has walls, we just need to close off the entrance area
+        
+        // Front wall sections around the entrance from chapel (at z=10)
+        // Left section of front wall
+        this.createWall(-7.5, 1.5, 10, 9, 3, 0.5, material);
+        // Right section of front wall  
+        this.createWall(7.5, 1.5, 10, 9, 3, 0.5, material);
+        // Top section above door
+        this.createWall(0, 2.75, 10, 3, 0.5, 0.5, material);
+        
+        // Close off the connecting corridor sides at z=-5 to z=-15
+        // These connect the entry area to the main armory room
+        // Extended left wall of corridor
+        this.createWall(-3, 1.5, 2.5, 0.5, 3, 15, material);
+        // Extended right wall of corridor
+        this.createWall(3, 1.5, 2.5, 0.5, 3, 15, material);
+    }
+    
+    checkElevatorInteraction(player) {
+        // Check if player is near the elevator and can interact
         if (!player || !player.position) return false;
         
         // Prevent multiple triggers
@@ -719,15 +1000,118 @@ export class ArmoryLevel extends BaseLevel {
             const playerZ = player.position.z;
             const playerX = player.position.x;
             
-            // Check if player has passed through the door area
-            // Made the detection area larger and more forgiving
-            if (playerZ < -48 && Math.abs(playerX) < 4) {
-                this.levelCompleted = true; // Set flag to prevent multiple triggers
-                return true;
+            // Check if player is near the elevator doors
+            if (playerZ < -49 && playerZ > -53 && Math.abs(playerX) < 3) {
+                // Show interaction prompt
+                if (!this.elevatorPromptShown) {
+                    if (this.game && this.game.narrativeSystem) {
+                        this.game.narrativeSystem.displaySubtitle("Press E to use elevator");
+                    }
+                    this.elevatorPromptShown = true;
+                }
+                
+                // Check for E key press
+                if (this.game && this.game.inputManager && this.game.inputManager.keys['KeyE']) {
+                    // Prevent multiple triggers
+                    this.game.inputManager.keys['KeyE'] = false;
+                    
+                    // Use ZoneManager for elevator transition if available
+                    if (this.game.zoneManager) {
+                        this.game.zoneManager.startTransition('armory', 'laboratory', 'armory_lab_elevator');
+                        this.levelCompleted = true;
+                        return 'transition';
+                    } else {
+                        // Fallback to regular loading
+                        this.levelCompleted = true;
+                        return true;
+                    }
+                }
+            } else {
+                this.elevatorPromptShown = false;
             }
         }
         
         return false;
+    }
+    
+    // Keep old method for compatibility but it just returns false now
+    checkExitCollision(player) {
+        return false;
+    }
+    
+    checkChapelDoorCollision(player) {
+        // Check if player wants to return to chapel
+        if (!player || !player.position || !this.chapelDoor) {
+            return false;
+        }
+        
+        const distance = player.position.distanceTo(this.chapelDoor.position);
+        
+        // Check if player is very close to the door
+        if (distance < 2) {
+            // Show prompt
+            if (this.game && this.game.narrativeSystem && !this.returnPromptShown) {
+                this.game.narrativeSystem.displaySubtitle("Press E to return to Chapel");
+                this.returnPromptShown = true;
+            }
+            
+            // Check for E key press
+            if (this.game && this.game.inputManager) {
+                const eKeyPressed = this.game.inputManager.keys['KeyE'] || this.game.inputManager.keys['e'];
+                if (eKeyPressed && !this.doorOpening) {
+                    this.doorOpening = true;
+                    console.log('[ArmoryLevel] Starting transition to chapel');
+                    
+                    // Use ZoneManager for seamless transition if available
+                    if (this.game && this.game.zoneManager) {
+                        this.game.zoneManager.triggerTransition('armory', 'chapel', player);
+                        return 'transition'; // Special value to indicate transition started
+                    } else {
+                        // Fallback to regular loading
+                        if (this.game) {
+                            this.game.returningFromArmory = true;
+                        }
+                        return 'chapel'; // Load chapel level
+                    }
+                }
+            }
+        } else {
+            this.returnPromptShown = false;
+            this.doorOpening = false;
+        }
+        
+        return false;
+    }
+    
+    openDoorAnimation(door, callback) {
+        if (!door) return;
+        
+        // Animate door sliding or rotating open
+        const startPos = door.position.x;
+        const targetPos = startPos - 2; // Slide door to the left
+        const duration = 1000; // 1 second animation
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Ease-in-out animation
+            const eased = progress < 0.5 
+                ? 2 * progress * progress 
+                : -1 + (4 - 2 * progress) * progress;
+            
+            door.position.x = startPos + (targetPos - startPos) * eased;
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Door fully open, execute callback
+                if (callback) callback();
+            }
+        };
+        
+        animate();
     }
     
     clearLevel() {

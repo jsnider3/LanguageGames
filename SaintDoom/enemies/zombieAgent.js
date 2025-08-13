@@ -1,16 +1,10 @@
 import * as THREE from 'three';
-import { Enemy } from '../enemy.js';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
 
-export class ZombieAgent extends Enemy {
+export class ZombieAgent extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
-        this.name = 'Zombie Agent';
-        this.health = 80;
-        this.maxHealth = 80;
-        this.speed = 1.2;
-        this.damage = 25;
-        this.attackRange = 2.5;
-        this.detectionRange = 15;
         
         // Zombie agent specific properties
         this.infectionChance = 0.3; // 30% chance to infect on attack
@@ -54,7 +48,7 @@ export class ZombieAgent extends Enemy {
         // Glowing eyes - MeshBasicMaterial doesn't support emissive
         const eyeGeometry = new THREE.SphereGeometry(0.08, 6, 6);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00ff00
+            color: THEME.ui.health.full
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -96,7 +90,7 @@ export class ZombieAgent extends Enemy {
         // Agent badge (tarnished)
         const badgeGeometry = new THREE.BoxGeometry(0.2, 0.3, 0.05);
         const badgeMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0x666666,
+            color: THEME.materials.wall.armory,
             metalness: 0.3
         });
         const badge = new THREE.Mesh(badgeGeometry, badgeMaterial);
@@ -118,7 +112,7 @@ export class ZombieAgent extends Enemy {
         for (let i = 0; i < 5; i++) {
             const stainGeometry = new THREE.PlaneGeometry(0.2, 0.2);
             const stainMaterial = new THREE.MeshBasicMaterial({
-                color: 0x440000,
+                color: THEME.materials.robeEmissive,
                 transparent: true,
                 opacity: 0.7
             });
@@ -260,7 +254,7 @@ export class ZombieAgent extends Enemy {
         // Muzzle flash
         const flashGeometry = new THREE.SphereGeometry(0.2, 6, 6);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
+            color: THEME.ui.health.medium,
             transparent: true,
             opacity: 0.8
         });
@@ -287,8 +281,8 @@ export class ZombieAgent extends Enemy {
     createBulletProjectile(direction) {
         const bulletGeometry = new THREE.SphereGeometry(0.05, 6, 6);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            emissive: 0x444444,
+            color: THEME.lights.spot.white,
+            emissive: THEME.materials.metal.dark,
             emissiveIntensity: 0.5
         });
         const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
@@ -334,7 +328,7 @@ export class ZombieAgent extends Enemy {
 
         // Deal damage
         if (player.takeDamage) {
-            player.takeDamage(this.damage);
+            player.takeDamage(this.damage, "Zombie Agent");
         }
 
         // Remove effect after animation
@@ -353,7 +347,7 @@ export class ZombieAgent extends Enemy {
         for (let i = 0; i < 3; i++) {
             const clawGeometry = new THREE.PlaneGeometry(0.1, 1);
             const clawMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
+                color: THEME.items.weapons.legendary,
                 transparent: true,
                 opacity: 0.8
             });
@@ -413,7 +407,7 @@ export class ZombieAgent extends Enemy {
     createInfectionEffect() {
         const infectionGeometry = new THREE.RingGeometry(1, 2, 16);
         const infectionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             transparent: true,
             opacity: 0.6,
             side: THREE.DoubleSide
@@ -559,7 +553,7 @@ export class ZombieAgent extends Enemy {
         // Damage effect
         if (this.mesh) {
             const originalColor = this.mesh.children[0].material.color.getHex();
-            this.mesh.children[0].material.color.setHex(0xff0000);
+            this.mesh.children[0].material.color.setHex(THEME.ui.health.low);
             
             setTimeout(() => {
                 if (this.mesh && this.mesh.children[0]) {
@@ -586,7 +580,7 @@ export class ZombieAgent extends Enemy {
         // Visual reanimation effect
         const reanimationGeometry = new THREE.SphereGeometry(2, 16, 16);
         const reanimationMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             transparent: true,
             opacity: 0.7,
             wireframe: true

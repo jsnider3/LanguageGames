@@ -1,7 +1,18 @@
-import * as THREE from 'three';
-import { Enemy } from '../enemies/enemy.js';
 
-export class Belial extends Enemy {
+import * as THREE from 'three';
+import { BaseEnemy } from '../core/BaseEnemy.js';
+import { THEME } from '../modules/config/theme.js';
+import { BelialPhaseOneState } from './belialStates/BelialPhaseOneState.js';
+import { BelialAngelFormState } from './belialStates/BelialAngelFormState.js';
+import { BelialPriestFormState } from './belialStates/BelialPriestFormState.js';
+import { BelialMIBDirectorFormState } from './belialStates/BelialMIBDirectorFormState.js';
+import { BelialShadowFormState } from './belialStates/BelialShadowFormState.js';
+import { BelialTrueFormState } from './belialStates/BelialTrueFormState.js';
+import { BelialPhaseTwoState } from './belialStates/BelialPhaseTwoState.js';
+import { BelialPhaseThreeState } from './belialStates/BelialPhaseThreeState.js';
+import { BelialFinalPhaseState } from './belialStates/BelialFinalPhaseState.js';
+
+export class Belial extends BaseEnemy {
     constructor(scene, position) {
         super(scene, position);
         this.name = 'Belial, The Lord of Lies';
@@ -18,13 +29,13 @@ export class Belial extends Enemy {
             true: {
                 health: 3000,
                 damage: 80,
-                color: 0x660000,
+                color: THEME.bosses.belial.primary,
                 abilities: ['shadow_wave', 'illusion_army', 'reality_tear', 'mind_prison']
             },
             angel: {
                 health: 1500,
                 damage: 60,
-                color: 0xffffaa,
+                color: THEME.lights.point.holy,
                 abilities: ['false_light', 'corrupt_blessing', 'divine_deception']
             },
             priest: {
@@ -42,7 +53,7 @@ export class Belial extends Enemy {
             shadow: {
                 health: 800,
                 damage: 100,
-                color: 0x000000,
+                color: THEME.materials.black,
                 abilities: ['void_strike', 'darkness_incarnate', 'shadow_split']
             }
         };
@@ -76,9 +87,16 @@ export class Belial extends Enemy {
         this.formChangeInterval = 15000;
         this.lastIllusionSpawn = 0;
         this.lastAbilityUse = 0;
+
+        // Effects management
+        this.activeEffects = [];
         
         this.createMesh();
         this.initializeAura();
+
+        // Initialize state
+        this.currentState = new BelialPhaseOneState(this);
+        this.currentState.enter();
     }
 
     createMesh() {
@@ -113,7 +131,7 @@ export class Belial extends Enemy {
             const faceGeometry = new THREE.SphereGeometry(0.8, 12, 12);
             const faceMaterial = new THREE.MeshPhongMaterial({
                 color: 0xffddaa,
-                emissive: 0x440000,
+                emissive: THEME.materials.robeEmissive,
                 emissiveIntensity: 0.3
             });
             const face = new THREE.Mesh(faceGeometry, faceMaterial);
@@ -123,8 +141,8 @@ export class Belial extends Enemy {
             for (let i = -1; i <= 1; i += 2) {
                 const eyeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
                 const eyeMaterial = new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    emissive: 0xff0000,
+                    color: THEME.ui.health.low,
+                    emissive: THEME.ui.health.low,
                     emissiveIntensity: 1.0
                 });
                 const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -149,7 +167,7 @@ export class Belial extends Enemy {
             
             const wingGeometry = new THREE.PlaneGeometry(4, 6);
             const wingMaterial = new THREE.MeshPhongMaterial({
-                color: 0x440000,
+                color: THEME.materials.robeEmissive,
                 side: THREE.DoubleSide,
                 transparent: true,
                 opacity: 0.7
@@ -169,7 +187,7 @@ export class Belial extends Enemy {
         for (let i = 0; i < 8; i++) {
             const spikeGeometry = new THREE.ConeGeometry(0.2, 1.5, 4);
             const spikeMaterial = new THREE.MeshPhongMaterial({
-                color: 0x666666,
+                color: THEME.materials.wall.armory,
                 metalness: 0.8,
                 roughness: 0.2
             });
@@ -189,7 +207,7 @@ export class Belial extends Enemy {
         for (let i = 0; i < 6; i++) {
             const tendrilGeometry = new THREE.CylinderGeometry(0.3, 0.1, 4, 8);
             const tendrilMaterial = new THREE.MeshPhongMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 transparent: true,
                 opacity: 0.8
             });
@@ -224,7 +242,7 @@ export class Belial extends Enemy {
         // Reality distortion effect
         const distortionGeometry = new THREE.TorusGeometry(15, 0.5, 8, 32);
         const distortionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             transparent: true,
             opacity: 0.3,
             wireframe: true
@@ -239,43 +257,33 @@ export class Belial extends Enemy {
     update(deltaTime, player) {
         if (!this.mesh || !player || this.health <= 0) return;
 
-        const playerPosition = player.position || player.mesh.position;
-        const distance = this.position.distanceTo(playerPosition);
-
-        // Update phase based on health
-        this.updatePhase();
-
-        // Form management
-        if (Date.now() - this.lastFormChange > this.formChangeInterval && !this.phaseTransitioning) {
-            this.changeForm();
+        // Delegate update to the current state
+        if (this.currentState) {
+            this.currentState.update(deltaTime, player);
         }
 
-        // Combat behavior based on phase
-        switch (this.phase) {
-            case 1:
-                this.phaseOnePattern(player, distance, deltaTime);
-                break;
-            case 2:
-                this.phaseTwoPattern(player, distance, deltaTime);
-                break;
-            case 3:
-                this.phaseThreePattern(player, distance, deltaTime);
-                break;
-            case 4:
-                this.finalPhasePattern(player, distance, deltaTime);
-                break;
-        }
-
-        // Update illusions
+        // Update illusions (if they are global to Belial, not specific to a form)
         this.updateIllusions(deltaTime, player);
 
-        // Animation
+        // Animation (global animations like floating)
         this.animateBoss(deltaTime);
 
         // Face player
         if (this.mesh) {
+            const playerPosition = player.position || player.mesh.position;
             this.mesh.lookAt(playerPosition);
         }
+        
+        this.updateEffects(deltaTime);
+    }
+
+    // Method to change state
+    changeState(newState) {
+        if (this.currentState) {
+            this.currentState.exit();
+        }
+        this.currentState = newState;
+        this.currentState.enter();
     }
 
     updatePhase() {
@@ -317,122 +325,61 @@ export class Belial extends Enemy {
         }, 3000);
     }
 
-    phaseOnePattern(player, distance, deltaTime) {
-        // Deceptive combat - form switching and basic illusions
-        if (distance <= this.attackRange) {
-            const currentTime = Date.now();
-            
-            if (currentTime - this.lastAttackTime > 2000) {
-                this.performFormAttack(player);
-                this.lastAttackTime = currentTime;
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
             }
 
-            if (currentTime - this.lastIllusionSpawn > 8000) {
-                this.spawnIllusion();
-                this.lastIllusionSpawn = currentTime;
+            switch (effect.type) {
+                case 'wave':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'tear':
+                    effect.mesh.scale.y -= effect.scaleRate * deltaTime;
+                    break;
+                case 'blood':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.velocity.y -= 9.8 * deltaTime;
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'transformation':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'teleport':
+                    effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'phase_transition':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + effect.scaleRate * deltaTime);
+                    effect.mesh.rotation.z += effect.rotationRate * deltaTime;
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'resurrection':
+                    effect.mesh.scale.x += effect.scaleRate * deltaTime;
+                    effect.mesh.scale.z += effect.scaleRate * deltaTime;
+                    effect.mesh.rotation.y += effect.rotationRate * deltaTime;
+                    effect.mesh.material.opacity -= effect.opacityRate * deltaTime;
+                    break;
+                case 'collapse':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x - effect.scaleRate * deltaTime);
+                    if (this.mesh) {
+                        this.mesh.scale.setScalar(this.mesh.scale.x - effect.scaleRate * deltaTime);
+                        this.mesh.rotation.y += effect.rotationRate * deltaTime;
+                    }
+                    break;
             }
-        }
-
-        // Movement pattern - slow approach
-        if (distance > 5) {
-            const direction = new THREE.Vector3()
-                .subVectors(player.position || player.mesh.position, this.position)
-                .normalize();
-            this.position.add(direction.multiplyScalar(this.speed * deltaTime / 1000));
-        }
+            return true;
+        });
     }
 
-    phaseTwoPattern(player, distance, deltaTime) {
-        // Multiple illusions and lies
-        const currentTime = Date.now();
-
-        if (currentTime - this.lastAbilityUse > 5000) {
-            this.castLie(player);
-            this.lastAbilityUse = currentTime;
-        }
-
-        if (this.illusions.length < 3) {
-            this.spawnIllusion();
-        }
-
-        // Teleporting between positions
-        if (Math.random() < 0.01) {
-            this.teleportToIllusion();
-        }
-
-        // Ranged attacks
-        if (distance <= this.attackRange && currentTime - this.lastAttackTime > 1500) {
-            this.performFormAttack(player);
-            this.shadowWave(player);
-            this.lastAttackTime = currentTime;
-        }
-    }
-
-    phaseThreePattern(player, distance, deltaTime) {
-        // Shadow realm and reality tears
-        const currentTime = Date.now();
-
-        // Maintain shadow realm
-        if (this.shadowRealm) {
-            this.updateShadowRealm(player);
-        }
-
-        // Create reality tears
-        if (currentTime - this.lastAbilityUse > 4000) {
-            this.createRealityTear(player);
-            this.lastAbilityUse = currentTime;
-        }
-
-        // Aggressive illusion spawning
-        if (this.illusions.length < this.maxIllusions) {
-            this.spawnIllusion();
-        }
-
-        // Mind prison
-        if (Math.random() < 0.005 && !this.mindPrison) {
-            this.createMindPrison(player);
-        }
-
-        // Combat
-        if (currentTime - this.lastAttackTime > 1000) {
-            this.performFormAttack(player);
-            this.lastAttackTime = currentTime;
-        }
-    }
-
-    finalPhasePattern(player, distance, deltaTime) {
-        // True form revealed - all abilities at maximum
-        const currentTime = Date.now();
-
-        // Constant form shifting
-        if (currentTime - this.lastFormChange > 5000) {
-            this.rapidFormShift();
-        }
-
-        // Maximum illusions
-        while (this.illusions.length < this.maxIllusions) {
-            this.spawnIllusion();
-        }
-
-        // Continuous attacks
-        if (currentTime - this.lastAttackTime > 800) {
-            this.performFormAttack(player);
-            this.darknessIncarnate(player);
-            this.lastAttackTime = currentTime;
-        }
-
-        // Reality breaking
-        if (currentTime - this.lastAbilityUse > 3000) {
-            this.breakReality(player);
-            this.lastAbilityUse = currentTime;
-        }
-
-        // Teleport frequently
-        if (Math.random() < 0.02) {
-            this.teleportToIllusion();
-        }
-    }
-
+    // New methods for state management
     changeForm() {
         const forms = Object.keys(this.forms);
         let newForm;
@@ -463,132 +410,52 @@ export class Belial extends Enemy {
         // Form-specific changes
         switch (formName) {
             case 'angel':
-                this.transformToAngel();
+                // this.transformToAngel(); // Handled by state
+                this.changeState(new BelialAngelFormState(this));
                 break;
             case 'priest':
-                this.transformToPriest();
+                // this.transformToPriest(); // Handled by state
+                this.changeState(new BelialPriestFormState(this));
                 break;
             case 'mib_director':
-                this.transformToDirector();
+                // this.transformToDirector(); // Handled by state
+                this.changeState(new BelialMIBDirectorFormState(this));
                 break;
             case 'shadow':
-                this.transformToShadow();
+                // this.transformToShadow(); // Handled by state
+                this.changeState(new BelialShadowFormState(this));
+                break;
+            case 'true':
+                this.changeState(new BelialTrueFormState(this));
                 break;
         }
     }
 
-    transformToAngel() {
-        // White wings and holy light (corrupted)
-        this.wings.forEach(wing => {
-            wing.children[0].material.color.setHex(0xffffaa);
-            wing.children[0].material.emissive = new THREE.Color(0xaaaa00);
-            wing.children[0].material.emissiveIntensity = 0.5;
-        });
+    transitionToPhase(newPhase) {
+        if (this.phaseTransitioning) return;
+        
+        this.phaseTransitioning = true;
+        this.phase = newPhase;
 
-        // False halo
-        const haloGeometry = new THREE.TorusGeometry(1.2, 0.1, 8, 32);
-        const haloMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
-            emissive: 0xaaaa00,
-            emissiveIntensity: 1.0
-        });
-        const halo = new THREE.Mesh(haloGeometry, haloMaterial);
-        halo.position.y = 7;
-        halo.rotation.x = Math.PI / 2;
-        this.mesh.add(halo);
-        this.falseHalo = halo;
-    }
+        // Phase transition effects
+        this.createPhaseTransitionEffect();
 
-    transformToPriest() {
-        // Black robes effect
-        this.wings.forEach(wing => {
-            wing.children[0].material.color.setHex(0x000000);
-            wing.children[0].material.opacity = 0.9;
-        });
-
-        // Corrupt rosary
-        this.createCorruptRosary();
-    }
-
-    transformToDirector() {
-        // MIB suit appearance
-        this.wings.forEach(wing => {
-            wing.visible = false;
-        });
-
-        // Sunglasses effect on faces
-        this.faces.forEach(face => {
-            face.children[1].material.color.setHex(0x000000);
-            face.children[2].material.color.setHex(0x000000);
-        });
-    }
-
-    transformToShadow() {
-        // Pure darkness
-        this.body.material.opacity = 0.5;
-        this.wings.forEach(wing => {
-            wing.children[0].material.color.setHex(0x000000);
-            wing.children[0].material.opacity = 0.3;
-        });
-
-        // Shadow particles
-        this.createShadowParticles();
-    }
-
-    performFormAttack(player) {
-        const abilities = this.forms[this.currentForm].abilities;
-        const ability = abilities[Math.floor(Math.random() * abilities.length)];
-
-        switch (ability) {
-            case 'shadow_wave':
-                this.shadowWave(player);
+        // Special phase abilities
+        switch (newPhase) {
+            case 2:
+                this.changeState(new BelialPhaseTwoState(this));
                 break;
-            case 'illusion_army':
-                this.spawnIllusionArmy();
+            case 3:
+                this.changeState(new BelialPhaseThreeState(this));
                 break;
-            case 'reality_tear':
-                this.createRealityTear(player);
-                break;
-            case 'mind_prison':
-                this.createMindPrison(player);
-                break;
-            case 'false_light':
-                this.falseLight(player);
-                break;
-            case 'corrupt_blessing':
-                this.corruptBlessing(player);
-                break;
-            case 'divine_deception':
-                this.divineDeception(player);
-                break;
-            case 'dark_sermon':
-                this.darkSermon(player);
-                break;
-            case 'corrupt_prayer':
-                this.corruptPrayer(player);
-                break;
-            case 'false_martyrdom':
-                this.falseMartyrdom(player);
-                break;
-            case 'summon_agents':
-                this.summonAgents();
-                break;
-            case 'temporal_shift':
-                this.temporalShift(player);
-                break;
-            case 'mind_control':
-                this.mindControl(player);
-                break;
-            case 'void_strike':
-                this.voidStrike(player);
-                break;
-            case 'darkness_incarnate':
-                this.darknessIncarnate(player);
-                break;
-            case 'shadow_split':
-                this.shadowSplit();
+            case 4:
+                this.changeState(new BelialFinalPhaseState(this));
                 break;
         }
+
+        setTimeout(() => {
+            this.phaseTransitioning = false;
+        }, 3000);
     }
 
     shadowWave(player) {
@@ -597,7 +464,7 @@ export class Belial extends Enemy {
         // Create expanding shadow wave
         const waveGeometry = new THREE.RingGeometry(0.5, 2, 32);
         const waveMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -607,32 +474,28 @@ export class Belial extends Enemy {
         wave.position.copy(this.position);
         this.scene.add(wave);
 
-        // Animate wave
-        let scale = 1;
-        const waveInterval = setInterval(() => {
-            scale += 1;
-            wave.scale.setScalar(scale);
-            wave.material.opacity -= 0.02;
-
-            // Check collision with player
-            const waveDistance = wave.position.distanceTo(playerPosition);
-            if (waveDistance <= scale * 2 && waveDistance >= scale * 0.5) {
-                if (player.takeDamage) {
-                    player.takeDamage(30);
-                }
-                if (player.addStatusEffect) {
-                    player.addStatusEffect('shadowed', {
-                        duration: 3000,
-                        visionReduced: true
-                    });
+        this.activeEffects.push({
+            mesh: wave,
+            type: 'wave',
+            duration: 2500,
+            currentTime: 0,
+            scaleRate: 50,
+            opacityRate: 0.02 / 0.05,
+            update: (effect, deltaTime) => {
+                const waveDistance = effect.mesh.position.distanceTo(playerPosition);
+                if (waveDistance <= effect.mesh.scale.x * 2 && waveDistance >= effect.mesh.scale.x * 0.5) {
+                    if (player.takeDamage) {
+                        player.takeDamage(30 * deltaTime, "Belial Dark Wave");
+                    }
+                    if (player.addStatusEffect) {
+                        player.addStatusEffect('shadowed', {
+                            duration: 3000,
+                            visionReduced: true
+                        });
+                    }
                 }
             }
-
-            if (wave.material.opacity <= 0) {
-                this.scene.remove(wave);
-                clearInterval(waveInterval);
-            }
-        }, 50);
+        });
     }
 
     spawnIllusion() {
@@ -663,33 +526,26 @@ export class Belial extends Enemy {
             mesh: illusionGroup,
             position: illusionPosition,
             health: this.illusionHealth,
-            active: true
+            active: true,
+            update: (deltaTime) => {
+                if (!illusion.active || illusion.health <= 0) {
+                    this.scene.remove(illusion.mesh);
+                    this.illusions = this.illusions.filter(i => i !== illusion);
+                    return;
+                }
+
+                // Float and rotate
+                illusion.mesh.rotation.y += 0.05 * deltaTime * 60;
+                illusion.mesh.position.y = illusion.position.y + Math.sin(Date.now() * 0.003) * 0.5;
+
+                // Occasionally attack
+                if (Math.random() < 0.01) {
+                    this.illusionAttack(illusion);
+                }
+            }
         };
 
         this.illusions.push(illusion);
-
-        // Illusion behavior
-        this.animateIllusion(illusion);
-    }
-
-    animateIllusion(illusion) {
-        const illusionInterval = setInterval(() => {
-            if (!illusion.active || illusion.health <= 0) {
-                this.scene.remove(illusion.mesh);
-                this.illusions = this.illusions.filter(i => i !== illusion);
-                clearInterval(illusionInterval);
-                return;
-            }
-
-            // Float and rotate
-            illusion.mesh.rotation.y += 0.05;
-            illusion.mesh.position.y = illusion.position.y + Math.sin(Date.now() * 0.003) * 0.5;
-
-            // Occasionally attack
-            if (Math.random() < 0.01) {
-                this.illusionAttack(illusion);
-            }
-        }, 50);
     }
 
     illusionAttack(illusion) {
@@ -777,7 +633,7 @@ export class Belial extends Enemy {
         // Visual tear in reality
         const tearGeometry = new THREE.PlaneGeometry(2, 6);
         const tearMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide
@@ -787,27 +643,23 @@ export class Belial extends Enemy {
         tear.rotation.y = Math.random() * Math.PI;
         this.scene.add(tear);
 
-        this.realityTears.push(tear);
-
-        // Tear damages nearby entities
-        const tearInterval = setInterval(() => {
-            const playerPos = player.position || player.mesh.position;
-            const distance = tear.position.distanceTo(playerPos);
-            
-            if (distance < 3) {
-                if (player.takeDamage) {
-                    player.takeDamage(15);
+        this.activeEffects.push({
+            mesh: tear,
+            type: 'tear',
+            duration: 5000,
+            currentTime: 0,
+            scaleRate: 0.02 / 0.05,
+            update: (effect, deltaTime) => {
+                const playerPos = player.position || player.mesh.position;
+                const distance = effect.mesh.position.distanceTo(playerPos);
+                
+                if (distance < 3) {
+                    if (player.takeDamage) {
+                        player.takeDamage(15 * deltaTime, "Belial Shadow Tentacle");
+                    }
                 }
             }
-
-            // Tear closes after time
-            tear.scale.y -= 0.02;
-            if (tear.scale.y <= 0) {
-                this.scene.remove(tear);
-                this.realityTears = this.realityTears.filter(t => t !== tear);
-                clearInterval(tearInterval);
-            }
-        }, 100);
+        });
     }
 
     createMindPrison(player) {
@@ -857,7 +709,7 @@ export class Belial extends Enemy {
         // Shadow realm visual
         const realmGeometry = new THREE.SphereGeometry(50, 32, 32);
         const realmMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.5,
             side: THREE.BackSide
@@ -899,101 +751,31 @@ export class Belial extends Enemy {
         }
 
         // True form appearance
-        this.body.material.color.setHex(0x000000);
-        this.body.material.emissive = new THREE.Color(0x660000);
+        this.body.material.color.setHex(THEME.materials.black);
+        this.body.material.emissive = new THREE.Color(THEME.bosses.belial.primary);
         this.body.material.emissiveIntensity = 1.0;
         this.body.scale.setScalar(1.5);
 
         // All faces become demonic
         this.faces.forEach(face => {
-            face.children[0].material.color.setHex(0x660000);
-            face.children[1].material.color.setHex(0xffff00);
-            face.children[2].material.color.setHex(0xffff00);
+            face.children[0].material.color.setHex(THEME.bosses.belial.primary);
+            face.children[1].material.color.setHex(THEME.ui.health.medium);
+            face.children[2].material.color.setHex(THEME.ui.health.medium);
         });
 
         // Wings become massive
         this.wings.forEach(wing => {
             wing.scale.setScalar(2);
-            wing.children[0].material.color.setHex(0x000000);
-            wing.children[0].material.emissive = new THREE.Color(0x440000);
+            wing.children[0].material.color.setHex(THEME.materials.black);
+            wing.children[0].material.emissive = new THREE.Color(THEME.materials.robeEmissive);
         });
     }
 
-    rapidFormShift() {
-        // Quickly cycle through forms
-        const forms = Object.keys(this.forms);
-        let formIndex = 0;
-        
-        const shiftInterval = setInterval(() => {
-            this.transformToForm(forms[formIndex]);
-            formIndex++;
-            
-            if (formIndex >= forms.length) {
-                clearInterval(shiftInterval);
-                this.currentForm = 'true';
-            }
-        }, 200);
-    }
+    
 
-    breakReality(player) {
-        // Ultimate reality-breaking attack
-        this.realityDistortion = true;
-        this.distortionRing.visible = true;
+    
 
-        // Multiple reality tears
-        for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-                this.createRealityTear(player);
-            }, i * 500);
-        }
-
-        // Spawn maximum illusions
-        while (this.illusions.length < this.maxIllusions) {
-            this.spawnIllusion();
-        }
-
-        // Apply all lies
-        const allLies = ['false_health', 'inverted_controls', 'fake_enemies', 'wrong_objective'];
-        allLies.forEach(lie => {
-            if (player.addStatusEffect) {
-                player.addStatusEffect(lie, { duration: 15000 });
-            }
-        });
-    }
-
-    darknessIncarnate(player) {
-        // Become one with darkness
-        const darknessGeometry = new THREE.SphereGeometry(10, 16, 16);
-        const darknessMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 0.9
-        });
-        const darkness = new THREE.Mesh(darknessGeometry, darknessMaterial);
-        darkness.position.copy(this.position);
-        this.scene.add(darkness);
-
-        // Expanding darkness
-        let scale = 1;
-        const darknessInterval = setInterval(() => {
-            scale += 0.5;
-            darkness.scale.setScalar(scale);
-            darkness.material.opacity -= 0.02;
-
-            // Damage everything in darkness
-            const playerPos = player.position || player.mesh.position;
-            if (darkness.position.distanceTo(playerPos) <= scale * 10) {
-                if (player.takeDamage) {
-                    player.takeDamage(5);
-                }
-            }
-
-            if (darkness.material.opacity <= 0) {
-                this.scene.remove(darkness);
-                clearInterval(darknessInterval);
-            }
-        }, 100);
-    }
+    
 
     animateBoss(deltaTime) {
         if (!this.mesh) return;
@@ -1003,7 +785,7 @@ export class Belial extends Enemy {
 
         // Rotate crown
         if (this.crown) {
-            this.crown.rotation.y += deltaTime * 0.001;
+            this.crown.rotation.y += deltaTime * 0.1;
         }
 
         // Animate faces
@@ -1036,7 +818,7 @@ export class Belial extends Enemy {
 
         // Reality distortion animation
         if (this.distortionRing && this.distortionRing.visible) {
-            this.distortionRing.rotation.z += deltaTime * 0.003;
+            this.distortionRing.rotation.z += deltaTime * 3;
             this.distortionRing.scale.x = 1 + Math.sin(Date.now() * 0.01) * 0.2;
             this.distortionRing.scale.y = 1 + Math.cos(Date.now() * 0.01) * 0.2;
         }
@@ -1055,6 +837,8 @@ export class Belial extends Enemy {
             (this.shadowRealm ? 20 : 0) +
             (this.realityDistortion ? 30 : 0)
         );
+
+        this.illusions.forEach(illusion => illusion.update(deltaTime));
     }
 
     takeDamage(amount, damageType) {
@@ -1097,7 +881,7 @@ export class Belial extends Enemy {
         for (let i = 0; i < bloodCount; i++) {
             const bloodGeometry = new THREE.SphereGeometry(0.1, 6, 6);
             const bloodMaterial = new THREE.MeshBasicMaterial({
-                color: 0x440000,
+                color: THEME.materials.robeEmissive,
                 transparent: true,
                 opacity: 0.8
             });
@@ -1110,23 +894,18 @@ export class Belial extends Enemy {
             ));
             this.scene.add(blood);
 
-            // Animate blood
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 3,
-                Math.random() * 2,
-                (Math.random() - 0.5) * 3
-            );
-
-            const bloodInterval = setInterval(() => {
-                blood.position.add(velocity.multiplyScalar(0.1));
-                velocity.y -= 0.05;
-                blood.material.opacity -= 0.02;
-
-                if (blood.material.opacity <= 0) {
-                    this.scene.remove(blood);
-                    clearInterval(bloodInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: blood,
+                type: 'blood',
+                duration: 1000,
+                currentTime: 0,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 3,
+                    Math.random() * 2,
+                    (Math.random() - 0.5) * 3
+                ),
+                opacityRate: 0.02 / 0.05
+            });
         }
     }
 
@@ -1162,7 +941,7 @@ export class Belial extends Enemy {
         // Reality restoration effect
         const restorationGeometry = new THREE.SphereGeometry(30, 32, 32);
         const restorationMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: THEME.lights.spot.white,
             transparent: true,
             opacity: 0.8,
             wireframe: true
@@ -1171,22 +950,14 @@ export class Belial extends Enemy {
         restoration.position.copy(this.position);
         this.scene.add(restoration);
 
-        // Collapse animation
-        let scale = 1;
-        const collapseInterval = setInterval(() => {
-            scale -= 0.05;
-            restoration.scale.setScalar(scale);
-            
-            if (this.mesh) {
-                this.mesh.scale.setScalar(scale);
-                this.mesh.rotation.y += 0.2;
-            }
-
-            if (scale <= 0) {
-                this.scene.remove(restoration);
-                clearInterval(collapseInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: restoration,
+            type: 'collapse',
+            duration: 1000,
+            currentTime: 0,
+            scaleRate: 0.05 / 0.05,
+            rotationRate: 0.2 / 0.05
+        });
 
         // Truth revealed message
         console.log("The Lord of Lies has been vanquished. Truth prevails.");
@@ -1197,7 +968,7 @@ export class Belial extends Enemy {
         // Blinding false holy light
         const lightGeometry = new THREE.SphereGeometry(20, 16, 16);
         const lightMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: THEME.lights.point.holy,
             transparent: true,
             opacity: 0.9
         });
@@ -1220,7 +991,7 @@ export class Belial extends Enemy {
     corruptBlessing(player) {
         // Reverse healing - damages instead
         if (player.takeDamage) {
-            player.takeDamage(40);
+            player.takeDamage(40, "Belial Corrupt Blessing");
         }
         
         if (player.addStatusEffect) {
@@ -1318,7 +1089,7 @@ export class Belial extends Enemy {
         // Direct void damage
         const strikeGeometry = new THREE.CylinderGeometry(0.5, 2, 20, 8);
         const strikeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             transparent: true,
             opacity: 0.9
         });
@@ -1329,37 +1100,22 @@ export class Belial extends Enemy {
         strike.position.y = 10;
         this.scene.add(strike);
 
-        // Strike falls
-        const strikeInterval = setInterval(() => {
-            strike.position.y -= 1;
-            
-            if (strike.position.y <= playerPos.y) {
+        this.activeEffects.push({
+            mesh: strike,
+            type: 'fall',
+            duration: 1000,
+            currentTime: 0,
+            fallSpeed: 10,
+            targetY: playerPos.y,
+            onEnd: () => {
                 if (player.takeDamage) {
-                    player.takeDamage(60);
+                    player.takeDamage(60, "Belial Shadow Teleport");
                 }
-                this.scene.remove(strike);
-                clearInterval(strikeInterval);
             }
-        }, 50);
+        });
     }
 
-    shadowSplit() {
-        // Split into multiple shadow forms
-        for (let i = 0; i < 3; i++) {
-            const splitPosition = this.position.clone();
-            splitPosition.x += (Math.random() - 0.5) * 10;
-            splitPosition.z += (Math.random() - 0.5) * 10;
-            
-            this.spawnIllusion();
-        }
-        
-        // Teleport to random position
-        this.position.x += (Math.random() - 0.5) * 20;
-        this.position.z += (Math.random() - 0.5) * 20;
-        if (this.mesh) {
-            this.mesh.position.copy(this.position);
-        }
-    }
+    
 
     // Helper effect methods
     createTransformationEffect() {
@@ -1374,17 +1130,14 @@ export class Belial extends Enemy {
         effect.position.copy(this.position);
         this.scene.add(effect);
 
-        let scale = 1;
-        const effectInterval = setInterval(() => {
-            scale += 0.2;
-            effect.scale.setScalar(scale);
-            effect.material.opacity -= 0.02;
-
-            if (effect.material.opacity <= 0) {
-                this.scene.remove(effect);
-                clearInterval(effectInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: effect,
+            type: 'transformation',
+            duration: 2500,
+            currentTime: 0,
+            scaleRate: 0.2 / 0.05,
+            opacityRate: 0.02 / 0.05
+        });
     }
 
     createTeleportEffect(position) {
@@ -1392,7 +1145,7 @@ export class Belial extends Enemy {
         for (let i = 0; i < particleCount; i++) {
             const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4);
             const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x9900ff,
+                color: THEME.enemies.possessed.aura,
                 transparent: true,
                 opacity: 0.8
             });
@@ -1405,28 +1158,25 @@ export class Belial extends Enemy {
             ));
             this.scene.add(particle);
 
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 2,
-                Math.random() * 2,
-                (Math.random() - 0.5) * 2
-            );
-
-            const particleInterval = setInterval(() => {
-                particle.position.add(velocity.multiplyScalar(0.1));
-                particle.material.opacity -= 0.02;
-
-                if (particle.material.opacity <= 0) {
-                    this.scene.remove(particle);
-                    clearInterval(particleInterval);
-                }
-            }, 50);
+            this.activeEffects.push({
+                mesh: particle,
+                type: 'teleport',
+                duration: 2500,
+                currentTime: 0,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 2,
+                    Math.random() * 2,
+                    (Math.random() - 0.5) * 2
+                ),
+                opacityRate: 0.02 / 0.05
+            });
         }
     }
 
     createPhaseTransitionEffect() {
         const transitionGeometry = new THREE.TorusGeometry(10, 2, 16, 32);
         const transitionMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.8
         });
@@ -1435,18 +1185,15 @@ export class Belial extends Enemy {
         transition.rotation.x = Math.PI / 2;
         this.scene.add(transition);
 
-        let scale = 0.1;
-        const transitionInterval = setInterval(() => {
-            scale += 0.1;
-            transition.scale.setScalar(scale);
-            transition.rotation.z += 0.1;
-            transition.material.opacity -= 0.01;
-
-            if (transition.material.opacity <= 0) {
-                this.scene.remove(transition);
-                clearInterval(transitionInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: transition,
+            type: 'phase_transition',
+            duration: 5000,
+            currentTime: 0,
+            scaleRate: 0.1 / 0.05,
+            rotationRate: 0.1 / 0.05,
+            opacityRate: 0.01 / 0.05
+        });
     }
 
     createCorruptRosary() {
@@ -1455,7 +1202,7 @@ export class Belial extends Enemy {
         for (let i = 0; i < beadCount; i++) {
             const beadGeometry = new THREE.SphereGeometry(0.2, 8, 8);
             const beadMaterial = new THREE.MeshPhongMaterial({
-                color: 0x000000,
+                color: THEME.materials.black,
                 emissive: 0x220000,
                 emissiveIntensity: 0.5
             });
@@ -1482,7 +1229,7 @@ export class Belial extends Enemy {
         particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            color: 0x000000,
+            color: THEME.materials.black,
             size: 0.2,
             transparent: true,
             opacity: 0.6
@@ -1502,7 +1249,7 @@ export class Belial extends Enemy {
 
             const fakeGeometry = new THREE.BoxGeometry(1, 2, 1);
             const fakeMaterial = new THREE.MeshBasicMaterial({
-                color: 0x660000,
+                color: THEME.bosses.belial.primary,
                 transparent: true,
                 opacity: 0.5
             });
@@ -1520,7 +1267,7 @@ export class Belial extends Enemy {
     createIllusionHitEffect(position) {
         const effectGeometry = new THREE.SphereGeometry(1, 8, 8);
         const effectMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             transparent: true,
             opacity: 0.6
         });
@@ -1536,7 +1283,7 @@ export class Belial extends Enemy {
     createResurrectionEffect() {
         const resGeometry = new THREE.CylinderGeometry(0.1, 3, 10, 16);
         const resMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: THEME.ui.health.low,
             transparent: true,
             opacity: 0.8
         });
@@ -1544,19 +1291,15 @@ export class Belial extends Enemy {
         res.position.copy(this.position);
         this.scene.add(res);
 
-        let scale = 1;
-        const resInterval = setInterval(() => {
-            scale += 0.1;
-            res.scale.x = scale;
-            res.scale.z = scale;
-            res.rotation.y += 0.2;
-            res.material.opacity -= 0.02;
-
-            if (res.material.opacity <= 0) {
-                this.scene.remove(res);
-                clearInterval(resInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: res,
+            type: 'resurrection',
+            duration: 2500,
+            currentTime: 0,
+            scaleRate: 0.1 / 0.05,
+            rotationRate: 0.2 / 0.05,
+            opacityRate: 0.02 / 0.05
+        });
     }
 
     getStatusInfo() {

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 // Dangerous environment with multiple hazards and escaped specimens
 
 import { BaseLevel } from './baseLevel.js';
+import { THEME } from '../modules/config/theme.js';
 import { BrimstoneGolem } from '../enemies/brimstoneGolem.js';
 import { Hellhound } from '../enemies/hellhound.js';
 import { Imp } from '../enemies/imp.js';
@@ -11,62 +12,18 @@ import { DemonKnight } from '../enemies/demonKnight.js';
 
 export class ContainmentLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        
-        this.levelName = 'Containment Area';
-        this.levelNumber = 4;
-        this.ambientColor = 0x110000;
-        this.fogColor = 0x220000;
-        this.fogDensity = 0.03;
-        
-        // Environmental hazards
-        this.hazards = {
-            radiation: [],
-            fire: [],
-            electricity: [],
-            corruption: [],
-            gravity: []
-        };
-        
-        // Containment systems
-        this.containmentStatus = {
-            cellBlock_A: 'breached',
-            cellBlock_B: 'compromised',
-            cellBlock_C: 'sealed',
-            cellBlock_D: 'critical'
-        };
-        
-        // Emergency systems
-        this.emergencySystems = {
-            fireSupression: false,
-            lockdown: true,
-            decontamination: false,
-            backup_power: true
-        };
-        
-        // Escaped specimens tracker
-        this.escapedSpecimens = 0;
-        this.maxSpecimens = 20;
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Initialize base level properties (since BaseLevel doesn't have create())
         this.init();
         
-        // Set safe spawn position
+        // Set safe spawn position - near sealed Cell Block C (north), away from enemies
         if (this.game && this.game.player) {
-            this.game.player.position.set(0, 1.7, 15); // Start in safe zone south of hub
+            this.game.player.position.set(0, 1.7, -20); // Start in safe zone north of hub, near sealed block
         }
         
         // Create main containment structure
@@ -110,8 +67,8 @@ export class ContainmentLevel extends BaseLevel {
         const hubRadius = 20;
         const hubGeometry = new THREE.CylinderGeometry(hubRadius, hubRadius, 10, 16);
         const hubMaterial = new THREE.MeshPhongMaterial({
-            color: 0x444444,
-            emissive: 0x110000,
+            color: THEME.materials.wall.containment,
+            emissive: THEME.lights.point.demonic,
             emissiveIntensity: 0.1
         });
         const hub = new THREE.Mesh(hubGeometry, hubMaterial);
@@ -153,9 +110,71 @@ export class ContainmentLevel extends BaseLevel {
         this.createFloorMarkings(hubRadius);
     }
     
+    createCellBlockSign(text, position, color = 0xffffff, emissive = 0x000000) {
+        // Create a large sign with text-like appearance
+        const signGroup = new THREE.Group();
+        
+        // Sign backing
+        const signGeometry = new THREE.BoxGeometry(8, 3, 0.2);
+        const signMaterial = new THREE.MeshPhongMaterial({
+            color: 0x111111,
+            emissive: emissive,
+            emissiveIntensity: 0.3
+        });
+        const sign = new THREE.Mesh(signGeometry, signMaterial);
+        signGroup.add(sign);
+        
+        // Create letter blocks to spell out text
+        const letterSize = 0.8;
+        const letterSpacing = 1;
+        const startX = -(text.length * letterSpacing) / 2 + letterSpacing / 2;
+        
+        for (let i = 0; i < text.length; i++) {
+            if (text[i] !== ' ') {
+                const letterGeometry = new THREE.BoxGeometry(letterSize, letterSize, 0.1);
+                const letterMaterial = new THREE.MeshPhongMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.5
+                });
+                const letter = new THREE.Mesh(letterGeometry, letterMaterial);
+                letter.position.x = startX + i * letterSpacing;
+                letter.position.z = -0.15;
+                signGroup.add(letter);
+            }
+        }
+        
+        signGroup.position.copy(position);
+        this.scene.add(signGroup);
+        
+        // Add glow light
+        const signLight = new THREE.PointLight(color, 0.5, 5);
+        signLight.position.copy(position);
+        signLight.position.z -= 1;
+        this.scene.add(signLight);
+        
+        return signGroup;
+    }
+    
     createCellBlockA() {
         // Breached block with fire hazards
         const blockPosition = new THREE.Vector3(-30, 0, 0);
+        
+        // Add identification sign
+        this.createCellBlockSign(
+            "BLOCK A",
+            new THREE.Vector3(blockPosition.x, 8, blockPosition.z + 15),
+            0xff4400,  // Orange for fire
+            0x440000   // Red emissive
+        );
+        
+        // Add hazard warning sign
+        this.createCellBlockSign(
+            "FIRE",
+            new THREE.Vector3(blockPosition.x, 5, blockPosition.z + 15),
+            0xff0000,  // Red
+            0x440000
+        );
         
         // Main structure
         const blockGeometry = new THREE.BoxGeometry(20, 10, 30);
@@ -201,6 +220,22 @@ export class ContainmentLevel extends BaseLevel {
         // Compromised block with radiation
         const blockPosition = new THREE.Vector3(30, 0, 0);
         
+        // Add identification sign
+        this.createCellBlockSign(
+            "BLOCK B",
+            new THREE.Vector3(blockPosition.x, 8, blockPosition.z + 15),
+            0x00ff00,  // Green for radiation
+            0x004400   // Green emissive
+        );
+        
+        // Add hazard warning sign
+        this.createCellBlockSign(
+            "RADIATION",
+            new THREE.Vector3(blockPosition.x, 5, blockPosition.z + 15),
+            0x00ff00,
+            0x002200
+        );
+        
         // Main structure
         const blockGeometry = new THREE.BoxGeometry(20, 10, 30);
         const blockMaterial = new THREE.MeshPhongMaterial({
@@ -235,6 +270,22 @@ export class ContainmentLevel extends BaseLevel {
         // Sealed block - requires access
         const blockPosition = new THREE.Vector3(0, 0, -30);
         
+        // Add identification sign
+        this.createCellBlockSign(
+            "BLOCK C",
+            new THREE.Vector3(blockPosition.x + 15, 8, blockPosition.z),
+            0xffff00,  // Yellow for sealed/secure
+            0x444400   // Yellow emissive
+        );
+        
+        // Add status sign
+        this.createCellBlockSign(
+            "SEALED",
+            new THREE.Vector3(blockPosition.x + 15, 5, blockPosition.z),
+            0xffff00,
+            0x222200
+        );
+        
         // Main structure (reinforced)
         const blockGeometry = new THREE.BoxGeometry(30, 10, 20);
         const blockMaterial = new THREE.MeshPhongMaterial({
@@ -266,6 +317,22 @@ export class ContainmentLevel extends BaseLevel {
     createCellBlockD() {
         // Critical - corruption spreading
         const blockPosition = new THREE.Vector3(0, 0, 30);
+        
+        // Add identification sign
+        this.createCellBlockSign(
+            "BLOCK D",
+            new THREE.Vector3(blockPosition.x - 15, 8, blockPosition.z),
+            0xff00ff,  // Purple for corruption
+            0x440044   // Purple emissive
+        );
+        
+        // Add hazard warning sign
+        this.createCellBlockSign(
+            "PORTAL",
+            new THREE.Vector3(blockPosition.x - 15, 5, blockPosition.z),
+            0xff00ff,
+            0x220022
+        );
         
         // Main structure (corrupted)
         const blockGeometry = new THREE.BoxGeometry(30, 10, 20);
@@ -954,6 +1021,12 @@ export class ContainmentLevel extends BaseLevel {
             { id: 'evacuate', text: 'Reach Emergency Exit', completed: false }
         ];
         
+        // Display initial objective
+        if (this.game.narrativeSystem) {
+            this.game.narrativeSystem.setObjective("Restore containment: Activate emergency systems");
+            this.game.narrativeSystem.displaySubtitle("WARNING: Multiple containment breaches detected!");
+        }
+        
         // Create control panels for objectives
         this.createControlPanels();
     }
@@ -1115,7 +1188,8 @@ export class ContainmentLevel extends BaseLevel {
         const lastDamage = player.lastHazardDamage[hazardData.type] || 0;
         
         if (now - lastDamage > 1000) { // Damage once per second
-            player.takeDamage(hazardData.damage);
+            const hazardName = hazardData.type ? `${hazardData.type} Hazard` : "Environmental Hazard";
+            player.takeDamage(hazardData.damage, hazardName);
             player.lastHazardDamage[hazardData.type] = now;
             
             // Special effects
@@ -1200,6 +1274,7 @@ export class ContainmentLevel extends BaseLevel {
                 fireObjective.completed = true;
                 if (this.game.narrativeSystem) {
                     this.game.narrativeSystem.displaySubtitle("Fire suppression activated!");
+                    this.updateObjectiveDisplay();
                 }
             }
             
@@ -1215,6 +1290,7 @@ export class ContainmentLevel extends BaseLevel {
                 deconObjective.completed = true;
                 if (this.game.narrativeSystem) {
                     this.game.narrativeSystem.displaySubtitle("Decontamination systems online!");
+                    this.updateObjectiveDisplay();
                 }
             }
             
@@ -1230,6 +1306,7 @@ export class ContainmentLevel extends BaseLevel {
             portalObjective.completed = true;
             if (this.game.narrativeSystem) {
                 this.game.narrativeSystem.displaySubtitle("Demonic portal sealed!");
+                this.updateObjectiveDisplay();
             }
         }
         
@@ -1237,6 +1314,24 @@ export class ContainmentLevel extends BaseLevel {
         const allComplete = this.objectives.filter(o => o.id !== 'evacuate').every(o => o.completed);
         if (allComplete && !this.exitPortalCreated) {
             this.createExitPortal();
+        }
+    }
+    
+    updateObjectiveDisplay() {
+        if (!this.game.narrativeSystem) return;
+        
+        // Count completed objectives
+        const completed = this.objectives.filter(o => o.completed && o.id !== 'evacuate').length;
+        const total = this.objectives.filter(o => o.id !== 'evacuate').length;
+        
+        if (completed === total) {
+            this.game.narrativeSystem.setObjective("All systems restored! Head to the emergency exit!");
+        } else {
+            // Show next incomplete objective
+            const nextObjective = this.objectives.find(o => !o.completed && o.id !== 'evacuate');
+            if (nextObjective) {
+                this.game.narrativeSystem.setObjective(`${nextObjective.text} (${completed}/${total} complete)`);
+            }
         }
     }
     
@@ -1287,7 +1382,8 @@ export class ContainmentLevel extends BaseLevel {
         }
         
         if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle("Emergency exit portal activated! Proceed to evacuate!");
+            this.game.narrativeSystem.setObjective("All systems restored! Head to the emergency exit!");
+            this.game.narrativeSystem.displaySubtitle("Emergency exit portal activated at the east end!");
         }
         
         // Animate portal

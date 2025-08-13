@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { BaseWeapon } from '../core/BaseWeapon.js';
+import { THEME } from '../modules/config/theme.js';
+
 
 export class GravityHammer extends BaseWeapon {
     constructor() {
@@ -22,6 +24,7 @@ export class GravityHammer extends BaseWeapon {
         this.maxEnergy = 100;
         this.energyRegenRate = 10; // per second
         this.areaAttackCost = 40;
+        this.activeEffects = [];
     }
 
     createWeaponModel() {
@@ -52,7 +55,7 @@ export class GravityHammer extends BaseWeapon {
         // Gravity core - glowing center
         const coreGeometry = new THREE.SphereGeometry(0.4, 16, 16);
         const coreMaterial = new THREE.MeshStandardMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             emissive: 0x440088,
             emissiveIntensity: 0.6,
             transparent: true,
@@ -93,7 +96,7 @@ export class GravityHammer extends BaseWeapon {
         spikePositions.forEach(pos => {
             const spikeGeometry = new THREE.ConeGeometry(0.15, 0.6, 6);
             const spikeMaterial = new THREE.MeshStandardMaterial({
-                color: 0x666666,
+                color: THEME.materials.wall.armory,
                 metalness: 0.8,
                 roughness: 0.2
             });
@@ -110,7 +113,7 @@ export class GravityHammer extends BaseWeapon {
         // Energy indicator on handle
         const indicatorGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.5, 8);
         const indicatorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ff00,
+            color: THEME.ui.health.full,
             emissive: 0x004400,
             emissiveIntensity: 0.5,
             transparent: true,
@@ -143,7 +146,7 @@ export class GravityHammer extends BaseWeapon {
         // Reset core appearance
         if (this.gravityCore) {
             this.gravityCore.material.emissiveIntensity = 0.6;
-            this.gravityCore.material.color.setHex(0x9900ff);
+            this.gravityCore.material.color.setHex(THEME.enemies.possessed.aura);
         }
     }
 
@@ -156,8 +159,7 @@ export class GravityHammer extends BaseWeapon {
         this.lastFired = Date.now();
         
         // Create hammer swing effect
-        const swingEffect = this.createSwingEffect(position, direction);
-        scene.add(swingEffect);
+        this.createSwingEffect(scene, position, direction);
 
         // Create shockwave
         this.createShockwave(scene, position);
@@ -195,13 +197,13 @@ export class GravityHammer extends BaseWeapon {
         };
     }
 
-    createSwingEffect(position, direction) {
+    createSwingEffect(scene, position, direction) {
         const effectGroup = new THREE.Group();
 
         // Energy trail
         const trailGeometry = new THREE.CylinderGeometry(0.1, 0.3, 3, 8);
         const trailMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             transparent: true,
             opacity: 0.7
         });
@@ -213,8 +215,8 @@ export class GravityHammer extends BaseWeapon {
         for (let i = 0; i < 10; i++) {
             const sparkGeometry = new THREE.SphereGeometry(0.05, 4, 4);
             const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
-                emissive: 0xffaa00,
+                color: THEME.items.weapons.legendary,
+                emissive: THEME.items.weapons.legendary,
                 emissiveIntensity: 1.0
             });
             const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
@@ -229,21 +231,13 @@ export class GravityHammer extends BaseWeapon {
         effectGroup.position.copy(position);
         effectGroup.lookAt(position.clone().add(direction));
 
-        // Animate effect
-        let opacity = 0.7;
-        const effectInterval = setInterval(() => {
-            opacity -= 0.1;
-            effectGroup.children.forEach(child => {
-                if (child.material.opacity !== undefined) {
-                    child.material.opacity = opacity;
-                }
-            });
-
-            if (opacity <= 0) {
-                if (effectGroup.parent) effectGroup.parent.remove(effectGroup);
-                clearInterval(effectInterval);
-            }
-        }, 50);
+        scene.add(effectGroup);
+        this.activeEffects.push({
+            mesh: effectGroup,
+            type: 'swing',
+            duration: 500,
+            currentTime: 0
+        });
 
         return effectGroup;
     }
@@ -263,20 +257,12 @@ export class GravityHammer extends BaseWeapon {
         ring.rotation.x = -Math.PI / 2;
         scene.add(ring);
 
-        // Animate ring expansion
-        let scale = 1;
-        let opacity = 0.8;
-        const shockwaveInterval = setInterval(() => {
-            scale += 1;
-            opacity -= 0.08;
-            ring.scale.setScalar(scale);
-            ring.material.opacity = opacity;
-
-            if (opacity <= 0) {
-                scene.remove(ring);
-                clearInterval(shockwaveInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: ring,
+            type: 'shockwave',
+            duration: 1000,
+            currentTime: 0
+        });
     }
 
     createGravitySlam(scene, position) {
@@ -285,7 +271,7 @@ export class GravityHammer extends BaseWeapon {
         // Central gravity distortion
         const distortionGeometry = new THREE.SphereGeometry(this.gravityRadius, 16, 16);
         const distortionMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9900ff,
+            color: THEME.enemies.possessed.aura,
             transparent: true,
             opacity: 0.3,
             wireframe: true
@@ -329,23 +315,14 @@ export class GravityHammer extends BaseWeapon {
         effectGroup.position.copy(position);
         scene.add(effectGroup);
 
-        // Animate gravity effect
-        let time = 0;
-        const gravityInterval = setInterval(() => {
-            time += 50;
-            
-            // Pulsing distortion
-            const pulse = 1 + Math.sin(time * 0.01) * 0.2;
-            distortion.scale.setScalar(pulse);
-            
-            // Swirling particles
-            particles.rotation.y += 0.1;
-            
-            if (time > 2000) {
-                scene.remove(effectGroup);
-                clearInterval(gravityInterval);
-            }
-        }, 50);
+        this.activeEffects.push({
+            mesh: effectGroup,
+            type: 'gravity_slam',
+            duration: 2000,
+            currentTime: 0,
+            distortion: distortion,
+            particles: particles
+        });
 
         return effectGroup;
     }
@@ -355,13 +332,13 @@ export class GravityHammer extends BaseWeapon {
         if (this.energyLevel < this.maxEnergy) {
             this.energyLevel = Math.min(
                 this.maxEnergy,
-                this.energyLevel + (this.energyRegenRate * deltaTime / 1000)
+                this.energyLevel + (this.energyRegenRate * deltaTime)
             );
         }
 
         // Charge building
         if (this.charging && this.currentCharge < 100) {
-            this.currentCharge += (deltaTime / this.chargeTime) * 100;
+            this.currentCharge += (100 / this.chargeTime) * deltaTime * 1000;
             this.currentCharge = Math.min(100, this.currentCharge);
 
             // Update visual effects
@@ -374,7 +351,7 @@ export class GravityHammer extends BaseWeapon {
         // Animate energy rings
         if (this.energyRings) {
             this.energyRings.forEach((ring, index) => {
-                ring.rotation.z += deltaTime * 0.001 * (index + 1);
+                ring.rotation.z += deltaTime * (index + 1);
             });
         }
 
@@ -382,13 +359,44 @@ export class GravityHammer extends BaseWeapon {
         if (this.energyIndicator) {
             const energyPercent = this.energyLevel / this.maxEnergy;
             if (energyPercent > 0.6) {
-                this.energyIndicator.material.color.setHex(0x00ff00);
+                this.energyIndicator.material.color.setHex(THEME.ui.health.full);
             } else if (energyPercent > 0.3) {
-                this.energyIndicator.material.color.setHex(0xffff00);
+                this.energyIndicator.material.color.setHex(THEME.ui.health.medium);
             } else {
-                this.energyIndicator.material.color.setHex(0xff0000);
+                this.energyIndicator.material.color.setHex(THEME.ui.health.low);
             }
         }
+
+        this.updateEffects(deltaTime);
+    }
+
+    updateEffects(deltaTime) {
+        this.activeEffects = this.activeEffects.filter(effect => {
+            effect.currentTime += deltaTime;
+            const progress = effect.currentTime / effect.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(effect.mesh);
+                return false;
+            }
+
+            switch (effect.type) {
+                case 'swing':
+                    effect.mesh.material.opacity -= 0.1;
+                    break;
+                case 'shockwave':
+                    effect.mesh.scale.setScalar(effect.mesh.scale.x + 10 * deltaTime);
+                    effect.mesh.material.opacity -= 0.08;
+                    break;
+                case 'gravity_slam':
+                    const pulse = 1 + Math.sin(effect.currentTime * 10) * 0.2;
+                    effect.distortion.scale.setScalar(pulse);
+                    effect.particles.rotation.y += 0.1;
+                    break;
+            }
+
+            return true;
+        });
     }
 
     getEnergyPercentage() {

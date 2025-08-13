@@ -5,43 +5,10 @@ import * as THREE from 'three';
 
 export class CommunicationsLevel extends BaseLevel {
     constructor(scene, game) {
-        // Handle both old and new constructor signatures
-        if (arguments.length === 1 && arguments[0].scene) {
-            // New signature: (game)
-            super(arguments[0]);
-            this.game = arguments[0];
-            this.scene = arguments[0].scene;
-        } else {
-            // Old signature: (scene, game)
-            super(game);
-            this.scene = scene;
-            this.game = game;
-        }
-        this.name = "Communications Tower";
-        this.description = "Scale the massive radio tower to restore communications with the outside world";
-        this.backgroundColor = new THREE.Color(0x1a1a2a);
-        
-        this.towerHeight = 200;
-        this.platforms = [];
-        this.antennaArray = [];
-        this.communicationNodes = [];
-        this.elevatorShafts = [];
-        this.stairwells = [];
-        this.transmissionEquipment = [];
-        
-        this.signalStrength = 0;
-        this.maxSignalStrength = 100;
-        this.nodesActivated = 0;
-        this.totalNodes = 8;
-        this.interferenceActive = true;
-        this.mainTransmitter = null;
-        
-        this.windEffect = null;
-        this.lightningStorms = [];
-        this.emergencyLighting = false;
-        
-        this.init();
-    }
+        // LevelFactory always passes (scene, game)
+        super(game);
+        this.scene = scene;
+        this.game = game;
     
     create() {
         // Return required data structure for Game.js
