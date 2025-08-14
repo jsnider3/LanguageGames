@@ -32,11 +32,13 @@ export class LevelFactory {
             playerStartPosition: new THREE.Vector3(0, 1.7, 8),
             weapons: ['sword', 'shotgun', 'holywater', 'crucifix'],
             setup: (level) => {
+                console.log("[LevelFactory] ChapelLevel setup function called.");
                 this.game.chapelLevel = level;
                 // Restore all weapons for Chapel
                 this.game.player.weapons = ['sword', 'shotgun', 'holywater', 'crucifix'];
                 this.game.player.currentWeaponIndex = 0;
                 this.game.player.currentWeapon = 'sword';
+                console.log("[LevelFactory] Calling switchToWeapon('sword') for ChapelLevel.");
                 this.game.weaponSystem.switchToWeapon('sword');
             }
         });
@@ -216,6 +218,7 @@ export class LevelFactory {
             }
             
             console.log(`[LevelFactory] Successfully created level: ${levelKey}`);
+            console.log("LevelFactory.createLevel(): Game Camera UUID after level creation: ", this.game.camera.uuid);
             this.hideLoadingIndicator();
             return level;
             

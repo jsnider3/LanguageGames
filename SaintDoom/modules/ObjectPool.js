@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GeometryCache } from './Utils.js';
 
 /**
  * Generic object pooling system for performance optimization
@@ -305,6 +306,7 @@ export class PoolManager {
         // Initialize default pools
         this.pools.set('bullets', new BulletPool(scene));
         this.pools.set('particles', new ParticlePool(scene));
+        this.pools.set('grenades', new GrenadePool(scene));
     }
     
     /**
@@ -348,5 +350,47 @@ export class PoolManager {
             stats[name] = pool.getStats();
         });
         return stats;
+    }
+}
+
+/**
+ * Specialized pool for holy water grenades
+ */
+export class GrenadePool extends ObjectPool {
+    constructor(scene, initialSize = 20, maxSize = 80) {
+        const createGrenade = () => {
+            const geometry = GeometryCache.getSphere(0.15, 8, 8);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x99ccff,
+                emissive: 0x99ccff,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            mesh.userData = {
+                velocity: new THREE.Vector3(),
+                active: false
+            };
+            scene.add(mesh);
+            return mesh;
+        };
+        const resetGrenade = (mesh) => {
+            mesh.visible = false;
+            mesh.position.set(0, -1000, 0);
+            mesh.userData.velocity.set(0, 0, 0);
+            mesh.userData.active = false;
+        };
+        super(createGrenade, resetGrenade, initialSize, maxSize);
+        this.scene = scene;
+    }
+    spawn(position, velocity) {
+        const g = this.acquire();
+        g.position.copy(position);
+        g.userData.velocity.copy(velocity);
+        g.userData.active = true;
+        g.visible = true;
+        return g;
     }
 }

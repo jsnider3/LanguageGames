@@ -1,11 +1,58 @@
 import * as THREE from 'three';
 import { Config } from './config/index.js';
+
+class SpatialGrid {
+    constructor(cellSize = 8) {
+        this.cellSize = cellSize;
+        this.grid = new Map();
+    }
+    clear() {
+        this.grid.clear();
+    }
+    _hash(x, z) {
+        const gx = Math.floor(x / this.cellSize);
+        const gz = Math.floor(z / this.cellSize);
+        return `${gx},${gz}`;
+    }
+    insert(entity) {
+        if (!entity || !entity.position) return;
+        const key = this._hash(entity.position.x, entity.position.z);
+        let cell = this.grid.get(key);
+        if (!cell) { cell = []; this.grid.set(key, cell); }
+        cell.push(entity);
+    }
+    build(entities) {
+        this.clear();
+        if (!entities) return;
+        for (const e of entities) this.insert(e);
+    }
+    queryNearby(position, radius) {
+        if (!position) return [];
+        const results = [];
+        const r = Math.max(1, Math.ceil(radius / this.cellSize));
+        const baseX = Math.floor(position.x / this.cellSize);
+        const baseZ = Math.floor(position.z / this.cellSize);
+        for (let dz = -r; dz <= r; dz++) {
+            for (let dx = -r; dx <= r; dx++) {
+                const key = `${baseX + dx},${baseZ + dz}`;
+                const cell = this.grid.get(key);
+                if (cell) results.push(...cell);
+            }
+        }
+        return results;
+    }
+}
 // CollisionSystem Module
 // Handles collision detection between players, enemies, walls, and pickups
 
 export class CollisionSystem {
     constructor() {
         this.margin = Config.engine.PHYSICS.PLAYER_RADIUS;
+        this.spatialGrid = new SpatialGrid(6);
+    }
+    
+    updateSpatialIndex(enemies) {
+        this.spatialGrid.build(enemies || []);
     }
     
     checkPlayerWallCollisions(player, walls, deltaTime, level, enemies) {
@@ -21,7 +68,8 @@ export class CollisionSystem {
         const originalPosition = player.position.clone();
         
         // Debug: Log if we're about to process a large position difference
-        if (Math.abs(player.position.x - 10) < 0.1 && Math.abs(player.position.z + 20) < 0.1) {
+        const _dbg = player?.game?.debugMode;
+        if (_dbg && Math.abs(player.position.x - 10) < 0.1 && Math.abs(player.position.z + 20) < 0.1) {
             console.log('[CollisionSystem] Processing player at expected corridor position x=10');
             console.log('  Velocity:', player.velocity.x, player.velocity.y, player.velocity.z);
             console.log('  Walls count:', walls.length);
@@ -82,9 +130,11 @@ export class CollisionSystem {
         // Final position validation - if somehow we're still in a wall, rollback
         const finalCollisionCheck = this.checkWallCollision(player.position, walls, this.margin);
         if (finalCollisionCheck) {
-            console.log('[CollisionSystem] Player in wall! Current pos:', player.position.x, player.position.y, player.position.z);
-            console.log('[CollisionSystem] Original pos:', originalPosition.x, originalPosition.y, originalPosition.z);
-            console.log('[CollisionSystem] Wall count:', walls.length);
+            if (_dbg) {
+                console.log('[CollisionSystem] Player in wall! Current pos:', player.position.x, player.position.y, player.position.z);
+                console.log('[CollisionSystem] Original pos:', originalPosition.x, originalPosition.y, originalPosition.z);
+                console.log('[CollisionSystem] Wall count:', walls.length);
+            }
             
             // Try to push player out of wall
             const pushDirection = player.position.clone().sub(originalPosition).normalize();
@@ -96,14 +146,14 @@ export class CollisionSystem {
                 if (!this.checkWallCollision(testPos, walls, this.margin)) {
                     player.position.copy(testPos);
                     pushed = true;
-                    console.log('[CollisionSystem] Pushed player to:', testPos.x, testPos.y, testPos.z);
+                    if (_dbg) console.log('[CollisionSystem] Pushed player to:', testPos.x, testPos.y, testPos.z);
                     break;
                 }
             }
             
             // If still stuck, return to original position
             if (!pushed) {
-                console.log('[CollisionSystem] Could not push out, rolling back to original position');
+                if (_dbg) console.log('[CollisionSystem] Could not push out, rolling back to original position');
                 player.position.copy(originalPosition);
             }
             
@@ -144,8 +194,8 @@ export class CollisionSystem {
         if (!pos || !enemies || !Array.isArray(enemies)) {
             return false;
         }
-        
-        for (let enemy of enemies) {
+        const candidates = this.spatialGrid ? this.spatialGrid.queryNearby(pos, playerRadius + 6) : enemies;
+        for (let enemy of candidates) {
             // Skip invalid enemies
             if (!enemy || !enemy.position) continue;
             
@@ -213,7 +263,8 @@ export class CollisionSystem {
     }
     
     checkEnemyPlayerCollisions(enemies, player) {
-        enemies.forEach(enemy => {
+        const candidates = this.spatialGrid ? this.spatialGrid.queryNearby(player.position, (player.radius || 0.4) + 8) : enemies;
+        candidates.forEach(enemy => {
             // Skip dead enemies
             if (enemy.health <= 0) return;
             

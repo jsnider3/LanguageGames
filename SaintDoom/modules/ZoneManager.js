@@ -725,7 +725,8 @@ export class ZoneManager {
             loadPromise = new Promise(resolve => {
                 // Store the resolve function to call later
                 this._deferredLoadResolve = () => {
-                    this.prepareTargetZone(toZone).then(resolve);
+                    const target = this.activeTransition ? this.activeTransition.to : toZone;
+                    this.prepareTargetZone(target).then(resolve);
                 };
             });
         } else {
@@ -1268,32 +1269,51 @@ export class ZoneManager {
             this.game.player.velocity.set(0, 0, 0);
         }
         
-        // Show initial elevator message
-        if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle("Freight Elevator");
-        }
+        // Use a single, lightweight prompt UI for elevator interactions
+        if (this.game.hideInteractPrompt) this.game.hideInteractPrompt();
         
         // Wait for player to press E to start elevator
         let elevatorStarted = false;
         const waitForInput = async () => {
+            // Destination selection among transition.connects
+            const opts = (this.activeTransition.transition?.connects || []).slice();
+            // Ensure includes both zones
+            if (opts.length === 0) opts.push(this.activeTransition.to);
+            // Default selection is current 'to'
+            let selected = this.activeTransition.to;
             while (this.activeTransition && !elevatorStarted) {
-                // Show prompt
-                if (this.game.showMessage) {
-                    this.game.showMessage("Press E to descend to Laboratory");
+                // Build prompt string once per frame
+                const pretty = (id) => (this.zones.get(id)?.name) || id;
+                const a = opts[0] || this.activeTransition.to;
+                const b = opts[1] || this.activeTransition.from;
+                const msg = `Elevator: Destination ${pretty(selected)} — 1: ${pretty(a)}  2: ${pretty(b)}  • Press E to travel`;
+                if (this.game.showInteractPrompt) {
+                    this.game.showInteractPrompt(msg);
+                } else if (this.game.showMessage) {
+                    this.game.showMessage(msg);
                 }
-                
-                // Check for E key press
+
+                // Handle selection keys
                 if (this.game.inputManager) {
-                    const ePressed = this.game.inputManager.keys['e'] || 
-                                   this.game.inputManager.keys['E'] || 
-                                   this.game.inputManager.keys['KeyE'];
+                    if (this.game.inputManager.keys['Digit1'] && a) {
+                        selected = a;
+                        this.game.inputManager.keys['Digit1'] = false;
+                    }
+                    if (this.game.inputManager.keys['Digit2'] && b) {
+                        selected = b;
+                        this.game.inputManager.keys['Digit2'] = false;
+                    }
+                    const ePressed = this.game.inputManager.keys['KeyE'];
                     if (ePressed) {
                         console.log('[ZoneManager] Player started elevator');
                         elevatorStarted = true;
-                        // Clear message
-                        if (this.game.showMessage) {
-                            this.game.showMessage('');
-                        }
+                        // Apply selected destination
+                        this.activeTransition.to = selected;
+                        // Clear prompt
+                        if (this.game.hideInteractPrompt) this.game.hideInteractPrompt();
+                        if (this.game.showMessage) this.game.showMessage('');
+                        // Consume key
+                        this.game.inputManager.keys['KeyE'] = false;
                         break;
                     }
                 }
@@ -1309,10 +1329,7 @@ export class ZoneManager {
             return;
         }
         
-        // Show descent message
-        if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle("Going down...");
-        }
+        // Suppress extra narrative spam during travel to reduce popup noise
         
         // Simulate elevator movement with camera shake
         let shakeTime = 0;
@@ -1336,10 +1353,7 @@ export class ZoneManager {
         // Wait for loading
         await loadPromise;
         
-        // Show arrival message
-        if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle("Elevator arrived at Laboratory");
-        }
+        // Arrival message suppressed to keep UX clean
         
         // Clean up elevator
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1690,6 +1704,36 @@ export class ZoneManager {
                 this.game.skipCollisionCheck = false;
                 console.log('[ZoneManager] Re-enabled collision after armory entry');
             }, 100);
+        } else if (zoneId === 'armory' && this.activeTransition.from === 'laboratory') {
+            // Elevator arrival into Armory: place player by the armory elevator doors
+            // Armory elevator is created at (0, 1.5, -51.5); place a bit in front of doors
+            this.game.skipCollisionCheck = true;
+            const px = 0, py = 1.7, pz = -49;
+            this.game.player.position.set(px, py, pz);
+            if (this.game.camera) {
+                this.game.camera.position.set(px, py, pz);
+                this.game.camera.rotation.y = Math.PI; // face towards armory interior or adjust as needed
+                this.game.camera.rotation.x = 0;
+            }
+            if (this.game.player.yaw !== undefined) this.game.player.yaw = Math.PI; // face north towards interior
+            if (this.game.player.pitch !== undefined) this.game.player.pitch = 0;
+            if (this.game.player.velocity) this.game.player.velocity.set(0, 0, 0);
+            setTimeout(() => { this.game.skipCollisionCheck = false; }, 100);
+        } else if (zoneId === 'laboratory' && this.activeTransition.from === 'armory') {
+            // Elevator arrival into Laboratory: place player by lab elevator
+            // Lab elevator floor centered at (0, 0.1, 18.5)
+            this.game.skipCollisionCheck = true;
+            const px = 0, py = 1.7, pz = 18.0;
+            this.game.player.position.set(px, py, pz);
+            if (this.game.camera) {
+                this.game.camera.position.set(px, py, pz);
+                this.game.camera.rotation.y = -Math.PI; // face into lab corridor
+                this.game.camera.rotation.x = 0;
+            }
+            if (this.game.player.yaw !== undefined) this.game.player.yaw = -Math.PI; 
+            if (this.game.player.pitch !== undefined) this.game.player.pitch = 0;
+            if (this.game.player.velocity) this.game.player.velocity.set(0, 0, 0);
+            setTimeout(() => { this.game.skipCollisionCheck = false; }, 100);
         }
     }
     

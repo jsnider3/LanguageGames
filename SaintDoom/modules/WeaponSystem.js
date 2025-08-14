@@ -36,13 +36,15 @@ class WeaponSystem {
     switchToWeapon(weaponType) {
         this.activeWeaponType = weaponType;
         
-        // Hide all weapon models
+        // Get the active weapon first
+        const activeWeapon = this.weapons[weaponType];
+        
+        // Hide all weapon models except the active one
         Object.values(this.weapons).forEach(weapon => {
-            if (weapon.hide) weapon.hide();
+            if (weapon.hide && weapon !== activeWeapon) weapon.hide();
         });
         
         // Show active weapon
-        const activeWeapon = this.weapons[weaponType];
         if (activeWeapon && activeWeapon.show) {
             activeWeapon.show();
         }
@@ -84,6 +86,8 @@ class HolyWaterWeapon {
         this.throwForce = GAME_CONFIG.WEAPONS.HOLYWATER.THROW_FORCE;
         this.blastRadius = GAME_CONFIG.WEAPONS.HOLYWATER.RADIUS;
         this.damage = GAME_CONFIG.WEAPONS.HOLYWATER.DAMAGE;
+        // Use pooled grenades if available
+        this.pool = (player && player.game && player.game.poolManager) ? player.game.poolManager.getPool('grenades') : null;
     }
     
     throw(enemies) {
@@ -95,32 +99,32 @@ class HolyWaterWeapon {
         this.player.holyWaterCount--;
         this.throwCooldown = GAME_CONFIG.WEAPONS.HOLYWATER.COOLDOWN;
         
-        // Create grenade projectile
-        const geometry = new THREE.SphereGeometry(0.15, 8, 8);
-        const material = new THREE.MeshStandardMaterial({
-            color: THEME.items.weapons.rare,
-            emissive: THEME.items.weapons.rare,
-            emissiveIntensity: 0.5,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        const grenade = new THREE.Mesh(geometry, material);
+        // Create grenade projectile (pooled if possible)
         const direction = this.player.getForwardVector();
-        
-        grenade.position.copy(this.player.camera.position);
-        grenade.position.add(direction.clone().multiplyScalar(1));
-        
+        const spawnPos = this.player.camera.position.clone().add(direction.clone().multiplyScalar(1));
         const velocity = direction.multiplyScalar(this.throwForce);
         velocity.y += 5; // Arc trajectory
         
-        this.scene.add(grenade);
+        const mesh = this.pool ? this.pool.spawn(spawnPos, velocity) : (() => {
+            const geometry = new THREE.SphereGeometry(0.15, 8, 8);
+            const material = new THREE.MeshStandardMaterial({
+                color: THEME.items.weapons.rare,
+                emissive: THEME.items.weapons.rare,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            const m = new THREE.Mesh(geometry, material);
+            m.position.copy(spawnPos);
+            this.scene.add(m);
+            return m;
+        })();
         
         const grenadeData = {
-            mesh: grenade,
+            mesh: mesh,
             velocity: velocity,
             timer: 2, // Explodes after 2 seconds
-            position: grenade.position.clone()
+            position: mesh.position.clone()
         };
         
         this.grenades.push(grenadeData);
@@ -161,6 +165,17 @@ class HolyWaterWeapon {
             if (grenade.timer <= 0) {
                 this.explode(grenade, enemies);
                 this.grenades.splice(i, 1);
+                // Return to pool if available, else remove
+                if (this.pool) {
+                    this.pool.release(grenade.mesh);
+                } else {
+                    this.scene.remove(grenade.mesh);
+                    // dispose unpooled materials
+                    if (grenade.mesh.material) {
+                        if (Array.isArray(grenade.mesh.material)) grenade.mesh.material.forEach(m => m.dispose());
+                        else grenade.mesh.material.dispose();
+                    }
+                }
             }
         }
     }
@@ -189,8 +204,7 @@ class HolyWaterWeapon {
             }
         });
         
-        // Remove grenade
-        this.scene.remove(grenade.mesh);
+        // Remove grenade (handled by caller to reuse via pool)
         
         // Play explosion sound
         this.playExplosionSound();
@@ -494,6 +508,7 @@ class RangedCombat {
     
     createShotgunModel() {
         const group = new THREE.Group();
+        group.userData.isWeapon = true;
         
         // Barrel
         const barrelGeometry = new THREE.CylinderGeometry(0.04, 0.06, 0.8);
@@ -504,6 +519,7 @@ class RangedCombat {
         });
         
         const barrel = new THREE.Mesh(barrelGeometry, gunMaterial);
+        barrel.userData.isWeapon = true;
         barrel.rotation.x = Math.PI / 2;
         barrel.position.z = -0.4;
         group.add(barrel);
@@ -516,6 +532,7 @@ class RangedCombat {
         });
         
         const stock = new THREE.Mesh(stockGeometry, woodMaterial);
+        stock.userData.isWeapon = true;
         stock.position.z = 0.1;
         stock.position.y = -0.05;
         group.add(stock);
@@ -531,6 +548,7 @@ class RangedCombat {
         });
         
         const cross = new THREE.Mesh(crossGeometry, goldMaterial);
+        cross.userData.isWeapon = true;
         cross.position.set(0, 0.05, 0);
         group.add(cross);
         
@@ -538,6 +556,8 @@ class RangedCombat {
         // Position relative to camera for FPS view
         this.shotgunMesh.position.set(0.5, -0.4, -0.8);
         this.shotgunMesh.rotation.y = -0.1;
+        this.shotgunMesh.frustumCulled = false;
+        this.shotgunMesh.renderOrder = 10;
         this.camera.add(this.shotgunMesh);
         this.hide();
     }
@@ -636,37 +656,29 @@ class RangedCombat {
     }
     
     createMuzzleFlash() {
-        // Remove old flash
-        if (this.muzzleFlash) {
-            this.scene.remove(this.muzzleFlash);
+        // Prefer pooled particle burst for muzzle flash
+        const poolMgr = (this.player && this.player.game && this.player.game.poolManager)
+            ? this.player.game.poolManager
+            : (window.currentGame && window.currentGame.poolManager) ? window.currentGame.poolManager : null;
+        const pool = poolMgr ? poolMgr.getPool('particles') : null;
+        if (pool && pool.burst) {
+            const offset = new THREE.Vector3(0.3, -0.2, -1.2);
+            offset.applyQuaternion(this.player.camera.quaternion);
+            const pos = this.player.camera.position.clone().add(offset);
+            pool.burst(pos, 8, 0xffff66, 6);
+            return;
         }
-        
+        // Fallback: small ephemeral mesh
         const flashGeometry = new THREE.SphereGeometry(0.3, 8, 6);
-        const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
-        
-        // Position at gun barrel
+        const flashMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8 });
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
         const offset = new THREE.Vector3(0.3, -0.2, -1.2);
         offset.applyQuaternion(this.player.camera.quaternion);
-        this.muzzleFlash.position.copy(this.player.camera.position);
-        this.muzzleFlash.position.add(offset);
-        
-        this.scene.add(this.muzzleFlash);
-        
-        // Fade out
+        flash.position.copy(this.player.camera.position).add(offset);
+        this.scene.add(flash);
         const fadeOut = () => {
-            this.muzzleFlash.material.opacity -= 0.1;
-            if (this.muzzleFlash.material.opacity > 0) {
-                requestAnimationFrame(fadeOut);
-            } else {
-                this.scene.remove(this.muzzleFlash);
-                this.muzzleFlash = null;
-            }
+            flash.material.opacity -= 0.1;
+            if (flash.material.opacity > 0) requestAnimationFrame(fadeOut); else this.scene.remove(flash);
         };
         fadeOut();
     }
@@ -943,6 +955,8 @@ class MeleeCombat {
     createSwordModel() {
         // Create a group to hold all sword parts
         const swordGroup = new THREE.Group();
+        // Mark container for debugging; meshes are flagged individually for persistence
+        swordGroup.userData.isWeapon = true;
 
         // Blade material - shiny steel
         const bladeMaterial = new THREE.MeshStandardMaterial({
@@ -956,12 +970,14 @@ class MeleeCombat {
         // Blade should extend upward from the guard along +Y in first-person
         const bladeGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.02);
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+        blade.userData.isWeapon = true;
         blade.position.set(0, 0.6, 0); // Half the blade length above the guard
         swordGroup.add(blade);
 
         // Blade tip aligned with +Y (cone along Y by default)
         const tipGeometry = new THREE.ConeGeometry(0.04, 0.12, 8);
         const tip = new THREE.Mesh(tipGeometry, bladeMaterial);
+        tip.userData.isWeapon = true;
         // Place so the cone base meets the top of the blade and apex extends upward
         tip.position.set(0, 0.66, 0);
         swordGroup.add(tip);
@@ -974,6 +990,7 @@ class MeleeCombat {
             roughness: 0.3
         });
         const fuller = new THREE.Mesh(fullerGeometry, fullerMaterial);
+        fuller.userData.isWeapon = true;
         fuller.position.set(0, 0.6, 0.008);
         swordGroup.add(fuller);
 
@@ -987,6 +1004,7 @@ class MeleeCombat {
             emissiveIntensity: 0.1
         });
         const guard = new THREE.Mesh(guardGeometry, guardMaterial);
+        guard.userData.isWeapon = true;
         // Center guard at origin so its back face is at z=-0.02 and front at z=+0.02
         guard.position.set(0, 0, 0);
         swordGroup.add(guard);
@@ -999,6 +1017,7 @@ class MeleeCombat {
             metalness: 0.1
         });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.userData.isWeapon = true;
         // CylinderGeometry is along Y by default; drop it below the guard
         handle.position.y = -0.12;
         swordGroup.add(handle);
@@ -1013,6 +1032,7 @@ class MeleeCombat {
             emissiveIntensity: 0.1
         });
         const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
+        pommel.userData.isWeapon = true;
         // Align pommel to the end of the handle along -Y
         // handle center y = -0.12, half-length ~0.09 -> end y ~= -0.21; extend a bit for pommel radius
         pommel.position.y = -0.24;
@@ -1029,6 +1049,7 @@ class MeleeCombat {
             side: THREE.DoubleSide
         });
         const inscription = new THREE.Mesh(inscriptionGeometry, inscriptionMaterial);
+        inscription.userData.isWeapon = true;
         inscription.position.set(0.041, 0.6, 0.001);
         inscription.rotation.y = Math.PI / 2; // Face outward from blade
         swordGroup.add(inscription);
@@ -1036,6 +1057,9 @@ class MeleeCombat {
         this.swordMesh = swordGroup;
         this.swordMesh.castShadow = true;
         this.swordMesh.receiveShadow = true;
+        // FPS weapon: avoid frustum culling and render after world
+        this.swordMesh.frustumCulled = false;
+        this.swordMesh.renderOrder = 10;
 
         // Default local transform; will be attached to hand grip
         this.swordMesh.position.set(0, 0, 0);
@@ -1044,29 +1068,39 @@ class MeleeCombat {
     }
     
     show() {
-        console.log("MeleeCombat.show() called");
+        const dbg = this.player && this.player.game && this.player.game.debugMode;
+        if (dbg) console.log("MeleeCombat.show() called");
+        if (dbg) console.log("MeleeCombat.show(): armGroup.parent before add: ", this.armGroup ? this.armGroup.parent : "null");
         // Ensure hierarchy is attached correctly
-        if (this.armGroup && !this.armGroup.parent) {
+        if (this.armGroup) {
+            if (this.armGroup.parent) {
+                this.armGroup.parent.remove(this.armGroup);
+                if (dbg) console.log("MeleeCombat: armGroup removed from its previous parent.");
+            }
             this.camera.add(this.armGroup);
-            console.log("MeleeCombat: armGroup added to camera");
+            if (dbg) console.log("MeleeCombat: armGroup added to camera");
         }
         if (this.gripGroup && this.swordMesh && this.swordMesh.parent !== this.gripGroup) {
             this.gripGroup.add(this.swordMesh);
-            console.log("MeleeCombat: swordMesh added to gripGroup");
+            if (dbg) console.log("MeleeCombat: swordMesh added to gripGroup");
         }
         if (this.swordMesh) {
             this.swordMesh.visible = true;
-            console.log("MeleeCombat: swordMesh visible set to true");
+            if (dbg) console.log("MeleeCombat: swordMesh visible set to true");
         }
         if (this.armGroup) {
             this.armGroup.visible = true;
-            console.log("MeleeCombat: armGroup visible set to true");
+            if (dbg) console.log("MeleeCombat: armGroup visible set to true");
         }
+        if (dbg) console.log("MeleeCombat.show(): armGroup.parent after show: ", this.armGroup ? this.armGroup.parent : "null");
         // Normalize default pose so it appears in view
         this.updateSwordPosition();
     }
     
     hide() {
+        const dbg = this.player && this.player.game && this.player.game.debugMode;
+        if (dbg) console.log("MeleeCombat.hide() called");
+        if (dbg) console.log("MeleeCombat.hide(): armGroup.parent before remove: ", this.armGroup ? this.armGroup.parent : "null");
         if (this.swordMesh) this.swordMesh.visible = false;
         if (this.armGroup) {
             this.armGroup.visible = false;
@@ -1074,11 +1108,15 @@ class MeleeCombat {
                 this.armGroup.parent.remove(this.armGroup);
             }
         }
+        if (dbg) console.log("MeleeCombat.hide(): armGroup.parent after remove: ", this.armGroup ? this.armGroup.parent : "null");
     }
     
     createArmModel() {
         // Create arm group
         this.armGroup = new THREE.Group();
+        // FPS hands should not be culled and should render after world
+        this.armGroup.frustumCulled = false;
+        this.armGroup.renderOrder = 10;
         
         // Create upper arm
         const upperArmGeometry = new THREE.CylinderGeometry(0.07, 0.08, 0.38, 10);
@@ -1089,6 +1127,7 @@ class MeleeCombat {
         });
         
         this.upperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+        this.upperArm.userData.isWeapon = true;
         // Orient the upper arm forward (-Z) from the shoulder
         this.upperArm.rotation.x = Math.PI / 2;
         this.upperArm.position.set(0, -0.04, -0.20);
@@ -1097,6 +1136,7 @@ class MeleeCombat {
         // Create forearm
         const forearmGeometry = new THREE.CylinderGeometry(0.06, 0.055, 0.36, 10);
         this.forearm = new THREE.Mesh(forearmGeometry, armMaterial);
+        this.forearm.userData.isWeapon = true;
         // Continue forward and slightly inward toward screen center
         this.forearm.rotation.x = Math.PI / 2;
         this.forearm.position.set(-0.18, -0.08, -0.48);
@@ -1105,6 +1145,7 @@ class MeleeCombat {
         // Create wrist and hand
         const wristGeometry = new THREE.CylinderGeometry(0.05, 0.055, 0.08, 10);
         const wrist = new THREE.Mesh(wristGeometry, armMaterial);
+        wrist.userData.isWeapon = true;
         wrist.rotation.x = Math.PI / 2;
         wrist.position.set(-0.24, -0.10, -0.66);
         this.armGroup.add(wrist);
@@ -1117,12 +1158,14 @@ class MeleeCombat {
         });
         
         this.hand = new THREE.Mesh(handGeometry, handMaterial);
+        this.hand.userData.isWeapon = true;
         // Place hand near screen center and forward
         this.hand.position.set(-0.30, -0.10, -0.74);
         this.hand.rotation.set(0.0, -0.10, -0.10);
         this.armGroup.add(this.hand);
         // Simple knuckle ridge for silhouette
         const knuckles = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.02, 0.12), handMaterial);
+        knuckles.userData.isWeapon = true;
         knuckles.position.set(0, 0.04, 0);
         this.hand.add(knuckles);
         
@@ -1135,6 +1178,7 @@ class MeleeCombat {
         });
         
         const shoulderPad = new THREE.Mesh(shoulderPadGeometry, armorMaterial);
+        shoulderPad.userData.isWeapon = true;
         // Keep shoulder at the far right, away from the view center
         shoulderPad.position.set(0, 0, 0);
         shoulderPad.scale.set(0.55, 0.45, 0.45);
@@ -1177,6 +1221,23 @@ class MeleeCombat {
         this.armGroup.position.set(0.42, -0.22, -0.35);
         // Keep local rotation neutral; do not copy camera rotation for children
         this.armGroup.rotation.set(0, 0, 0);
+
+        // Debugging world position and scale
+        this.swordMesh.updateMatrixWorld(true);
+        this.armGroup.updateMatrixWorld(true);
+        const swordWorldPosition = new THREE.Vector3();
+        const swordWorldScale = new THREE.Vector3();
+        const armWorldPosition = new THREE.Vector3();
+        const armWorldScale = new THREE.Vector3();
+        this.swordMesh.getWorldPosition(swordWorldPosition);
+        this.swordMesh.getWorldScale(swordWorldScale);
+        this.armGroup.getWorldPosition(armWorldPosition);
+        this.armGroup.getWorldScale(armWorldScale);
+        const dbg = this.player && this.player.game && this.player.game.debugMode;
+        if (dbg) console.log("MeleeCombat.updateSwordPosition(): Sword World Position:", swordWorldPosition);
+        if (dbg) console.log("MeleeCombat.updateSwordPosition(): Sword World Scale:", swordWorldScale);
+        if (dbg) console.log("MeleeCombat.updateSwordPosition(): Arm World Position:", armWorldPosition);
+        if (dbg) console.log("MeleeCombat.updateSwordPosition(): Arm World Scale:", armWorldScale);
     }
     
     performSwing(enemies) {
@@ -1408,6 +1469,8 @@ class MeleeCombat {
     
     update(deltaTime) {
         // Weapons automatically follow camera since they're attached
+        // Avoid per-frame logging; optionally guard with debug mode if needed
+        // const dbg = this.player && this.player.game && this.player.game.debugMode;
     }
 }
 

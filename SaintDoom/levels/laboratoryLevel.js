@@ -97,12 +97,16 @@ export class LaboratoryLevel extends BaseLevel {
         floor.rotation.x = -Math.PI / 2;
         floor.position.set(0, 0, -30);
         floor.receiveShadow = true;
+        floor.matrixAutoUpdate = false;
+        floor.updateMatrix();
         this.scene.add(floor);
         
         // Create ceiling
         const ceiling = new THREE.Mesh(mainFloor, concreteMaterial);
         ceiling.rotation.x = Math.PI / 2;
         ceiling.position.set(0, 4, -30);
+        ceiling.matrixAutoUpdate = false;
+        ceiling.updateMatrix();
         this.scene.add(ceiling);
         
         // Create outer walls - properly enclosed laboratory
@@ -167,7 +171,9 @@ export class LaboratoryLevel extends BaseLevel {
         const deskGeometry = new THREE.BoxGeometry(6, 1.5, 3);
         const desk = new THREE.Mesh(deskGeometry, concreteMaterial);
         desk.position.set(-8, 0.75, 5);
-        desk.castShadow = true;
+        desk.castShadow = false;
+        desk.matrixAutoUpdate = false;
+        desk.updateMatrix();
         this.scene.add(desk);
     }
     
@@ -193,6 +199,8 @@ export class LaboratoryLevel extends BaseLevel {
         });
         const elevatorFloor = new THREE.Mesh(floorGeometry, floorMaterial);
         elevatorFloor.position.set(0, 0.1, 18.5);
+        elevatorFloor.matrixAutoUpdate = false;
+        elevatorFloor.updateMatrix();
         elevatorGroup.add(elevatorFloor);
         
         // Create elevator doors (open by default - player just exited)
@@ -271,6 +279,8 @@ export class LaboratoryLevel extends BaseLevel {
         });
         const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
         indicator.position.set(0, 3.7, 19.9);
+        indicator.matrixAutoUpdate = false;
+        indicator.updateMatrix();
         this.scene.add(indicator);
         
         // Add additional elevator shaft light
@@ -285,7 +295,9 @@ export class LaboratoryLevel extends BaseLevel {
             const tubeGeometry = new THREE.CylinderGeometry(1, 1, 3, 8);
             const tube = new THREE.Mesh(tubeGeometry, glassMaterial);
             tube.position.set(centerX - 5 + i * 3, 1.5, centerZ);
-            tube.castShadow = true;
+            tube.castShadow = false;
+            tube.matrixAutoUpdate = false;
+            tube.updateMatrix();
             this.scene.add(tube);
             
             // Specimen inside
@@ -297,6 +309,9 @@ export class LaboratoryLevel extends BaseLevel {
             });
             const specimen = new THREE.Mesh(specimenGeometry, specimenMaterial);
             specimen.position.set(centerX - 5 + i * 3, 1.5, centerZ);
+            specimen.castShadow = false;
+            specimen.matrixAutoUpdate = false;
+            specimen.updateMatrix();
             this.scene.add(specimen);
         }
     }
@@ -312,7 +327,9 @@ export class LaboratoryLevel extends BaseLevel {
                 const barGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3.5);
                 const bar = new THREE.Mesh(barGeometry, metalMaterial);
                 bar.position.set(cellX + j * 0.8 - 1.6, 1.75, cellZ);
-                bar.castShadow = true;
+                bar.castShadow = false;
+                bar.matrixAutoUpdate = false;
+                bar.updateMatrix();
                 this.scene.add(bar);
             }
         }
@@ -329,14 +346,18 @@ export class LaboratoryLevel extends BaseLevel {
             });
             const bench = new THREE.Mesh(benchGeometry, benchMaterial);
             bench.position.set(centerX, 0.5, centerZ - 5 + i * 4);
-            bench.castShadow = true;
+            bench.castShadow = false;
+            bench.matrixAutoUpdate = false;
+            bench.updateMatrix();
             this.scene.add(bench);
             
             // Equipment on benches
             const equipmentGeometry = new THREE.BoxGeometry(1, 0.8, 0.8);
             const equipment = new THREE.Mesh(equipmentGeometry, metalMaterial);
             equipment.position.set(centerX + (i - 1) * 2, 1.4, centerZ - 5 + i * 4);
-            equipment.castShadow = true;
+            equipment.castShadow = false;
+            equipment.matrixAutoUpdate = false;
+            equipment.updateMatrix();
             this.scene.add(equipment);
         }
     }
@@ -385,6 +406,8 @@ export class LaboratoryLevel extends BaseLevel {
         // Position panel on corridor side of door
         const panelX = isLeftWall ? x + 0.3 : x - 0.3;  // Right side for left wall, left side for right wall
         panel.position.set(panelX, y, z + 2.3);
+        panel.matrixAutoUpdate = false;
+        panel.updateMatrix();
         this.scene.add(panel);
         
         // Store door info
@@ -421,6 +444,8 @@ export class LaboratoryLevel extends BaseLevel {
         lockedText.position.set(textX, y + 2.3, z);
         lockedText.rotation.y = isLeftWall ? Math.PI / 2 : -Math.PI / 2;  // Face the corridor
         lockedText.userData.isLockedIndicator = true;
+        lockedText.matrixAutoUpdate = false;
+        lockedText.updateMatrix();
         this.scene.add(lockedText);
         door.userData.lockedText = lockedText;
     }
@@ -452,7 +477,9 @@ export class LaboratoryLevel extends BaseLevel {
         
         const card = new THREE.Mesh(cardGeometry, cardMaterial);
         card.position.set(x, y, z);
-        card.castShadow = true;
+        card.castShadow = false;
+        card.matrixAutoUpdate = false;
+        card.updateMatrix();
         // Add brighter glow light
         const cardLight = new THREE.PointLight(
             color === 'blue' ? 0x0066cc : 
@@ -472,6 +499,8 @@ export class LaboratoryLevel extends BaseLevel {
         });
         const beacon = new THREE.Mesh(beaconGeometry, beaconMaterial);
         beacon.position.set(x, y + 2, z);
+        beacon.matrixAutoUpdate = false;
+        beacon.updateMatrix();
         this.scene.add(beacon);
         
         // Store references to light and beacon for removal
@@ -492,7 +521,7 @@ export class LaboratoryLevel extends BaseLevel {
         for (let z = 10; z >= -70; z -= 10) {
             const light = new THREE.PointLight(0xffffff, 0.3, 15);
             light.position.set(0, 3.5, z);
-            light.castShadow = true;
+            light.castShadow = false; // reduce shadow cost
             this.scene.add(light);
         }
         
@@ -506,7 +535,7 @@ export class LaboratoryLevel extends BaseLevel {
         roomLights.forEach(pos => {
             const light = new THREE.PointLight(0xffffff, 0.4, 20);
             light.position.set(pos.x, 3.5, pos.z);
-            light.castShadow = true;
+            light.castShadow = false; // reduce shadow cost
             this.scene.add(light);
         });
         
@@ -798,38 +827,38 @@ export class LaboratoryLevel extends BaseLevel {
         
         const playerPos = this.game.player.position;
         const buttonPos = this.elevatorButton.position;
-        const distance = Math.sqrt(
-            Math.pow(playerPos.x - buttonPos.x, 2) +
-            Math.pow(playerPos.y - buttonPos.y, 2) +
-            Math.pow(playerPos.z - buttonPos.z, 2)
-        );
+        const dx = playerPos.x - buttonPos.x;
+        const dy = playerPos.y - buttonPos.y;
+        const dz = playerPos.z - buttonPos.z;
+        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
         
-        // Check if player is near button and pressing E
         if (distance < 3) {
-            // Show interaction prompt
-            if (!this.elevatorPromptShown) {
-                if (this.game.narrativeSystem) {
-                    this.game.narrativeSystem.displaySubtitle("Press E to use elevator");
-                }
-                this.elevatorPromptShown = true;
+            // Show prompt via game UI helper (lighter than narrative spam)
+            if (this.game.showInteractPrompt) {
+                this.game.showInteractPrompt("Press E to use elevator");
+            } else if (this.game.narrativeSystem && !this.elevatorPromptShown) {
+                this.game.narrativeSystem.displaySubtitle("Press E to use elevator");
             }
+            this.elevatorPromptShown = true;
             
-            // Check for E key press
-            if (this.game.inputManager && this.game.inputManager.keys['KeyE']) {
-                // Prevent multiple triggers
-                if (!this.elevatorActivated) {
-                    this.elevatorActivated = true;
-                    this.game.inputManager.keys['KeyE'] = false;
-                    
-                    // Change button to red
+            // Accept either raw key state or current input snapshot
+            const input = this.game.inputManager ? this.game.inputManager.getInput() : null;
+            const pressed = (this.game.inputManager && this.game.inputManager.keys['KeyE']) || (input && input.interact);
+            if (pressed && !this.elevatorActivated) {
+                this.elevatorActivated = true;
+                if (this.game.inputManager) this.game.inputManager.keys['KeyE'] = false;
+                
+                // Change button to red
+                if (this.elevatorButton && this.elevatorButton.material && this.elevatorButton.material.emissive) {
                     this.elevatorButton.material.emissive.setHex(0xff0000);
-                    
-                    // Close doors and transition
-                    this.animateElevatorClose();
                 }
+                
+                // Close doors and transition
+                this.animateElevatorClose();
             }
         } else {
             this.elevatorPromptShown = false;
+            if (this.game.hideInteractPrompt) this.game.hideInteractPrompt();
         }
     }
     
@@ -851,20 +880,13 @@ export class LaboratoryLevel extends BaseLevel {
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                // Doors closed, transition to armory
-                if (this.game.narrativeSystem) {
-                    this.game.narrativeSystem.displaySubtitle("Returning to Armory...");
+                // Doors closed, start elevator transition zone (lab <-> armory)
+                if (this.game.zoneManager && this.game.zoneManager.startTransition) {
+                    this.game.zoneManager.startTransition('laboratory', 'armory', 'armory_lab_elevator');
+                } else if (this.game.loadLevel) {
+                    // Fallback: direct load (older behavior)
+                    this.game.loadLevel('armory', { fromLaboratory: true });
                 }
-                
-                // Wait a moment then load armory
-                setTimeout(() => {
-                    if (this.game.loadLevel) {
-                        // Pass a flag to indicate we're coming from laboratory
-                        this.game.loadLevel('armory', { fromLaboratory: true });
-                    } else {
-                        console.error('Cannot load armory level - loadLevel method not found');
-                    }
-                }, 500);
             }
         };
         

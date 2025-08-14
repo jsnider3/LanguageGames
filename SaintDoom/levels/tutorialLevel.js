@@ -840,8 +840,8 @@ export class TutorialLevel extends BaseLevel {
                 // Make sure player has sword in inventory
                 if (this.game && this.game.player) {
                     this.game.player.weapons = ['sword'];
-                    this.game.player.currentWeaponIndex = 0;
-                    this.game.player.currentWeapon = 'sword';
+                    this.game.player.currentWeaponIndex = 0; // Set index
+                    this.game.player.currentWeapon = 'sword'; // Set current weapon
                 }
                 
                 this.showTutorialControls(['WASD - Move', 'Mouse - Look', '1 - Holy Sword']);
@@ -862,9 +862,12 @@ export class TutorialLevel extends BaseLevel {
                 break;
                 
             case 6:
-                ns.displaySubtitle("\"Remember: holy water heals, ammunition is blessed, and death is temporary.\"");
+                ns.displaySubtitle("Remember: holy water heals, ammunition is blessed, and death is temporary.");
                 ns.setObjective("Listen to final instructions");
-                this.addTimeout(() => this.nextTutorialStep(), 4000);
+                this.addTimeout(() => {
+                    this.nextTutorialStep(); // Go to case 7
+                    this.nextTutorialStep(); // Skip case 7, go to case 8
+                }, 4000);
                 break;
                 
             case 7:
@@ -1075,31 +1078,12 @@ export class TutorialLevel extends BaseLevel {
     }
     
     hideWeapons() {
-        // Hide all weapon meshes and hands when entering missile
-        if (this.game.weaponSystem) {
-            // Hide the sword mesh
-            if (this.game.weaponSystem.swordMesh) {
-                this.game.weaponSystem.swordMesh.visible = false;
-            }
-            // Hide the arm groups (hands holding weapons)
-            if (this.game.weaponSystem.armGroup) {
-                this.game.weaponSystem.armGroup.visible = false;
-            }
-            if (this.game.weaponSystem.gripGroup) {
-                this.game.weaponSystem.gripGroup.visible = false;
-            }
-            // Hide the shotgun if it exists
-            if (this.game.weaponSystem.shotgunMesh) {
-                this.game.weaponSystem.shotgunMesh.visible = false;
-            }
-            // Hide holy water if it exists
-            if (this.game.weaponSystem.holyWaterMesh) {
-                this.game.weaponSystem.holyWaterMesh.visible = false;
-            }
-            // Hide any projectile meshes
-            if (this.game.weaponSystem.projectileMesh) {
-                this.game.weaponSystem.projectileMesh.visible = false;
-            }
+        // Hide all weapon models using the WeaponSystem API
+        if (this.game && this.game.weaponSystem) {
+            const ws = this.game.weaponSystem;
+            Object.values(ws.weapons).forEach(w => { if (w && w.hide) w.hide(); });
+            // Clear active weapon type during the cinematic
+            ws.activeWeaponType = null;
         }
     }
     

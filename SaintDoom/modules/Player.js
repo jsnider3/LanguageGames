@@ -66,8 +66,8 @@ export class Player {
         
         // Weapons
         this.weapons = ['sword', 'shotgun', 'holywater', 'crucifix'];
-        this.currentWeaponIndex = 0;
-        this.currentWeapon = 'sword';
+        this.currentWeaponIndex = -1; // No weapon selected initially
+        this.currentWeapon = null; // No weapon selected initially
         
         // Holy water grenades
         this.holyWaterCount = 3;

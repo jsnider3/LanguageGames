@@ -188,6 +188,7 @@ export class Game {
             this.weaponSystem.switchToWeapon('sword');
         } else {
             // Hide all weapons in tutorial until instructed
+            this.weaponSystem.activeWeaponType = null; // Explicitly set no active weapon
             Object.values(this.weaponSystem.weapons).forEach(weapon => {
                 if (weapon.hide) weapon.hide();
             });
@@ -317,6 +318,7 @@ Player: ${playerPos}`;
         
         // Add camera to scene so its children (weapons) will render
         this.scene.add(this.camera);
+        console.log("Game.setupScene(): Camera UUID: ", this.camera.uuid);
         
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
         this.scene.add(ambientLight);
@@ -347,6 +349,15 @@ Player: ${playerPos}`;
         
         this.update(deltaTime);
         this.renderer.render(this.scene, this.camera);
+        
+        // Debug: Check camera parent (avoid per-frame logs unless debugging)
+        if (this.debugMode) {
+            if (this.camera && this.camera.parent) {
+                console.log("Camera parent:", this.camera.parent.type);
+            } else {
+                console.log("Camera has no parent!");
+            }
+        }
     }
 
     spawnEnemy(x, y, z, type = 'possessed_scientist') {
@@ -948,6 +959,10 @@ Player: ${playerPos}`;
         }
         
         const walls = level.walls || [];
+        // Rebuild spatial index for enemies to reduce collision checks
+        if (this.collisionSystem && this.enemies) {
+            this.collisionSystem.updateSpatialIndex(this.enemies);
+        }
         this.collisionSystem.checkPlayerWallCollisions(this.player, walls, deltaTime, level, this.enemies);
         // Still do separation if overlapping
         this.collisionSystem.checkEnemyPlayerCollisions(this.enemies, this.player);
@@ -2322,6 +2337,11 @@ Player: ${playerPos}`;
             
             // Restore level state if returning
             this.restoreLevelState(levelName);
+
+            // Ensure the active weapon is visible after level load
+            if (this.player && this.weaponSystem && this.player.currentWeapon) {
+                this.weaponSystem.switchToWeapon(this.player.currentWeapon);
+            }
         } else {
             const errorMsg = `[Game] Failed to load level: ${levelName}`;
             console.error(errorMsg);

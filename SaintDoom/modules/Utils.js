@@ -71,6 +71,8 @@ export class ParticleSystem {
                     
                     if (particle.material.opacity <= 0) {
                         scene.remove(particle);
+                        // Dispose per-particle materials (geometry is cached via GeometryCache)
+                        if (Array.isArray(particle.material)) particle.material.forEach(m => m.dispose()); else particle.material?.dispose();
                     }
                 }
             });
@@ -108,6 +110,9 @@ export class ParticleSystem {
                 requestAnimationFrame(animateRing);
             } else {
                 scene.remove(ring);
+                // Dispose materials to avoid leaks (geometry is not cached here)
+                ring.geometry?.dispose();
+                if (Array.isArray(ring.material)) ring.material.forEach(m => m.dispose()); else ring.material?.dispose();
             }
         };
         

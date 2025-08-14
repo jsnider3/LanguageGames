@@ -501,6 +501,9 @@ export class BaseLevel {
         wall.position.set(x, y, z);
         wall.castShadow = true;
         wall.receiveShadow = true;
+        // Static level geometry: freeze transforms to avoid per-frame matrix updates
+        wall.matrixAutoUpdate = false;
+        wall.updateMatrix();
         this.scene.add(wall);
         
         // Store wall bounds for collision
