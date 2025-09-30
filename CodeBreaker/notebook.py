@@ -96,6 +96,7 @@ class Notebook:
             '←': 'Assignment',
             '⊕': 'Addition',
             '⊖': 'Subtraction',
+            '⊛': 'Multiplication',
             '⊗': 'Greater than',
             '⊘': 'Less than',
             '≈': 'Equality check',
@@ -124,7 +125,7 @@ class Notebook:
                 symbols_in_code.append(keyword)
 
         # Operators
-        operators = ['←', '⊕', '⊖', '⊗', '⊘', '≈', '¬']
+        operators = ['←', '⊕', '⊖', '⊛', '⊗', '⊘', '≈', '¬']
         for op in operators:
             if op in code:
                 symbols_in_code.append(op)

@@ -1,12 +1,57 @@
 """
 Terminal UI System for CodeBreaker
-Handles all visual rendering and formatting.
+Handles all visual rendering and formatting with robust error handling.
 """
 
 import os
 import sys
+import logging
 from typing import List, Optional, Dict, Any
 from enum import Enum
+
+
+# Configure logging
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+
+class UIConstants:
+    """Constants for UI configuration."""
+
+    # Display dimensions
+    DEFAULT_WIDTH = 80
+    MIN_WIDTH = 40
+    MAX_WIDTH = 120
+
+    # Content limits
+    MAX_VALUE_DISPLAY_LENGTH = 50
+    TRUNCATION_SUFFIX = "..."
+
+    # Progress bar
+    PROGRESS_BAR_LENGTH = 40
+
+    # Line numbering
+    LINE_NUMBER_WIDTH = 2
+
+    # Word wrap
+    WORD_WRAP_MARGIN = 4
+
+    # Box drawing
+    MIN_BOX_WIDTH = 20
+    BOX_PADDING = 4
+
+    # Symbols
+    FILLED_STAR = '★'
+    EMPTY_STAR = '☆'
+    INFO_SYMBOL = 'ℹ '
+    SUCCESS_SYMBOL = '✓ '
+    HINT_SYMBOL = '💡 '
+    PROGRESS_FILLED = '█'
+    PROGRESS_EMPTY = '░'
+
+    # Confirmation responses
+    CONFIRM_POSITIVE = ['y', 'yes']
+    CONFIRM_NEGATIVE = ['n', 'no']
 
 
 class Color(Enum):
@@ -43,29 +88,65 @@ class Color(Enum):
 class UI:
     """Terminal UI manager for CodeBreaker."""
 
-    def __init__(self):
-        self.width = 80
+    def __init__(self, width: int = UIConstants.DEFAULT_WIDTH):
+        """
+        Initialize UI manager.
+
+        Args:
+            width: Terminal width (default 80)
+        """
+        if not isinstance(width, int):
+            logger.warning(f"Invalid width type: {type(width)}, using default")
+            width = UIConstants.DEFAULT_WIDTH
+
+        # Clamp width to valid range
+        self.width = max(
+            UIConstants.MIN_WIDTH,
+            min(width, UIConstants.MAX_WIDTH)
+        )
+
         self.syntax_highlighting_enabled = False
+        logger.info(f"UI initialized with width={self.width}")
 
-    def clear_screen(self):
+    def clear_screen(self) -> None:
         """Clear the terminal screen."""
-        os.system('clear' if os.name != 'nt' else 'cls')
+        try:
+            os.system('clear' if os.name != 'nt' else 'cls')
+        except Exception as e:
+            logger.error(f"Error clearing screen: {e}")
 
-    def print_header(self):
+    def print_header(self) -> None:
         """Print the game header."""
-        print(Color.CYAN.value + Color.BOLD.value)
-        print("╔" + "═" * (self.width - 2) + "╗")
-        print("║" + "CODEBREAKER v1.0".center(self.width - 2) + "║")
-        print("║" + "Xenolinguistic Analysis Terminal".center(self.width - 2) + "║")
-        print("╚" + "═" * (self.width - 2) + "╝")
-        print(Color.RESET.value)
+        try:
+            print(Color.CYAN.value + Color.BOLD.value)
+            print("╔" + "═" * (self.width - 2) + "╗")
+            print("║" + "CODEBREAKER v1.0".center(self.width - 2) + "║")
+            print("║" + "Xenolinguistic Analysis Terminal".center(self.width - 2) + "║")
+            print("╚" + "═" * (self.width - 2) + "╝")
+            print(Color.RESET.value)
+        except Exception as e:
+            logger.error(f"Error printing header: {e}")
+            print("CODEBREAKER v1.0")
 
-    def print_title(self, title: str):
-        """Print a section title."""
-        print(Color.YELLOW.value + Color.BOLD.value)
-        print(f"\n[{title}]")
-        print("━" * self.width)
-        print(Color.RESET.value)
+    def print_title(self, title: str) -> None:
+        """
+        Print a section title.
+
+        Args:
+            title: Title text to display
+        """
+        if not isinstance(title, str):
+            logger.warning(f"Invalid title type: {type(title)}")
+            title = str(title)
+
+        try:
+            print(Color.YELLOW.value + Color.BOLD.value)
+            print(f"\n[{title}]")
+            print("━" * self.width)
+            print(Color.RESET.value)
+        except Exception as e:
+            logger.error(f"Error printing title: {e}")
+            print(f"\n[{title}]")
 
     def print_code(self, code: str, highlight_lines: Optional[List[int]] = None):
         """Print Xenocode with line numbers."""
@@ -98,7 +179,7 @@ class UI:
                 line = line.replace(keyword, f"{Color.CYAN.value}{keyword}{Color.RESET.value}")
 
         # Operators
-        operators = ['⊕', '⊖', '⊗', '⊘', '≈', '¬', '←']
+        operators = ['⊕', '⊖', '⊛', '⊗', '⊘', '≈', '¬', '←']
         for op in operators:
             if op in line:
                 line = line.replace(op, f"{Color.MAGENTA.value}{op}{Color.RESET.value}")
@@ -179,28 +260,71 @@ class UI:
         print("└" + "─" * box_width + "┘")
         print(Color.RESET.value)
 
-    def print_variables(self, variables: Dict[str, Any]):
-        """Print variable state."""
-        print(Color.MAGENTA.value + Color.BOLD.value + "\n[VARIABLES]" + Color.RESET.value)
-        if variables:
-            for name, value in variables.items():
-                value_str = str(value)
-                if len(value_str) > 50:
-                    value_str = value_str[:47] + "..."
-                print(Color.MAGENTA.value + f"  {name} = {value_str}" + Color.RESET.value)
-        else:
-            print(Color.DIM.value + "  (no variables)" + Color.RESET.value)
+    def print_variables(self, variables: Dict[str, Any]) -> None:
+        """
+        Print variable state.
 
-    def print_puzzle_info(self, puzzle: Dict[str, Any]):
-        """Print puzzle metadata."""
-        print(Color.YELLOW.value)
-        print(f"\n┌─ PUZZLE #{puzzle['id'].split('_')[1]} ─────────────────────────")
-        print(f"│ Title: {puzzle['title']}")
-        print(f"│ Difficulty: {'★' * puzzle['difficulty']}{'☆' * (5 - puzzle['difficulty'])}")
-        if puzzle.get('arc'):
-            print(f"│ Arc: {puzzle['arc']}")
-        print("└" + "─" * (self.width - 1))
-        print(Color.RESET.value)
+        Args:
+            variables: Dictionary of variables to display
+        """
+        if not isinstance(variables, dict):
+            logger.warning(f"Invalid variables type: {type(variables)}")
+            variables = {}
+
+        try:
+            print(Color.MAGENTA.value + Color.BOLD.value + "\n[VARIABLES]" + Color.RESET.value)
+
+            if variables:
+                for name, value in variables.items():
+                    value_str = str(value)
+                    if len(value_str) > UIConstants.MAX_VALUE_DISPLAY_LENGTH:
+                        truncate_len = UIConstants.MAX_VALUE_DISPLAY_LENGTH - len(UIConstants.TRUNCATION_SUFFIX)
+                        value_str = value_str[:truncate_len] + UIConstants.TRUNCATION_SUFFIX
+
+                    print(Color.MAGENTA.value + f"  {name} = {value_str}" + Color.RESET.value)
+            else:
+                print(Color.DIM.value + "  (no variables)" + Color.RESET.value)
+
+        except Exception as e:
+            logger.error(f"Error printing variables: {e}")
+            print("(error displaying variables)")
+
+    def print_puzzle_info(self, puzzle: Dict[str, Any]) -> None:
+        """
+        Print puzzle metadata.
+
+        Args:
+            puzzle: Puzzle dictionary
+        """
+        if not isinstance(puzzle, dict):
+            logger.error(f"Invalid puzzle type: {type(puzzle)}")
+            return
+
+        try:
+            puzzle_id = puzzle.get('id', 'unknown')
+            puzzle_num = puzzle_id.split('_')[1] if '_' in puzzle_id else '??'
+            title = puzzle.get('title', 'Untitled')
+            difficulty = puzzle.get('difficulty', 1)
+            arc = puzzle.get('arc')
+
+            print(Color.YELLOW.value)
+            print(f"\n┌─ PUZZLE #{puzzle_num} ─────────────────────────")
+            print(f"│ Title: {title}")
+
+            # Difficulty stars
+            filled_stars = UIConstants.FILLED_STAR * difficulty
+            empty_stars = UIConstants.EMPTY_STAR * (5 - difficulty)
+            print(f"│ Difficulty: {filled_stars}{empty_stars}")
+
+            if arc:
+                print(f"│ Arc: {arc}")
+
+            print("└" + "─" * (self.width - 1))
+            print(Color.RESET.value)
+
+        except Exception as e:
+            logger.error(f"Error printing puzzle info: {e}")
+            print("\n[PUZZLE]")
 
     def print_narrative(self, text: str):
         """Print narrative/story text."""
@@ -218,41 +342,104 @@ class UI:
             print("  " + line)
         print(Color.RESET.value)
 
-    def print_progress(self, current: int, total: int, unlocked_tools: List[str]):
-        """Print overall progress."""
-        percentage = (current / total) * 100
-        bar_length = 40
-        filled = int(bar_length * current / total)
-        bar = "█" * filled + "░" * (bar_length - filled)
+    def print_progress(
+        self,
+        current: int,
+        total: int,
+        unlocked_tools: List[str]
+    ) -> None:
+        """
+        Print overall progress.
 
-        print(Color.CYAN.value + Color.BOLD.value)
-        print(f"\n╔══ PROGRESS {'═' * (self.width - 15)}╗")
-        print(f"║ Puzzles: {current}/{total} ({percentage:.0f}%)")
-        print(f"║ {bar}")
-        if unlocked_tools:
-            print(f"║ Tools Unlocked: {', '.join(unlocked_tools)}")
-        print("╚" + "═" * (self.width - 2) + "╝")
-        print(Color.RESET.value)
+        Args:
+            current: Number of puzzles completed
+            total: Total number of puzzles
+            unlocked_tools: List of unlocked tool names
+        """
+        if not isinstance(current, int) or not isinstance(total, int):
+            logger.error("Invalid progress values")
+            return
 
-    def print_ascii_art(self, art: str):
-        """Print ASCII art."""
-        print(Color.BRIGHT_CYAN.value)
-        print(art)
-        print(Color.RESET.value)
+        if total == 0:
+            logger.warning("Total puzzles is 0")
+            percentage = 0
+            filled = 0
+        else:
+            percentage = (current / total) * 100
+            filled = int(UIConstants.PROGRESS_BAR_LENGTH * current / total)
+
+        try:
+            bar = (UIConstants.PROGRESS_FILLED * filled +
+                   UIConstants.PROGRESS_EMPTY * (UIConstants.PROGRESS_BAR_LENGTH - filled))
+
+            print(Color.CYAN.value + Color.BOLD.value)
+            print(f"\n╔══ PROGRESS {'═' * (self.width - 15)}╗")
+            print(f"║ Puzzles: {current}/{total} ({percentage:.0f}%)")
+            print(f"║ {bar}")
+
+            if unlocked_tools:
+                tools_str = ', '.join(unlocked_tools)
+                print(f"║ Tools Unlocked: {tools_str}")
+
+            print("╚" + "═" * (self.width - 2) + "╝")
+            print(Color.RESET.value)
+
+        except Exception as e:
+            logger.error(f"Error printing progress: {e}")
+            print(f"\nProgress: {current}/{total}")
+
+    def print_ascii_art(self, art: str) -> None:
+        """
+        Print ASCII art.
+
+        Args:
+            art: ASCII art string to display
+        """
+        if not isinstance(art, str):
+            logger.warning(f"Invalid art type: {type(art)}")
+            return
+
+        try:
+            print(Color.BRIGHT_CYAN.value)
+            print(art)
+            print(Color.RESET.value)
+        except Exception as e:
+            logger.error(f"Error printing ASCII art: {e}")
 
     def confirm(self, message: str) -> bool:
-        """Ask for yes/no confirmation."""
-        response = self.get_input(f"{message} (y/n)")
-        return response.lower() in ['y', 'yes']
+        """
+        Ask for yes/no confirmation.
 
-    def pause(self):
+        Args:
+            message: Confirmation message
+
+        Returns:
+            True if confirmed, False otherwise
+        """
+        if not isinstance(message, str):
+            logger.warning(f"Invalid message type: {type(message)}")
+            message = str(message)
+
+        try:
+            response = self.get_input(f"{message} (y/n)")
+            return response.lower() in UIConstants.CONFIRM_POSITIVE
+        except Exception as e:
+            logger.error(f"Error in confirmation: {e}")
+            return False
+
+    def pause(self) -> None:
         """Wait for user to press enter."""
-        self.get_input("\nPress Enter to continue...")
+        try:
+            self.get_input("\nPress Enter to continue...")
+        except Exception as e:
+            logger.error(f"Error in pause: {e}")
 
-    def enable_syntax_highlighting(self):
+    def enable_syntax_highlighting(self) -> None:
         """Enable syntax highlighting."""
         self.syntax_highlighting_enabled = True
+        logger.debug("Syntax highlighting enabled")
 
-    def disable_syntax_highlighting(self):
+    def disable_syntax_highlighting(self) -> None:
         """Disable syntax highlighting."""
         self.syntax_highlighting_enabled = False
+        logger.debug("Syntax highlighting disabled")

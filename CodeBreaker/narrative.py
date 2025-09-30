@@ -1,19 +1,35 @@
 """
 Narrative System
-Story text and environmental storytelling.
+Story text and environmental storytelling with robust error handling.
 """
 
+import logging
 from typing import Dict, Optional
 from ui import UI, Color
+
+
+# Configure logging
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 
 class Narrative:
     """Manages story progression and narrative elements."""
 
     def __init__(self, ui: UI):
+        """
+        Initialize narrative system.
+
+        Args:
+            ui: UI instance for display
+        """
+        if ui is None:
+            raise ValueError("UI instance is required")
+
         self.ui = ui
         self.story_beats = self._init_story_beats()
         self.arc_intros = self._init_arc_intros()
+        logger.info("Narrative system initialized")
 
     def _init_story_beats(self) -> Dict[str, str]:
         """Initialize story beats for key moments."""
@@ -294,10 +310,11 @@ Everything you've learned has prepared you for this moment.
 Complete the sequence. Decode the message. Understand."""
         }
 
-    def show_intro(self):
+    def show_intro(self) -> None:
         """Show game introduction."""
-        self.ui.clear_screen()
-        self.ui.print_ascii_art("""
+        try:
+            self.ui.clear_screen()
+            self.ui.print_ascii_art("""
    ██████╗ ██████╗ ██████╗ ███████╗██████╗ ██████╗ ███████╗ █████╗ ██╗  ██╗███████╗██████╗
   ██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║ ██╔╝██╔════╝██╔══██╗
   ██║     ██║   ██║██║  ██║█████╗  ██████╔╝██████╔╝█████╗  ███████║█████╔╝ █████╗  ██████╔╝
@@ -305,28 +322,77 @@ Complete the sequence. Decode the message. Understand."""
   ╚██████╗╚██████╔╝██████╔╝███████╗██████╔╝██║  ██║███████╗██║  ██║██║  ██╗███████╗██║  ██║
    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
         """)
-        self.ui.print_narrative(self.story_beats['intro'])
-        self.ui.pause()
+            self.ui.print_narrative(self.story_beats['intro'])
+            self.ui.pause()
+            logger.debug("Showed intro sequence")
+        except Exception as e:
+            logger.error(f"Error showing intro: {e}")
+            print("CODEBREAKER\n\nWelcome to the game...")
+            self.ui.pause()
 
-    def show_story_beat(self, beat_id: str):
-        """Show a story beat at key moments."""
-        if beat_id in self.story_beats:
+    def show_story_beat(self, beat_id: str) -> None:
+        """
+        Show a story beat at key moments.
+
+        Args:
+            beat_id: ID of story beat to display
+        """
+        if not isinstance(beat_id, str):
+            logger.warning(f"Invalid beat_id type: {type(beat_id)}")
+            return
+
+        if beat_id not in self.story_beats:
+            logger.warning(f"Story beat not found: {beat_id}")
+            return
+
+        try:
             self.ui.clear_screen()
             self.ui.print_title("STORY UPDATE")
             self.ui.print_narrative(self.story_beats[beat_id])
             self.ui.pause()
+            logger.debug(f"Showed story beat: {beat_id}")
+        except Exception as e:
+            logger.error(f"Error showing story beat {beat_id}: {e}")
 
-    def show_arc_intro(self, arc_name: str):
-        """Show introduction for a new arc."""
-        if arc_name in self.arc_intros:
+    def show_arc_intro(self, arc_name: str) -> None:
+        """
+        Show introduction for a new arc.
+
+        Args:
+            arc_name: Name of arc to introduce
+        """
+        if not isinstance(arc_name, str):
+            logger.warning(f"Invalid arc_name type: {type(arc_name)}")
+            return
+
+        if arc_name not in self.arc_intros:
+            logger.warning(f"Arc intro not found: {arc_name}")
+            return
+
+        try:
             self.ui.clear_screen()
             print(Color.BRIGHT_YELLOW.value)
             print(self.arc_intros[arc_name])
             print(Color.RESET.value)
             self.ui.pause()
+            logger.debug(f"Showed arc intro: {arc_name}")
+        except Exception as e:
+            logger.error(f"Error showing arc intro {arc_name}: {e}")
 
     def get_puzzle_flavor_text(self, puzzle_id: str) -> Optional[str]:
-        """Get flavor text for a specific puzzle."""
+        """
+        Get flavor text for a specific puzzle.
+
+        Args:
+            puzzle_id: ID of puzzle
+
+        Returns:
+            Flavor text string or None if not found
+        """
+        if not isinstance(puzzle_id, str):
+            logger.warning(f"Invalid puzzle_id type: {type(puzzle_id)}")
+            return None
+
         flavor_texts = {
             'puzzle_01': 'Your first contact with the alien language. Start simple.',
             'puzzle_05': 'You\'re getting the hang of this. The symbols are starting to feel familiar.',
@@ -340,17 +406,33 @@ Complete the sequence. Decode the message. Understand."""
             'puzzle_45': 'The final sequence. Everything has led to this.',
             'puzzle_50': 'The last program. The ultimate truth awaits.'
         }
+
         return flavor_texts.get(puzzle_id)
 
-    def show_achievement(self, achievement: str, description: str):
-        """Show achievement unlock."""
-        self.ui.clear_screen()
-        print(Color.YELLOW.value + Color.BOLD.value)
-        print("\n" + "═" * 80)
-        print("🏆 ACHIEVEMENT UNLOCKED!")
-        print("═" * 80)
-        print(f"\n  {achievement}")
-        print(f"  {description}")
-        print("\n" + "═" * 80)
-        print(Color.RESET.value)
-        self.ui.pause()
+    def show_achievement(self, achievement: str, description: str) -> None:
+        """
+        Show achievement unlock.
+
+        Args:
+            achievement: Achievement name
+            description: Achievement description
+        """
+        if not isinstance(achievement, str) or not isinstance(description, str):
+            logger.error("Invalid achievement parameters")
+            return
+
+        try:
+            self.ui.clear_screen()
+            print(Color.YELLOW.value + Color.BOLD.value)
+            print("\n" + "═" * 80)
+            print("🏆 ACHIEVEMENT UNLOCKED!")
+            print("═" * 80)
+            print(f"\n  {achievement}")
+            print(f"  {description}")
+            print("\n" + "═" * 80)
+            print(Color.RESET.value)
+            self.ui.pause()
+            logger.info(f"Achievement unlocked: {achievement}")
+        except Exception as e:
+            logger.error(f"Error showing achievement: {e}")
+            print(f"\n🏆 Achievement: {achievement}")

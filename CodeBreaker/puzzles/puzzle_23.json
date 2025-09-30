@@ -3,14 +3,14 @@
   "title": "Multiple Calls",
   "difficulty": 3,
   "arc": "Functions Arc",
-  "code": "§function square(n)\n  result ← n ⊗ n\n  §transmit result\n§end_function\n\n§begin main\n  §call square(3)\n  §call square(5)\n  §call square(7)\n§end",
+  "code": "§function square(n)\n  result ← n ⊛ n\n  §transmit result\n§end_function\n\n§begin main\n  §call square(3)\n  §call square(5)\n  §call square(7)\n§end",
   "default_input": null,
   "expected_output": "9\n25\n49",
   "solution_description": "calls a function multiple times with different arguments to square numbers",
   "key_concepts": ["function reuse", "multiple calls", "multiplication"],
   "hints": [
     "The function is called three times",
-    "⊗ is being used for multiplication here",
+    "⊛ is the multiplication operator",
     "Outputs 3², 5², 7²"
   ],
   "unlock_requirements": ["puzzle_22"],

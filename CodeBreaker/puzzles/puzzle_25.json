@@ -3,7 +3,7 @@
   "title": "Summation",
   "difficulty": 4,
   "arc": "Functions Arc",
-  "code": "§function factorial(n)\n  result ← 1\n  current ← 1\n  §iterate i §in [1,2,3,4,5]\n    §if n ⊗ current ⊖ 1\n      result ← result ⊕ current\n      current ← current ⊕ 1\n    §end_if\n  §end_iterate\n  §transmit result\n§end_function\n\n§begin main\n  §call factorial(5)\n§end",
+  "code": "§function sum_to_n(n)\n  result ← 0\n  current ← 1\n  §iterate i §in [1,2,3,4,5]\n    §if n ⊗ current ⊖ 1\n      result ← result ⊕ current\n      current ← current ⊕ 1\n    §end_if\n  §end_iterate\n  §return result\n§end_function\n\n§begin main\n  value ← §call sum_to_n(5)\n  §transmit value\n§end",
   "default_input": null,
   "expected_output": "15",
   "solution_description": "calculates sum of numbers from 1 to n",

@@ -149,6 +149,7 @@ class Analyzer:
             pseudo = pseudo.replace('←', '=')
             pseudo = pseudo.replace('⊕', '+')
             pseudo = pseudo.replace('⊖', '-')
+            pseudo = pseudo.replace('⊛', '*')
             pseudo = pseudo.replace('⊗', '>')
             pseudo = pseudo.replace('⊘', '<')
             pseudo = pseudo.replace('≈', '==')
