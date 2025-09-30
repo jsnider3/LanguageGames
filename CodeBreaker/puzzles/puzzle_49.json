@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_49",
+  "title": "The Question",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin final_preparation\n  ready ← §true\n  understood ← §true\n  §if ready ≈ §true\n    §if understood ≈ §true\n      §transmit \"Ready for final message\"\n    §end_if\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "Ready for final message",
+  "solution_description": "checks if conditions are met to receive the final message",
+  "key_concepts": ["readiness", "confirmation", "preparation"],
+  "hints": [
+    "Both conditions must be true",
+    "ready and understood are both true",
+    "This prepares you for the final revelation"
+  ],
+  "unlock_requirements": ["puzzle_48"],
+  "rewards": []
+}

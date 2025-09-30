@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_13",
+  "title": "Array Echo",
+  "difficulty": 2,
+  "arc": "Iteration Arc",
+  "code": "§begin echo_array\n  data ← [10, 20, 30]\n  §iterate item §in data\n    §transmit item\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "10\n20\n30",
+  "solution_description": "iterates through an array and outputs each element",
+  "key_concepts": ["loop", "iteration", "array"],
+  "hints": [
+    "§iterate creates a loop",
+    "item takes on each value in the array",
+    "Each item is output one by one"
+  ],
+  "unlock_requirements": ["puzzle_12"],
+  "rewards": []
+}

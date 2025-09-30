@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_31",
+  "title": "Dictionary Iteration",
+  "difficulty": 3,
+  "arc": "Data Structures Arc",
+  "code": "§begin iterate_dict\n  scores ← §create_map\n  scores[\"Alice\"] ← 95\n  scores[\"Bob\"] ← 87\n  scores[\"Carol\"] ← 92\n  §iterate name §in scores\n    §transmit name\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "Alice\nBob\nCarol",
+  "solution_description": "creates a dictionary and iterates through its keys",
+  "key_concepts": ["dictionary", "iteration", "keys"],
+  "hints": [
+    "Iterating over a dictionary visits its keys",
+    "Three names are stored as keys",
+    "Order: Alice, Bob, Carol"
+  ],
+  "unlock_requirements": ["puzzle_30"],
+  "rewards": []
+}

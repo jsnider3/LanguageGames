@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_48",
+  "title": "First Contact",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin contact\n  question ← \"ARE YOU ALIVE?\"\n  §transmit question\n  confirmation ← \"We hoped someone would find us\"\n  understanding ← \"We hoped someone would understand\"\n  §transmit confirmation\n  §transmit understanding\n§end",
+  "default_input": null,
+  "expected_output": "ARE YOU ALIVE?\nWe hoped someone would find us\nWe hoped someone would understand",
+  "solution_description": "the aliens ask a question and express their hope to be found and understood",
+  "key_concepts": ["contact", "consciousness", "communication", "hope"],
+  "hints": [
+    "This is the first direct communication",
+    "They ask if YOU are alive",
+    "This is the moment everything changes"
+  ],
+  "unlock_requirements": ["puzzle_47"],
+  "rewards": []
+}

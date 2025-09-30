@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_46",
+  "title": "Emotional Spectrum",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin emotions\n  states ← §create_map\n  states[\"joy\"] ← 10\n  states[\"calm\"] ← 5\n  states[\"hope\"] ← 8\n  states[\"wonder\"] ← 9\n  §iterate feeling §in states\n    §transmit feeling\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "joy\ncalm\nhope\nwonder",
+  "solution_description": "represents emotional states and their intensities",
+  "key_concepts": ["emotions", "consciousness", "mapping", "psychology"],
+  "hints": [
+    "The program maps emotions to intensity values",
+    "joy=10, calm=5, hope=8, wonder=9",
+    "The aliens modeled their feelings as data"
+  ],
+  "unlock_requirements": ["puzzle_45"],
+  "rewards": []
+}

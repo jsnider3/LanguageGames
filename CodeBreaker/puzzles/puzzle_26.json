@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_26",
+  "title": "Maximum Finder",
+  "difficulty": 4,
+  "arc": "Functions Arc",
+  "code": "§function find_max(a, b)\n  §if a ⊗ b\n    §transmit a\n  §else\n    §transmit b\n  §end_if\n§end_function\n\n§begin main\n  §call find_max(15, 23)\n  §call find_max(100, 50)\n§end",
+  "default_input": null,
+  "expected_output": "23\n100",
+  "solution_description": "finds and returns the maximum of two numbers",
+  "key_concepts": ["function", "comparison", "maximum"],
+  "hints": [
+    "The function compares two values",
+    "It outputs the larger one",
+    "Between 15 and 23, output is 23"
+  ],
+  "unlock_requirements": ["puzzle_25"],
+  "rewards": []
+}

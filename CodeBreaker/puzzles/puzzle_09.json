@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_09",
+  "title": "Negative Detector",
+  "difficulty": 2,
+  "arc": "Logic Arc",
+  "code": "§begin check_negative\n  value ← -5\n  zero ← 0\n  §if value ⊘ zero\n    §transmit \"negative\"\n  §else\n    §transmit \"positive\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "negative",
+  "solution_description": "checks if a number is negative by comparing it to zero",
+  "key_concepts": ["less than", "comparison", "negative numbers"],
+  "hints": [
+    "⊘ is a comparison operator (different from ⊗)",
+    "The value is -5, which is less than 0",
+    "⊘ means 'less than'"
+  ],
+  "unlock_requirements": ["puzzle_08"],
+  "rewards": []
+}

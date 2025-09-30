@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_02",
+  "title": "Echo Chamber",
+  "difficulty": 1,
+  "arc": "Tutorial Arc",
+  "code": "§begin echo\n  input_signal ← §receive\n  §transmit input_signal\n§end",
+  "default_input": "Hello",
+  "expected_output": "Hello",
+  "solution_description": "reads input and outputs it unchanged, like an echo",
+  "key_concepts": ["input", "receive", "echo", "variable"],
+  "hints": [
+    "Try running with different inputs",
+    "§receive likely means input or read",
+    "The ← symbol appears to be assignment"
+  ],
+  "unlock_requirements": ["puzzle_01"],
+  "rewards": []
+}

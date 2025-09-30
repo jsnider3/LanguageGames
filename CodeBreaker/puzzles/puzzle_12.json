@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_12",
+  "title": "Absolute Value",
+  "difficulty": 3,
+  "arc": "Logic Arc",
+  "code": "§begin absolute\n  number ← -42\n  zero ← 0\n  §if number ⊘ zero\n    result ← zero ⊖ number\n  §else\n    result ← number\n  §end_if\n  §transmit result\n§end",
+  "default_input": null,
+  "expected_output": "42",
+  "solution_description": "calculates the absolute value of a number",
+  "key_concepts": ["absolute value", "conditional", "negation"],
+  "hints": [
+    "If number is negative, it's converted to positive",
+    "zero ⊖ number inverts the sign",
+    "This implements absolute value"
+  ],
+  "unlock_requirements": ["puzzle_11"],
+  "rewards": ["pattern_matcher"]
+}

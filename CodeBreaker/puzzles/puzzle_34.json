@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_34",
+  "title": "Frequency Counter",
+  "difficulty": 4,
+  "arc": "Data Structures Arc",
+  "code": "§begin count_frequency\n  items ← [\"red\", \"blue\", \"red\", \"green\", \"blue\", \"red\"]\n  counts ← §create_map\n  §iterate color §in items\n    §if §exists counts[color]\n      counts[color] ← counts[color] ⊕ 1\n    §else\n      counts[color] ← 1\n    §end_if\n  §end_iterate\n  §transmit counts[\"red\"]\n  §transmit counts[\"blue\"]\n  §transmit counts[\"green\"]\n§end",
+  "default_input": null,
+  "expected_output": "3\n2\n1",
+  "solution_description": "counts frequency of each item in an array using a dictionary",
+  "key_concepts": ["frequency counting", "dictionary", "accumulation"],
+  "hints": [
+    "Each item increments its count in the dictionary",
+    "red appears 3 times, blue 2 times, green 1 time",
+    "This is a classic frequency counter pattern"
+  ],
+  "unlock_requirements": ["puzzle_33"],
+  "rewards": []
+}

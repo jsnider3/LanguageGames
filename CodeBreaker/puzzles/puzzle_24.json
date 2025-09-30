@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_24",
+  "title": "Conditional Function",
+  "difficulty": 4,
+  "arc": "Functions Arc",
+  "code": "§function classify(n)\n  §if n ⊗ 10\n    §transmit \"large\"\n  §else\n    §transmit \"small\"\n  §end_if\n§end_function\n\n§begin main\n  §call classify(5)\n  §call classify(15)\n  §call classify(10)\n§end",
+  "default_input": null,
+  "expected_output": "small\nlarge\nsmall",
+  "solution_description": "function that classifies numbers as large or small based on a threshold",
+  "key_concepts": ["function", "conditional", "comparison"],
+  "hints": [
+    "The function checks if n is greater than 10",
+    "⊗ means greater than",
+    "5 and 10 are not greater than 10, but 15 is"
+  ],
+  "unlock_requirements": ["puzzle_23"],
+  "rewards": []
+}

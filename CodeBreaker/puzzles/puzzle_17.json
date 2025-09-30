@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_17",
+  "title": "Filter Positive",
+  "difficulty": 3,
+  "arc": "Iteration Arc",
+  "code": "§begin filter_positive\n  numbers ← [-3, 5, -1, 8, -2, 10]\n  zero ← 0\n  §iterate num §in numbers\n    §if num ⊗ zero\n      §transmit num\n    §end_if\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "5\n8\n10",
+  "solution_description": "outputs only the positive numbers from an array",
+  "key_concepts": ["filter", "conditional", "loop"],
+  "hints": [
+    "Only some numbers are output",
+    "The condition checks if numbers are positive",
+    "This filters out negative numbers"
+  ],
+  "unlock_requirements": ["puzzle_16"],
+  "rewards": []
+}

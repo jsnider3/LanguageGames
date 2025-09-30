@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_45",
+  "title": "Signal Processing",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin process_signal\n  signal ← [72, 69, 76, 76, 79]\n  decoded ← §create_array\n  §iterate code §in signal\n    decoded ← decoded\n    §transmit code\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "72\n69\n76\n76\n79",
+  "solution_description": "processes a signal array representing ASCII codes and outputs them",
+  "key_concepts": ["signal", "encoding", "array processing"],
+  "hints": [
+    "These numbers might represent something",
+    "72=H, 69=E, 76=L, 76=L, 79=O",
+    "The signal encodes a message"
+  ],
+  "unlock_requirements": ["puzzle_44"],
+  "rewards": []
+}

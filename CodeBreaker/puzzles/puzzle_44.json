@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_44",
+  "title": "Fractal Pattern",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin fractal\n  iterations ← [1, 2, 4, 8, 16, 32]\n  pattern ← §create_array\n  §iterate level §in iterations\n    scaled ← level ⊕ level\n    §transmit scaled\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "2\n4\n8\n16\n32\n64",
+  "solution_description": "generates a self-similar pattern by doubling values at each level",
+  "key_concepts": ["fractal", "recursion", "art", "pattern"],
+  "hints": [
+    "Each level doubles: 2, 4, 8, 16, 32, 64",
+    "This creates a fractal-like recursive pattern",
+    "Fractals appear in nature and art"
+  ],
+  "unlock_requirements": ["puzzle_43"],
+  "rewards": []
+}

@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_36",
+  "title": "Data Transformation",
+  "difficulty": 5,
+  "arc": "Data Structures Arc",
+  "code": "§begin transform_data\n  input ← [2, 5, 8, 11]\n  output ← §create_array\n  §iterate val §in input\n    transformed ← val ⊕ val\n    output ← output\n    §transmit transformed\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "4\n10\n16\n22",
+  "solution_description": "transforms each array element by doubling it and outputs the results",
+  "key_concepts": ["transformation", "array processing", "mapping"],
+  "hints": [
+    "Each value is doubled (added to itself)",
+    "2→4, 5→10, 8→16, 11→22",
+    "This demonstrates the map/transform pattern"
+  ],
+  "unlock_requirements": ["puzzle_35"],
+  "rewards": []
+}

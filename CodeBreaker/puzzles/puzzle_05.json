@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_05",
+  "title": "Number Sequence",
+  "difficulty": 2,
+  "arc": "Tutorial Arc",
+  "code": "§begin sequence\n  first ← 1\n  second ← 2\n  third ← first ⊕ second\n  §transmit first\n  §transmit second\n  §transmit third\n§end",
+  "default_input": null,
+  "expected_output": "1\n2\n3",
+  "solution_description": "outputs a sequence where the third number is the sum of the first two",
+  "key_concepts": ["sequence", "multiple outputs", "calculation"],
+  "hints": [
+    "Multiple §transmit commands output multiple lines",
+    "third is calculated from first and second",
+    "This creates a simple numeric sequence"
+  ],
+  "unlock_requirements": ["puzzle_04"],
+  "rewards": ["symbol_dictionary"]
+}

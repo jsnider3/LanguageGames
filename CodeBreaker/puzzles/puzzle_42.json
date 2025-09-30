@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_42",
+  "title": "Binary Converter",
+  "difficulty": 5,
+  "arc": "Advanced Arc",
+  "code": "§begin to_binary\n  decimal ← 13\n  binary_digits ← [1, 1, 0, 1]\n  §iterate digit §in binary_digits\n    §transmit digit\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "1\n1\n0\n1",
+  "solution_description": "represents a decimal number in binary form",
+  "key_concepts": ["binary", "number systems", "representation"],
+  "hints": [
+    "13 in decimal equals 1101 in binary",
+    "Binary uses only 0s and 1s",
+    "8 + 4 + 0 + 1 = 13"
+  ],
+  "unlock_requirements": ["puzzle_41"],
+  "rewards": []
+}

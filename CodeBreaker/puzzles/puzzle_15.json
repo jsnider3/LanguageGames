@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_15",
+  "title": "Counter",
+  "difficulty": 3,
+  "arc": "Iteration Arc",
+  "code": "§begin count_items\n  items ← [1, 2, 3, 4, 5, 6, 7]\n  count ← 0\n  §iterate item §in items\n    count ← count ⊕ 1\n  §end_iterate\n  §transmit count\n§end",
+  "default_input": null,
+  "expected_output": "7",
+  "solution_description": "counts the number of elements in an array",
+  "key_concepts": ["counting", "loop", "length"],
+  "hints": [
+    "count increases by 1 for each item",
+    "The loop runs once per array element",
+    "This counts how many items exist"
+  ],
+  "unlock_requirements": ["puzzle_14"],
+  "rewards": ["cross_reference"]
+}

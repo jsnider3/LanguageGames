@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_21",
+  "title": "Simple Function",
+  "difficulty": 3,
+  "arc": "Functions Arc",
+  "code": "§function double(x)\n  result ← x ⊕ x\n  §transmit result\n§end_function\n\n§begin main\n  §call double(5)\n§end",
+  "default_input": null,
+  "expected_output": "10",
+  "solution_description": "defines and calls a function that doubles a number",
+  "key_concepts": ["function", "parameter", "call"],
+  "hints": [
+    "§function defines a reusable piece of code",
+    "double takes a parameter x",
+    "The function is called with argument 5"
+  ],
+  "unlock_requirements": ["puzzle_20"],
+  "rewards": []
+}

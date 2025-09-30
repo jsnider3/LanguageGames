@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_35",
+  "title": "Nested Data",
+  "difficulty": 4,
+  "arc": "Data Structures Arc",
+  "code": "§begin nested\n  ship ← §create_map\n  crew ← §create_map\n  crew[\"captain\"] ← \"Rodriguez\"\n  crew[\"engineer\"] ← \"Chen\"\n  ship[\"name\"] ← \"Discovery\"\n  ship[\"crew\"] ← crew\n  §transmit ship[\"crew\"][\"captain\"]\n§end",
+  "default_input": null,
+  "expected_output": "Rodriguez",
+  "solution_description": "creates nested dictionaries and accesses deeply nested values",
+  "key_concepts": ["nested structures", "chained access"],
+  "hints": [
+    "crew is a dictionary stored inside ship",
+    "Access is chained: ship[crew][captain]",
+    "This demonstrates nested data structures"
+  ],
+  "unlock_requirements": ["puzzle_34"],
+  "rewards": ["decompiler"]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_14",
+  "title": "Sum Calculator",
+  "difficulty": 3,
+  "arc": "Iteration Arc",
+  "code": "§begin sum_array\n  numbers ← [5, 10, 15, 20]\n  total ← 0\n  §iterate num §in numbers\n    total ← total ⊕ num\n  §end_iterate\n  §transmit total\n§end",
+  "default_input": null,
+  "expected_output": "50",
+  "solution_description": "calculates the sum of all numbers in an array",
+  "key_concepts": ["accumulator", "sum", "loop"],
+  "hints": [
+    "total starts at 0 and accumulates values",
+    "Each number is added to the running total",
+    "This is a classic sum algorithm"
+  ],
+  "unlock_requirements": ["puzzle_13"],
+  "rewards": []
+}

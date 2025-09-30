@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_47",
+  "title": "Memory Echo",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin remember\n  memories ← [\"first\", \"light\", \"home\", \"stars\", \"end\", \"hope\"]\n  preserved ← 0\n  §iterate memory §in memories\n    preserved ← preserved ⊕ 1\n    §transmit memory\n  §end_iterate\n  §transmit preserved\n§end",
+  "default_input": null,
+  "expected_output": "first\nlight\nhome\nstars\nend\nhope\n6",
+  "solution_description": "preserves and counts memories, representing the act of remembering",
+  "key_concepts": ["memory", "preservation", "consciousness", "identity"],
+  "hints": [
+    "Each memory is preserved (counted and output)",
+    "Six memories: first light, home, stars, end, hope",
+    "This represents the act of remembering itself"
+  ],
+  "unlock_requirements": ["puzzle_46"],
+  "rewards": []
+}

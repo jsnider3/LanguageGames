@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_28",
+  "title": "Range Filter",
+  "difficulty": 4,
+  "arc": "Functions Arc",
+  "code": "§function in_range(val, min, max)\n  §if val ⊗ min ⊖ 1\n    §if max ⊗ val ⊖ 1\n      §transmit \"in range\"\n    §else\n      §transmit \"out of range\"\n    §end_if\n  §else\n    §transmit \"out of range\"\n  §end_if\n§end_function\n\n§begin main\n  §call in_range(15, 10, 20)\n  §call in_range(5, 10, 20)\n  §call in_range(25, 10, 20)\n§end",
+  "default_input": null,
+  "expected_output": "in range\nout of range\nout of range",
+  "solution_description": "checks if a value falls within a specified range using nested conditionals",
+  "key_concepts": ["nested conditionals", "range check", "logic"],
+  "hints": [
+    "Function checks if val is between min and max",
+    "15 is between 10 and 20 (inclusive)",
+    "5 and 25 are outside the range [10, 20]"
+  ],
+  "unlock_requirements": ["puzzle_27"],
+  "rewards": []
+}

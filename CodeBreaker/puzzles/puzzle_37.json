@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_37",
+  "title": "Prime Checker",
+  "difficulty": 5,
+  "arc": "Advanced Arc",
+  "code": "§begin check_prime\n  n ← 17\n  is_prime ← §true\n  divisor ← 2\n  §iterate check §in [1, 2, 3, 4, 5, 6, 7, 8]\n    §if divisor ⊘ n\n      test ← divisor ⊕ divisor\n      §if n ≈ test\n        is_prime ← §false\n      §end_if\n      divisor ← divisor ⊕ 1\n    §end_if\n  §end_iterate\n  §if is_prime\n    §transmit \"prime\"\n  §else\n    §transmit \"composite\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "prime",
+  "solution_description": "checks if a number is prime by testing divisibility",
+  "key_concepts": ["prime checking", "algorithm", "boolean logic"],
+  "hints": [
+    "Tests if n can be divided by any number from 2 upward",
+    "17 cannot be evenly divided by 2, 4, 6, 8, etc.",
+    "This implements a basic primality test"
+  ],
+  "unlock_requirements": ["puzzle_36"],
+  "rewards": []
+}

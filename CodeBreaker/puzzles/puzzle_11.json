@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_11",
+  "title": "Range Checker",
+  "difficulty": 3,
+  "arc": "Logic Arc",
+  "code": "§begin in_range\n  value ← 50\n  min ← 10\n  max ← 100\n  §if value ⊗ min\n    §if max ⊗ value\n      §transmit \"in range\"\n    §else\n      §transmit \"out of range\"\n    §end_if\n  §else\n    §transmit \"out of range\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "in range",
+  "solution_description": "checks if a value is between a minimum and maximum using nested conditionals",
+  "key_concepts": ["nested conditionals", "range check", "multiple conditions"],
+  "hints": [
+    "Two conditional statements are nested",
+    "First checks if value > min, then if max > value",
+    "This creates a range check"
+  ],
+  "unlock_requirements": ["puzzle_10"],
+  "rewards": []
+}

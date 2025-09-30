@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_08",
+  "title": "Equality Check",
+  "difficulty": 2,
+  "arc": "Logic Arc",
+  "code": "§begin check_equal\n  a ← 7\n  b ← 7\n  §if a ≈ b\n    §transmit \"match\"\n  §else\n    §transmit \"different\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "match",
+  "solution_description": "checks if two values are equal and outputs match or different",
+  "key_concepts": ["equality", "comparison", "conditional"],
+  "hints": [
+    "Both variables have the same value",
+    "≈ appears to be an equality test",
+    "The output is 'match' because values are equal"
+  ],
+  "unlock_requirements": ["puzzle_07"],
+  "rewards": ["execution_tracer"]
+}

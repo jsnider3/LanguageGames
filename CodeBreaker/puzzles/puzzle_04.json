@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_04",
+  "title": "Subtraction Cipher",
+  "difficulty": 1,
+  "arc": "Tutorial Arc",
+  "code": "§begin subtract\n  x ← 10\n  y ← 4\n  difference ← x ⊖ y\n  §transmit difference\n§end",
+  "default_input": null,
+  "expected_output": "6",
+  "solution_description": "subtracts one number from another and outputs the difference",
+  "key_concepts": ["subtraction", "arithmetic"],
+  "hints": [
+    "Similar to puzzle_03, but with a different operator",
+    "What operation on 10 and 4 gives 6?",
+    "⊖ is likely subtraction"
+  ],
+  "unlock_requirements": ["puzzle_03"],
+  "rewards": []
+}

@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_29",
+  "title": "Array Builder",
+  "difficulty": 3,
+  "arc": "Data Structures Arc",
+  "code": "§begin build_array\n  collection ← §create_array\n  collection ← [1, 2, 3, 4, 5]\n  §iterate item §in collection\n    §transmit item\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "1\n2\n3\n4\n5",
+  "solution_description": "creates an array and iterates through it outputting each element",
+  "key_concepts": ["array", "iteration", "collection"],
+  "hints": [
+    "§create_array initializes an empty array",
+    "The array is then assigned values",
+    "Loop outputs each element"
+  ],
+  "unlock_requirements": ["puzzle_28"],
+  "rewards": []
+}

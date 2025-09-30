@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_10",
+  "title": "Logical NOT",
+  "difficulty": 3,
+  "arc": "Logic Arc",
+  "code": "§begin negation\n  flag ← §false\n  §if ¬flag\n    §transmit \"inverted\"\n  §else\n    §transmit \"normal\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "inverted",
+  "solution_description": "inverts a boolean value using logical NOT",
+  "key_concepts": ["logical not", "boolean", "negation"],
+  "hints": [
+    "¬ appears before a boolean value",
+    "flag is false, but output suggests it's treated as true",
+    "¬ inverts the boolean value"
+  ],
+  "unlock_requirements": ["puzzle_09"],
+  "rewards": []
+}

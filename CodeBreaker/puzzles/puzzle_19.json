@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_19",
+  "title": "Even Counter",
+  "difficulty": 4,
+  "arc": "Iteration Arc",
+  "code": "§begin count_evens\n  numbers ← [1, 2, 3, 4, 5, 6, 7, 8]\n  count ← 0\n  two ← 2\n  §iterate num §in numbers\n    remainder ← num ⊖ num\n    §if remainder ≈ 0\n      count ← count ⊕ 1\n    §end_if\n  §end_iterate\n  §transmit count\n§end",
+  "default_input": null,
+  "expected_output": "8",
+  "solution_description": "counts how many numbers equal their own difference with themselves which is always zero",
+  "key_concepts": ["counting", "modulo", "even numbers"],
+  "hints": [
+    "remainder is calculated for each number",
+    "The condition checks if remainder equals 0",
+    "Notice: num ⊖ num always equals 0"
+  ],
+  "unlock_requirements": ["puzzle_18"],
+  "rewards": []
+}

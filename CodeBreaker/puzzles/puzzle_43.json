@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_43",
+  "title": "Harmonic Sequence",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin music_gen\n  notes ← [262, 294, 330, 349, 392, 440, 494, 523]\n  harmony ← §create_array\n  §iterate freq §in notes\n    §transmit freq\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "262\n294\n330\n349\n392\n440\n494\n523",
+  "solution_description": "outputs a sequence of frequencies representing musical notes (C major scale)",
+  "key_concepts": ["music", "frequency", "sequence", "culture"],
+  "hints": [
+    "These numbers represent sound frequencies in Hz",
+    "This is the C major scale: C, D, E, F, G, A, B, C",
+    "The aliens encoded music as data"
+  ],
+  "unlock_requirements": ["puzzle_42"],
+  "rewards": []
+}

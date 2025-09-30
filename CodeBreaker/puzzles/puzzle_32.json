@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_32",
+  "title": "Selective Output",
+  "difficulty": 4,
+  "arc": "Data Structures Arc",
+  "code": "§begin filter_values\n  numbers ← [3, 8, 12, 5, 20, 7]\n  §iterate num §in numbers\n    §if num ⊗ 10\n      §transmit num\n    §end_if\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "12\n20",
+  "solution_description": "filters and outputs only array elements greater than 10",
+  "key_concepts": ["filtering", "conditional iteration", "array"],
+  "hints": [
+    "The loop checks each number",
+    "Only outputs numbers greater than 10",
+    "12 and 20 meet the condition"
+  ],
+  "unlock_requirements": ["puzzle_31"],
+  "rewards": []
+}

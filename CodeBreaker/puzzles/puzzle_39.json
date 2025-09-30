@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_39",
+  "title": "Min-Max Finder",
+  "difficulty": 4,
+  "arc": "Advanced Arc",
+  "code": "§begin find_min_max\n  data ← [45, 12, 67, 23, 89, 34]\n  minimum ← 999\n  maximum ← 0\n  §iterate value §in data\n    §if value ⊘ minimum\n      minimum ← value\n    §end_if\n    §if value ⊗ maximum\n      maximum ← value\n    §end_if\n  §end_iterate\n  §transmit minimum\n  §transmit maximum\n§end",
+  "default_input": null,
+  "expected_output": "12\n89",
+  "solution_description": "finds both minimum and maximum values in an array",
+  "key_concepts": ["min-max", "comparison", "tracking"],
+  "hints": [
+    "Tracks both smallest and largest values seen",
+    "minimum starts high, maximum starts low",
+    "12 is smallest, 89 is largest"
+  ],
+  "unlock_requirements": ["puzzle_38"],
+  "rewards": []
+}

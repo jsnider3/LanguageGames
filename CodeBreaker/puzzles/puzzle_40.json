@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_40",
+  "title": "Pattern Generator",
+  "difficulty": 4,
+  "arc": "Advanced Arc",
+  "code": "§begin pattern\n  sequence ← §create_array\n  a ← 0\n  b ← 1\n  §iterate i §in [1,2,3,4,5,6,7,8]\n    §transmit a\n    temp ← a ⊕ b\n    a ← b\n    b ← temp\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "0\n1\n1\n2\n3\n5\n8\n13",
+  "solution_description": "generates a Fibonacci-like sequence",
+  "key_concepts": ["fibonacci", "sequence", "pattern"],
+  "hints": [
+    "Each number is the sum of the previous two",
+    "Variables are swapped each iteration",
+    "This is the Fibonacci sequence"
+  ],
+  "unlock_requirements": ["puzzle_39"],
+  "rewards": []
+}

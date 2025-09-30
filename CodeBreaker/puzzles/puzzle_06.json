@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_06",
+  "title": "Basic Comparison",
+  "difficulty": 2,
+  "arc": "Logic Arc",
+  "code": "§begin compare\n  a ← 10\n  b ← 5\n  §if a ⊗ b\n    §transmit \"yes\"\n  §else\n    §transmit \"no\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "yes",
+  "solution_description": "checks if the first number is greater than the second and outputs yes or no",
+  "key_concepts": ["conditional", "comparison", "greater than"],
+  "hints": [
+    "§if introduces a conditional branch",
+    "⊗ compares two values",
+    "Since output is 'yes', the condition must be true"
+  ],
+  "unlock_requirements": ["puzzle_05"],
+  "rewards": []
+}

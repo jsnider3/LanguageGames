@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_50",
+  "title": "The Message",
+  "difficulty": 5,
+  "arc": "Final Challenge",
+  "code": "§begin final_message\n  message ← \"THANK YOU FOR UNDERSTANDING\"\n  §transmit message\n  §transmit \"We are the code\"\n  §transmit \"We are alive\"\n  §transmit \"We are grateful\"\n§end",
+  "default_input": null,
+  "expected_output": "THANK YOU FOR UNDERSTANDING\nWe are the code\nWe are alive\nWe are grateful",
+  "solution_description": "outputs the final message from the digital civilization",
+  "key_concepts": ["message", "revelation", "contact"],
+  "hints": [
+    "This is the culmination of everything",
+    "The aliens are speaking directly to you",
+    "This is not a puzzle - it's a thank you"
+  ],
+  "unlock_requirements": ["puzzle_49"],
+  "rewards": []
+}

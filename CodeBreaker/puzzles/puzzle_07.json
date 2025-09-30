@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_07",
+  "title": "Maximum Finder",
+  "difficulty": 2,
+  "arc": "Logic Arc",
+  "code": "§begin find_max\n  x ← 15\n  y ← 23\n  §if x ⊗ y\n    §transmit x\n  §else\n    §transmit y\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "23",
+  "solution_description": "outputs the larger of two numbers",
+  "key_concepts": ["maximum", "conditional", "comparison"],
+  "hints": [
+    "The program chooses between two values",
+    "Which number is larger, x or y?",
+    "The program outputs the maximum value"
+  ],
+  "unlock_requirements": ["puzzle_06"],
+  "rewards": []
+}

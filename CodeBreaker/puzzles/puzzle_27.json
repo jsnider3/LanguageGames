@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_27",
+  "title": "Function Composition",
+  "difficulty": 4,
+  "arc": "Functions Arc",
+  "code": "§function increment(n)\n  result ← n ⊕ 1\n  §transmit result\n§end_function\n\n§function double(n)\n  result ← n ⊕ n\n  §transmit result\n§end_function\n\n§begin main\n  value ← 5\n  §call increment(value)\n  §call double(value)\n§end",
+  "default_input": null,
+  "expected_output": "6\n10",
+  "solution_description": "defines multiple functions and calls them with the same input",
+  "key_concepts": ["multiple functions", "function composition", "reusability"],
+  "hints": [
+    "Two different functions operate on the same value",
+    "increment adds 1: 5 + 1 = 6",
+    "double adds to itself: 5 + 5 = 10"
+  ],
+  "unlock_requirements": ["puzzle_26"],
+  "rewards": []
+}

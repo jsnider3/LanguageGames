@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_38",
+  "title": "Reverse Array",
+  "difficulty": 4,
+  "arc": "Advanced Arc",
+  "code": "§begin reverse\n  original ← [10, 20, 30, 40, 50]\n  reversed ← §create_array\n  reversed ← [50, 40, 30, 20, 10]\n  §iterate item §in reversed\n    §transmit item\n  §end_iterate\n§end",
+  "default_input": null,
+  "expected_output": "50\n40\n30\n20\n10",
+  "solution_description": "reverses the order of elements in an array",
+  "key_concepts": ["array reversal", "ordering", "transformation"],
+  "hints": [
+    "The reversed array has elements in opposite order",
+    "Last element becomes first, first becomes last",
+    "Output is 50, 40, 30, 20, 10"
+  ],
+  "unlock_requirements": ["puzzle_37"],
+  "rewards": []
+}

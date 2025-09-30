@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_16",
+  "title": "Maximum in Array",
+  "difficulty": 3,
+  "arc": "Iteration Arc",
+  "code": "§begin find_maximum\n  values ← [3, 9, 2, 15, 7]\n  max_val ← 0\n  §iterate val §in values\n    §if val ⊗ max_val\n      max_val ← val\n    §end_if\n  §end_iterate\n  §transmit max_val\n§end",
+  "default_input": null,
+  "expected_output": "15",
+  "solution_description": "finds the largest value in an array",
+  "key_concepts": ["maximum", "loop", "conditional"],
+  "hints": [
+    "max_val is updated when a larger value is found",
+    "The loop checks each value against the current maximum",
+    "This finds the largest number in the array"
+  ],
+  "unlock_requirements": ["puzzle_15"],
+  "rewards": []
+}

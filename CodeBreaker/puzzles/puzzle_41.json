@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_41",
+  "title": "Pattern Matcher",
+  "difficulty": 5,
+  "arc": "Advanced Arc",
+  "code": "§begin match_pattern\n  sequence ← [1, 1, 2, 3, 5, 8, 13]\n  pattern ← [1, 1, 2]\n  matches ← 0\n  §iterate val §in sequence\n    §if val ≈ 1\n      matches ← matches ⊕ 1\n    §end_if\n  §end_iterate\n  §transmit matches\n§end",
+  "default_input": null,
+  "expected_output": "2",
+  "solution_description": "counts how many times the value 1 appears in a sequence",
+  "key_concepts": ["pattern matching", "counting", "equality"],
+  "hints": [
+    "Counts occurrences of a specific value",
+    "The value 1 appears twice in the sequence",
+    "This is a basic pattern matching algorithm"
+  ],
+  "unlock_requirements": ["puzzle_40"],
+  "rewards": []
+}

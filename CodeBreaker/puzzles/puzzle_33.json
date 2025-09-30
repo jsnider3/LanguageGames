@@ -1,0 +1,18 @@
+{
+  "id": "puzzle_33",
+  "title": "Key Search",
+  "difficulty": 4,
+  "arc": "Data Structures Arc",
+  "code": "§begin search_key\n  data ← §create_map\n  data[\"alpha\"] ← 100\n  data[\"beta\"] ← 200\n  data[\"gamma\"] ← 300\n  target ← \"beta\"\n  §if §exists data[target]\n    §transmit \"found\"\n    §transmit data[target]\n  §else\n    §transmit \"not found\"\n  §end_if\n§end",
+  "default_input": null,
+  "expected_output": "found\n200",
+  "solution_description": "searches for a key in a dictionary and retrieves its value if found",
+  "key_concepts": ["dictionary", "key existence", "conditional"],
+  "hints": [
+    "§exists checks if a key is in the dictionary",
+    "target is 'beta' which exists",
+    "Outputs confirmation and the value (200)"
+  ],
+  "unlock_requirements": ["puzzle_32"],
+  "rewards": []
+}
