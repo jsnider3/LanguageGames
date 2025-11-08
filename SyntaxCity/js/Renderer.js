@@ -95,6 +95,34 @@ export class Renderer {
         if (game.selectedEnemy && game.selectedEnemy.isAlive()) {
             game.selectedEnemy.renderInfo(this.ctx);
         }
+
+        // Render pause overlay
+        if (game.paused) {
+            this.renderPauseOverlay();
+        }
+    }
+
+    renderPauseOverlay() {
+        // Semi-transparent dark overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // "PAUSED" text
+        this.ctx.save();
+        this.ctx.fillStyle = '#00ff88';
+        this.ctx.font = 'bold 72px Courier New';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.shadowBlur = 20;
+        this.ctx.shadowColor = '#00ff88';
+        this.ctx.fillText('PAUSED', this.width / 2, this.height / 2 - 40);
+
+        // Instruction text
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '24px Courier New';
+        this.ctx.fillText('Press P or click Pause to resume', this.width / 2, this.height / 2 + 40);
+        this.ctx.restore();
     }
 
     renderPaths(paths) {

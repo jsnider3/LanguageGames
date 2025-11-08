@@ -191,6 +191,14 @@ export class UIManager {
         this.updateSelectionInfo();
         this.updateWaveControl();
         this.updatePowerUps();
+        this.updatePauseButton();
+    }
+
+    updatePauseButton() {
+        if (this.pauseBtn) {
+            this.pauseBtn.textContent = this.game.paused ? 'Resume (P)' : 'Pause (P)';
+            this.pauseBtn.classList.toggle('paused', this.game.paused);
+        }
     }
 
     updateHeader() {
