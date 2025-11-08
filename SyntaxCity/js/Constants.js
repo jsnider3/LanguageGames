@@ -442,7 +442,7 @@ export const GAME_CONFIG = {
     FPS: 60,
     WAVE_PREP_TIME: 15,  // seconds
     SELL_REFUND_PERCENT: 0.75,
-    PROJECTILE_SPEED: 200,  // pixels per second
+    PROJECTILE_SPEED: 400,  // pixels per second (increased to catch fast enemies)
     DAMAGE_NUMBER_DURATION: 1.0,  // seconds
     PARTICLE_LIFETIME: 0.5,  // seconds
     MAX_PROJECTILES: 500,

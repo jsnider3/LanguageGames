@@ -30,7 +30,7 @@ export class Projectile {
         this.maxTrailLength = 5;
 
         // Special properties
-        this.homing = this.special.homing || false;
+        this.homing = this.special.homing !== undefined ? this.special.homing : true;  // Homing by default!
         this.pierce = this.special.pierce || false;
         this.splash = this.special.splash || false;
         this.splashRadius = this.special.splashRadius || 0;
