@@ -8,10 +8,58 @@ A tower defense game where each tower represents a fundamental programming const
 
 ### Quick Start
 
-1. Open `index.html` in a modern web browser
-2. Place towers on the grid to defend against bugs
-3. Prevent bugs from reaching the end of the path
-4. Complete waves to progress through levels
+**⚠️ IMPORTANT:** This game uses ES6 modules and **must** be run through a local web server (not by opening the HTML file directly).
+
+**Easiest Method - Python:**
+```bash
+# Navigate to the SyntaxCity directory
+cd path/to/LanguageGames/SyntaxCity
+
+# Python 3
+python -m http.server 8000
+
+# Python 2
+python -m SimpleHTTPServer 8000
+```
+
+Then open **http://localhost:8000** in your browser.
+
+**Alternative Methods:**
+
+<details>
+<summary>Node.js</summary>
+
+```bash
+cd path/to/LanguageGames/SyntaxCity
+npx serve
+# or
+npm install -g http-server
+http-server
+```
+</details>
+
+<details>
+<summary>VS Code Live Server</summary>
+
+1. Install "Live Server" extension
+2. Right-click `index.html`
+3. Select "Open with Live Server"
+</details>
+
+<details>
+<summary>PHP</summary>
+
+```bash
+cd path/to/LanguageGames/SyntaxCity
+php -S localhost:8000
+```
+</details>
+
+### Game Instructions
+
+1. Place towers on the grid to defend against bugs
+2. Prevent bugs from reaching the end of the path
+3. Complete waves to progress through levels
 
 ### Objective
 
@@ -171,9 +219,15 @@ Your final score is calculated from:
 
 ## 🐛 Troubleshooting
 
+**CORS Error / "Failed to load resource" errors?**
+- **YOU MUST USE A LOCAL WEB SERVER** - Don't open index.html directly!
+- See the "Quick Start" section above for server setup
+- The game uses ES6 modules which browsers block on `file://` protocol
+
 **Game won't load?**
 - Ensure you're using a modern browser (Chrome, Firefox, Edge, Safari)
 - Check browser console for errors (F12)
+- Make sure you're running a local web server (see above)
 - Try refreshing the page
 
 **Low performance?**
