@@ -159,6 +159,13 @@ export class Tower {
     attack(target, enemies, game) {
         let finalDamage = this.damage * this.comboBonus.damageMultiplier;
 
+        console.log(`${this.name} attacking`, {
+            type: this.type,
+            damage: finalDamage,
+            target: target.stats.name,
+            targetHP: Math.floor(target.hp)
+        });
+
         // Apply tower damage if taken explosion damage
         if (this.damageTaken > 0) {
             finalDamage *= (1 - Math.min(0.5, this.damageTaken));

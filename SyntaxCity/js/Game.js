@@ -588,6 +588,13 @@ export class Game {
 
         const actualDamage = proj.target.takeDamage(proj.damage, this, proj.towerId);
 
+        console.log('Projectile hit!', {
+            targetType: proj.target.type,
+            projDamage: proj.damage,
+            actualDamage: actualDamage,
+            targetHP: Math.floor(proj.target.hp)
+        });
+
         // Create damage number
         this.effects.createDamageNumber(
             proj.target.x,
