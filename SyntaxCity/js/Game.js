@@ -159,13 +159,30 @@ export class Game {
     }
 
     startWave() {
-        if (this.waveActive) return;
-        if (this.currentWaveNumber >= this.currentLevel.waves.length) return;
+        console.log('startWave called', {
+            waveActive: this.waveActive,
+            currentWaveNumber: this.currentWaveNumber,
+            totalWaves: this.currentLevel ? this.currentLevel.waves.length : 'no level'
+        });
+
+        if (this.waveActive) {
+            console.log('Wave already active, returning');
+            return;
+        }
+        if (this.currentWaveNumber >= this.currentLevel.waves.length) {
+            console.log('All waves complete, returning');
+            return;
+        }
 
         this.waveActive = true;
         this.currentWaveEnemies = [...this.currentLevel.waves[this.currentWaveNumber]];
         this.waveSpawnIndex = 0;
         this.waveSpawnTimer = 0;
+
+        console.log('Wave started!', {
+            waveNumber: this.currentWaveNumber + 1,
+            enemyCount: this.currentWaveEnemies.length
+        });
 
         // Reset tower catches for new wave
         for (let tower of this.grid.towers) {
@@ -513,6 +530,7 @@ export class Game {
                 const path = this.currentLevel.paths[pathIndex];
                 const enemy = createEnemy(nextEnemy.type, path, this.currentWaveNumber);
                 this.enemies.push(enemy);
+                console.log(`Spawned enemy ${this.waveSpawnIndex + 1}/${this.currentWaveEnemies.length}:`, nextEnemy.type);
                 this.waveSpawnIndex++;
             }
         }

@@ -218,6 +218,7 @@ export class Tower {
             const proj = new DelayedProjectile(
                 this.x, this.y, target, damage, this.color, this.special.delayedHit
             );
+            proj.towerId = this.id;
             game.projectiles.push(proj);
             return;
         }
@@ -239,6 +240,7 @@ export class Tower {
                 proj.stun = true;
                 proj.stunDuration = 1.0;
             }
+            proj.towerId = this.id;
             game.projectiles.push(proj);
             return;
         }
@@ -256,6 +258,7 @@ export class Tower {
             }
             // Still shoot a projectile for visual effect
             const proj = new Projectile(this.x, this.y, target, damage, this.color);
+            proj.towerId = this.id;
             game.projectiles.push(proj);
             return;
         }
@@ -264,12 +267,14 @@ export class Tower {
         if (this.special.stackDamage) {
             const proj = new Projectile(this.x, this.y, target, damage, this.color);
             proj.stacking = true;
+            proj.towerId = this.id;
             game.projectiles.push(proj);
             return;
         }
 
         // Standard projectile
         const proj = new Projectile(this.x, this.y, target, damage, this.color);
+        proj.towerId = this.id;
         game.projectiles.push(proj);
     }
 
