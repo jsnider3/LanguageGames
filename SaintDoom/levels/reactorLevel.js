@@ -9,9 +9,41 @@ export class ReactorLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
-    
+
+        this.name = 'Reactor Core';
+        this.description = 'Prevent catastrophic meltdown in the heart of the facility';
+
+        // Core state
+        this.reactorStable = false;
+        this.coolingSystemActive = false;
+        this.emergencyProtocol = false;
+        this.alarmActive = false;
+
+        // Reactor tuning / progression
+        this.totalControlRods = 4;
+        this.controlRodsInserted = 0;
+        this.currentTimer = 5 * 60 * 1000; // 5 minutes in ms
+        this.temperatureLevel = 75;
+        this.pressureLevel = 75;
+        this.radiationLevel = 75;
+        this.radiationProtection = 0;
+        this.radiationDamageRate = 2;
+
+        // Collections used throughout the level
+        this.coolingTowers = [];
+        this.controlRods = [];
+        this.radiationZones = [];
+        this.coolingPipes = [];
+        this.emergencyShutoffs = [];
+        this.warningLights = [];
+        this.steamVents = [];
+
+        this.reactorCore = null;
+        this.meltdownInterval = null;
+    }
+
     create() {
-        // Return required data structure for Game.js
+        this.init();
         return {
             walls: this.walls,
             enemies: this.enemies
@@ -170,13 +202,9 @@ export class ReactorLevel extends BaseLevel {
         const originalIntensity = light.intensity;
         const blinkSpeed = 800 + Math.random() * 400;
         
-        const blinkInterval = setInterval(() => {
+        this.addInterval(() => {
             light.intensity = light.intensity > 0 ? 0 : originalIntensity;
         }, blinkSpeed);
-        
-        // Track interval for cleanup
-        this.intervals = this.intervals || [];
-        this.intervals.push(blinkInterval);
     }
 
     createReactorCore() {
@@ -709,7 +737,7 @@ export class ReactorLevel extends BaseLevel {
         this.scene.add(sparks);
         
         // Animate sparks
-        setInterval(() => {
+        this.addInterval(() => {
             const positions = sparks.geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
                 positions[i] = x + (Math.random() - 0.5) * 2;
@@ -755,7 +783,8 @@ export class ReactorLevel extends BaseLevel {
     }
 
     startMeltdownTimer() {
-        this.meltdownInterval = setInterval(() => {
+        // Use BaseLevel interval tracking for cleanup
+        this.meltdownInterval = this.addInterval(() => {
             this.currentTimer -= 1000; // Decrease by 1 second
             
             if (this.currentTimer <= 0) {
@@ -856,14 +885,15 @@ export class ReactorLevel extends BaseLevel {
     }
 
     animateFan(fan, blades) {
-        const fanRotation = setInterval(() => {
+        let fanRotation = null;
+        fanRotation = this.addInterval(() => {
             if (fan && fan.parent) {
                 fan.rotation.y += 0.2;
                 blades.forEach(blade => {
                     blade.rotation.y += 0.2;
                 });
             } else {
-                clearInterval(fanRotation);
+                if (fanRotation) this.clearInterval(fanRotation);
             }
         }, 16);
     }
@@ -978,7 +1008,8 @@ export class ReactorLevel extends BaseLevel {
         // Animate explosion
         let scale = 1;
         let opacity = 1.0;
-        const explosionInterval = setInterval(() => {
+        let explosionInterval = null;
+        explosionInterval = this.addInterval(() => {
             scale += 0.5;
             opacity -= 0.02;
             explosion.scale.setScalar(scale);
@@ -986,7 +1017,7 @@ export class ReactorLevel extends BaseLevel {
             
             if (opacity <= 0) {
                 this.scene.remove(explosion);
-                clearInterval(explosionInterval);
+                if (explosionInterval) this.clearInterval(explosionInterval);
             }
         }, 50);
     }
@@ -1225,7 +1256,8 @@ export class ReactorLevel extends BaseLevel {
         super.cleanup();
         
         if (this.meltdownInterval) {
-            clearInterval(this.meltdownInterval);
+            this.clearInterval(this.meltdownInterval);
+            this.meltdownInterval = null;
         }
         
         this.coolingTowers = [];

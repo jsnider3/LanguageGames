@@ -11,6 +11,7 @@ export class NeuralScrambler extends BaseWeapon {
         this.fireRate = 600; // ms between shots
         this.ammoCapacity = 15;
         this.currentAmmo = this.ammoCapacity;
+        this.totalAmmo = 90;
         this.range = 50;
         this.accuracy = 0.88;
         

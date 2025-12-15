@@ -165,7 +165,10 @@ export class NarrativeSystem {
         
         this.isIntroComplete = true;
         this.playVoiceLine('resurrection');
-        this.setObjective("Find the desecrated chapel");
+        // Don't override objectives that were already set by the current level (e.g. tutorial steps).
+        if (!this.currentObjective) {
+            this.setObjective("Find the desecrated chapel");
+        }
     }
     
     displayIntroStage(container, stage) {

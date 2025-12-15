@@ -4,7 +4,7 @@ A browser-based FPS game where you play as Saint Giovanni, resurrected by the Va
 
 ## How to Run
 
-The game is currently in a single HTML file (`saintdoom.html`) for easy local testing without CORS issues.
+Open `index.html` via a local web server (ES modules + import maps generally won’t work from `file://`).
 
 ### Option 1: Simple Python Server (Recommended)
 ```bash
@@ -14,7 +14,7 @@ python -m http.server 8000
 # Python 2
 python -m SimpleHTTPServer 8000
 ```
-Then open http://localhost:8000/saintdoom.html
+Then open http://localhost:8000/index.html
 
 ### Option 2: Node.js Server
 ```bash
@@ -24,10 +24,10 @@ npm install -g http-server
 # Run server
 http-server -p 8000
 ```
-Then open http://localhost:8000/saintdoom.html
+Then open http://localhost:8000/index.html
 
 ### Option 3: VS Code Live Server
-If using VS Code, install the "Live Server" extension and right-click on `saintdoom.html` → "Open with Live Server"
+If using VS Code, install the "Live Server" extension and right-click on `index.html` → "Open with Live Server"
 
 ## Controls
 
@@ -70,13 +70,4 @@ If using VS Code, install the "Live Server" extension and right-click on `saintd
 
 ## Module Structure (For Future Refactoring)
 
-The game has been designed with modularity in mind. The existing module files are:
-- `player.js` - Player controller
-- `enemy.js` - Enemy AI and types
-- `combat.js` - Weapon systems
-- `level.js` - Level generation
-- `collision.js` - Collision detection
-- `input.js` - Input management
-- `game.js` - Main game loop
-
-To convert to modules, run a local web server and update the HTML to use `type="module"` scripts.
+Most game code lives under `modules/` (core loop, input, player, weapons, physics), with levels in `levels/` and enemies in `enemies/`.

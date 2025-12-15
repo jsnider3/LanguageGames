@@ -204,7 +204,7 @@ export class CollisionSystem {
             
             // Check if position would collide with enemy
             const distance = pos.distanceTo(enemy.position);
-            const collisionDistance = (enemy.radius || PHYSICS.DEFAULT_ENEMY_RADIUS) + playerRadius;
+            const collisionDistance = (enemy.radius || Config.engine.PHYSICS.DEFAULT_ENEMY_RADIUS) + playerRadius;
             
             if (distance < collisionDistance) {
                 return true;

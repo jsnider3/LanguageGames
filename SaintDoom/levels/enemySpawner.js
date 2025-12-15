@@ -75,10 +75,47 @@ export class EnemySpawner {
         const enemy = new EnemyClass(this.scene, position);
         
         // Apply configuration
-        if (config.health) enemy.health = config.health;
-        if (config.speed) enemy.speed = config.speed;
-        if (config.damage) enemy.damage = config.damage;
-        if (config.scale) enemy.scale = config.scale;
+        if (typeof config.health === 'number') {
+            enemy.health = config.health;
+            if (typeof enemy.maxHealth === 'number') {
+                enemy.maxHealth = Math.max(enemy.maxHealth, enemy.health);
+            } else {
+                enemy.maxHealth = enemy.health;
+            }
+        }
+        if (typeof config.damage === 'number') {
+            enemy.damage = config.damage;
+        }
+        if (typeof config.speed === 'number') {
+            if (typeof enemy.moveSpeed === 'number') enemy.moveSpeed = config.speed;
+            if (typeof enemy.speed === 'number') enemy.speed = config.speed;
+        }
+
+        // Multiplier support (useful for wave scaling)
+        if (typeof config.healthMultiplier === 'number') {
+            const m = config.healthMultiplier;
+            if (typeof enemy.health === 'number') enemy.health *= m;
+            if (typeof enemy.maxHealth === 'number') enemy.maxHealth *= m;
+        }
+        if (typeof config.damageMultiplier === 'number' && typeof enemy.damage === 'number') {
+            enemy.damage *= config.damageMultiplier;
+        }
+        if (typeof config.speedMultiplier === 'number') {
+            const m = config.speedMultiplier;
+            if (typeof enemy.moveSpeed === 'number') enemy.moveSpeed *= m;
+            if (typeof enemy.speed === 'number') enemy.speed *= m;
+        }
+
+        if (typeof config.scale === 'number') {
+            // Prefer scaling the rendered mesh/group if present
+            if (enemy.mesh && enemy.mesh.scale && typeof enemy.mesh.scale.setScalar === 'function') {
+                enemy.mesh.scale.setScalar(config.scale);
+            } else if (enemy.mesh && enemy.mesh.scale) {
+                enemy.mesh.scale.set(config.scale, config.scale, config.scale);
+            } else {
+                enemy.scale = config.scale;
+            }
+        }
 
         return enemy;
     }
@@ -108,11 +145,12 @@ export class EnemySpawner {
             const positionIndex = Math.floor(Math.random() * availablePositions.length);
             const position = availablePositions.splice(positionIndex, 1)[0];
 
-            // Scale enemy stats based on wave number
+            // Scale enemy stats based on wave number (multipliers, not absolute values)
+            const progression = Math.max(0, waveNumber - 1);
             const config = {
-                health: 1 + waveNumber * 0.1,
-                speed: 1 + waveNumber * 0.05,
-                damage: 1 + waveNumber * 0.1
+                healthMultiplier: 1 + progression * 0.1,
+                speedMultiplier: 1 + progression * 0.05,
+                damageMultiplier: 1 + progression * 0.1
             };
 
             const enemy = this.spawnEnemy(enemyType, position, config);

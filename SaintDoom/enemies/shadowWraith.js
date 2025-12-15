@@ -166,6 +166,7 @@ export class ShadowWraith extends BaseEnemy {
     
     update(deltaTime, player) {
         if (this.isDead || this.state === 'dead') return;
+        if (player) this.player = player;
         
         // Update phase particles
         if (this.phaseParticles) {
@@ -603,7 +604,12 @@ export class ShadowWraith extends BaseEnemy {
         const pass = new THREE.Mesh(passGeometry, passMaterial);
         pass.position.copy(this.position);
         pass.position.y += 1;
-        pass.lookAt(this.player.camera.position);
+        const camera = (this.player && this.player.camera) ||
+            (this.game && this.game.camera) ||
+            (window.currentGame && window.currentGame.camera);
+        if (camera && camera.position) {
+            pass.lookAt(camera.position);
+        }
         this.scene.add(pass);
         
         // Animate

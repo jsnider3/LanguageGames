@@ -27,6 +27,7 @@ export class CorruptedDrone extends BaseEnemy {
         this.lastEvasion = 0;
         this.shielding = 30; // Energy shield
         this.maxShielding = 30;
+        this.detectionRange = 25;
         
         this.createMesh();
         this.initializeFlightPattern();
@@ -338,6 +339,30 @@ export class CorruptedDrone extends BaseEnemy {
 
         this.position.add(direction.multiplyScalar(this.speed * 0.7 * deltaTime / 1000));
         this.flightHeight = 5 + Math.sin(Date.now() * 0.002) * 0.5;
+    }
+
+    defaultCombatFlight(playerPosition, deltaTime) {
+        // Default combat movement: circle player while maintaining distance
+        const optimalDistance = 12;
+        const currentDistance = this.position.distanceTo(playerPosition);
+
+        let direction = new THREE.Vector3();
+        if (currentDistance < optimalDistance - 2) {
+            // Back away
+            direction.subVectors(this.position, playerPosition).normalize();
+        } else if (currentDistance > optimalDistance + 2) {
+            // Close in
+            direction.subVectors(playerPosition, this.position).normalize();
+        } else {
+            // Strafe around
+            direction.crossVectors(
+                new THREE.Vector3().subVectors(playerPosition, this.position),
+                new THREE.Vector3(0, 1, 0)
+            ).normalize();
+        }
+
+        this.position.add(direction.multiplyScalar(this.speed * 0.5 * deltaTime / 1000));
+        this.flightHeight = 3.5 + Math.sin(Date.now() * 0.003) * 1.0;
     }
 
     performAttack(player) {
@@ -672,7 +697,7 @@ export class CorruptedDrone extends BaseEnemy {
         if (this.body) {
             const hoverTilt = Math.sin(Date.now() * 0.004) * 0.1;
             this.body.rotation.x = hoverTilt;
-            this.body.rotation.z = Math.sin(Date.Now() * 0.003) * 0.05;
+            this.body.rotation.z = Math.sin(Date.now() * 0.003) * 0.05;
         }
 
         // Corruption sparks animation

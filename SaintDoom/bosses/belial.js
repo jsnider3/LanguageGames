@@ -90,6 +90,7 @@ export class Belial extends BaseEnemy {
 
         // Effects management
         this.activeEffects = [];
+        this.falseHalo = null;
         
         this.createMesh();
         this.initializeAura();
@@ -296,33 +297,6 @@ export class Belial extends BaseEnemy {
         } else if (healthPercent <= 0.75 && this.phase < 2) {
             this.transitionToPhase(2);
         }
-    }
-
-    transitionToPhase(newPhase) {
-        if (this.phaseTransitioning) return;
-        
-        this.phaseTransitioning = true;
-        this.phase = newPhase;
-
-        // Phase transition effects
-        this.createPhaseTransitionEffect();
-
-        // Special phase abilities
-        switch (newPhase) {
-            case 2:
-                this.spawnIllusionArmy();
-                break;
-            case 3:
-                this.activateShadowRealm();
-                break;
-            case 4:
-                this.revealTrueForm();
-                break;
-        }
-
-        setTimeout(() => {
-            this.phaseTransitioning = false;
-        }, 3000);
     }
 
     updateEffects(deltaTime) {

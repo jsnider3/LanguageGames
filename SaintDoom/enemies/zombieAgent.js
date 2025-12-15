@@ -15,6 +15,7 @@ export class ZombieAgent extends BaseEnemy {
         this.lastShotTime = 0;
         this.shootCooldown = 2000; // 2 seconds between shots
         this.ammo = 15;
+        this.detectionRange = 25;
         
         this.createMesh();
         this.createWeapon();

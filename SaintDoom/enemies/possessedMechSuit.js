@@ -25,6 +25,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.stomping = false;
         this.emergencyProtocols = false;
         this.selfDestructArmed = false;
+        this.detectionRange = 35;
         
         this.createMesh();
         this.createWeaponSystems();
@@ -395,13 +396,63 @@ export class PossessedMechSuit extends BaseEnemy {
         this.updateWeaponHighlighting();
     }
 
+    createWeaponSwitchEffect() {
+        if (!this.scene) return;
+
+        const ringGeometry = new THREE.RingGeometry(2.5, 3.5, 24);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.position.copy(this.position);
+        ring.position.y += 0.2;
+        ring.rotation.x = -Math.PI / 2;
+        this.scene.add(ring);
+
+        let opacity = 0.6;
+        const interval = setInterval(() => {
+            opacity -= 0.1;
+            ring.scale.multiplyScalar(1.1);
+            ring.material.opacity = Math.max(0, opacity);
+
+            if (opacity <= 0) {
+                this.scene.remove(ring);
+                clearInterval(interval);
+            }
+        }, 30);
+    }
+
+    updateWeaponHighlighting() {
+        const weaponConfigs = [
+            { weapon: 'chaingun', mesh: this.chaingunMesh, color: 0xff4400 },
+            { weapon: 'rockets', mesh: this.rocketLauncherMesh, color: 0xffaa00 },
+            { weapon: 'laser', mesh: this.laserMesh, color: 0x0066ff }
+        ];
+
+        weaponConfigs.forEach(({ weapon, mesh, color }) => {
+            if (!mesh || !mesh.material) return;
+            const isActive = weapon === this.currentWeapon;
+
+            if (mesh.material.emissive && mesh.material.emissive.setHex) {
+                mesh.material.emissive.setHex(isActive ? color : 0x000000);
+                mesh.material.emissiveIntensity = isActive ? 0.8 : 0.1;
+            } else if (mesh.material.color && mesh.material.color.setHex) {
+                // MeshBasicMaterial has no emissive; color-shift to indicate active
+                mesh.material.color.setHex(isActive ? color : 0x2a2a2a);
+            }
+        });
+    }
+
     chaingunAttack(player) {
         if (this.overheated || this.ammunition.chaingun <= 0) return;
 
         const weapon = this.weaponSystems.chaingun;
         if (Date.now() - this.lastAttackTime < weapon.fireRate) return;
 
-        this.lastAttackTime = Date.Now();
+        this.lastAttackTime = Date.now();
         this.ammunition.chaingun--;
         this.heatLevel += weapon.heatGeneration;
 
@@ -411,6 +462,45 @@ export class PossessedMechSuit extends BaseEnemy {
         // Muzzle flash and effects
         this.createMuzzleFlash(this.chaingunMesh);
         this.animateChaingunFire();
+    }
+
+    createMuzzleFlash(weaponMesh) {
+        if (!this.scene || !weaponMesh) return;
+
+        const pos = new THREE.Vector3();
+        weaponMesh.getWorldPosition(pos);
+
+        const flashGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffcc66,
+            transparent: true,
+            opacity: 1.0
+        });
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(pos);
+        this.scene.add(flash);
+
+        let opacity = 1.0;
+        const interval = setInterval(() => {
+            opacity -= 0.25;
+            flash.scale.multiplyScalar(1.15);
+            flash.material.opacity = Math.max(0, opacity);
+
+            if (opacity <= 0) {
+                this.scene.remove(flash);
+                clearInterval(interval);
+            }
+        }, 25);
+    }
+
+    animateChaingunFire() {
+        if (!this.chaingunMesh) return;
+
+        const originalY = this.chaingunMesh.rotation.y;
+        this.chaingunMesh.rotation.y += 0.5;
+        setTimeout(() => {
+            if (this.chaingunMesh) this.chaingunMesh.rotation.y = originalY;
+        }, 60);
     }
 
     createChaingunRound(player) {
@@ -466,6 +556,45 @@ export class PossessedMechSuit extends BaseEnemy {
         // Launch effects
         this.createRocketLaunchEffect();
         this.animateRocketLaunch();
+    }
+
+    createRocketLaunchEffect() {
+        if (!this.scene || !this.rocketLauncherMesh) return;
+
+        const pos = new THREE.Vector3();
+        this.rocketLauncherMesh.getWorldPosition(pos);
+
+        const burstGeometry = new THREE.SphereGeometry(0.35, 10, 10);
+        const burstMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff6600,
+            transparent: true,
+            opacity: 0.8
+        });
+        const burst = new THREE.Mesh(burstGeometry, burstMaterial);
+        burst.position.copy(pos);
+        this.scene.add(burst);
+
+        let opacity = 0.8;
+        const interval = setInterval(() => {
+            opacity -= 0.15;
+            burst.scale.multiplyScalar(1.2);
+            burst.material.opacity = Math.max(0, opacity);
+
+            if (opacity <= 0) {
+                this.scene.remove(burst);
+                clearInterval(interval);
+            }
+        }, 30);
+    }
+
+    animateRocketLaunch() {
+        if (!this.rocketLauncherMesh) return;
+
+        const originalZ = this.rocketLauncherMesh.position.z;
+        this.rocketLauncherMesh.position.z -= 0.15;
+        setTimeout(() => {
+            if (this.rocketLauncherMesh) this.rocketLauncherMesh.position.z = originalZ;
+        }, 80);
     }
 
     createRocket(player) {

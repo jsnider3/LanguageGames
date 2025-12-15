@@ -150,10 +150,12 @@ export class BaseLevel {
      * Update level state - called every frame
      */
     update(deltaTime) {
+        const player = this.game ? this.game.player : null;
+
         // Update enemies and filter out dead ones
         this.enemies = this.enemies.filter(enemy => {
             if (enemy.update) {
-                enemy.update(deltaTime);
+                enemy.update(deltaTime, player);
             }
             
             // Remove dead enemies
@@ -181,6 +183,10 @@ export class BaseLevel {
      * Check if objectives are complete
      */
     checkObjectives() {
+        if (!this.objectives || this.objectives.length === 0) {
+            this.completed = false;
+            return;
+        }
         this.completed = this.objectives.every(obj => obj.completed);
     }
 
@@ -189,13 +195,6 @@ export class BaseLevel {
      */
     getSpawnPosition() {
         return new THREE.Vector3(0, 1, 0);
-    }
-
-    /**
-     * Check if level is complete
-     */
-    isComplete() {
-        return this.completed;
     }
 
     /**
@@ -489,6 +488,35 @@ export class BaseLevel {
         }, 16);
 
         return { explosion, light };
+    }
+
+    /**
+     * Create screen shake via `Game.cameraShake` (see `modules/Game.js#applyCameraEffects`)
+     * @param {number} durationMs
+     * @param {number} intensity
+     */
+    createScreenShake(durationMs = 300, intensity = 10) {
+        if (!this.game) return;
+
+        const shakeAmount = Math.min(0.5, Math.max(0, intensity) * 0.02);
+        const bump = () => {
+            if (this.game.cameraShake === undefined || this.game.cameraShake === null) {
+                this.game.cameraShake = 0;
+            }
+            this.game.cameraShake = Math.max(this.game.cameraShake, shakeAmount);
+        };
+
+        bump();
+        if (durationMs <= 0) return;
+
+        const startMs = Date.now();
+        const intervalId = this.addInterval(() => {
+            if (Date.now() - startMs >= durationMs) {
+                this.clearInterval(intervalId);
+                return;
+            }
+            bump();
+        }, 50);
     }
 
     /**

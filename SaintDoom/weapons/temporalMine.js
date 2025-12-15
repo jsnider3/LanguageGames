@@ -11,6 +11,7 @@ export class TemporalMine extends BaseWeapon {
         this.fireRate = 1500; // Time between deployments
         this.ammoCapacity = 5; // Limited mine count
         this.currentAmmo = this.ammoCapacity;
+        this.totalAmmo = 20;
         this.range = 15; // Throwing range
         this.accuracy = 1.0;
         

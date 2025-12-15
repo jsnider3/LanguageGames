@@ -13,9 +13,49 @@ export class SpawningGroundsLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
-    
+
+        this.name = 'Spawning Grounds';
+        this.description = 'Endless waves of enemies from hell portals';
+
+        // Configuration-driven tuning
+        this.config = {
+            arena: {
+                radius: 40,
+                wallHeight: 10,
+                wallCount: 24,
+                ringCount: 3,
+                ringSpacing: 8
+            },
+            visuals: {
+                fleshColor: 0x552222,
+                wallColor: 0x883333,
+                ringColor: 0xff0000,
+                ringOpacity: 0.2,
+                portalColor: 0xff0066,
+                altarColor: 0x440000
+            },
+            waves: {
+                spawnInterval: 5000,
+                breakDuration: 8000,
+                intensityGrowth: 0.25,
+                maxIntensity: 8,
+                portalCooldown: 6000
+            }
+        };
+
+        // Runtime state
+        this.enemySpawner = new EnemySpawner(this.scene);
+        this.spawnPortals = [];
+        this.portalCooldowns = new Map();
+        this.waveNumber = 1;
+        this.swarmIntensity = 1;
+        this.waveBreakTimer = 0;
+        this.enemiesSpawnedThisWave = 0;
+        this.altarDestroyed = false;
+    }
+
     create() {
-        // Return required data structure for Game.js
+        this.init();
         return {
             walls: this.walls,
             enemies: this.enemies
@@ -43,7 +83,7 @@ export class SpawningGroundsLevel extends BaseLevel {
         const arenaGeometry = new THREE.CylinderGeometry(radius, radius, 2, 32);
         const arenaMaterial = new THREE.MeshLambertMaterial({ 
             color: fleshColor,
-            map: this.createTexture('organic')
+            map: this.createTexture({ pattern: 'flesh', baseColor: '#552222' })
         });
         const arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
         arena.position.y = -1;
@@ -123,7 +163,7 @@ export class SpawningGroundsLevel extends BaseLevel {
         portalPositions.forEach((pos, index) => {
             const portal = this.createPortal(pos.x, 0, pos.z, index);
             this.spawnPortals.push(portal);
-            this.portalCooldowns.set(portal.id, 0);
+            this.portalCooldowns.set(portal.userData.id, 0);
         });
     }
 
@@ -209,15 +249,14 @@ export class SpawningGroundsLevel extends BaseLevel {
         crystal.position.y = 5;
         altarGroup.add(crystal);
 
-        // Store crystal for animation
-        altarGroup.userData.crystal = crystal;
-
         // Altar light
         const altarLight = new THREE.PointLight(0xff0000, 3, 15);
         altarLight.position.y = 5;
         altarGroup.add(altarLight);
 
         altarGroup.userData = {
+            crystal,
+            altarLight,
             health: 1000,
             maxHealth: 1000,
             isAltar: true
@@ -293,8 +332,33 @@ export class SpawningGroundsLevel extends BaseLevel {
 
         // Use EnemySpawner to spawn the wave
         const enemies = this.enemySpawner.spawnWave(pattern, spawnPositions, this.waveNumber);
-        this.enemies.push(...enemies);
         this.enemiesSpawnedThisWave = enemies.length;
+
+        // Important: Game systems (combat/collisions) operate on `game.enemies`
+        if (this.game && Array.isArray(this.game.enemies)) {
+            enemies.forEach(enemy => {
+                if (!enemy) return;
+                enemy.game = this.game;
+
+                // Register with physics system if available
+                if (this.game.physicsManager && !enemy.physicsData) {
+                    const flyingNames = new Set(['Imp', 'Succubus', 'CorruptedDrone', 'ShadowWraith']);
+                    const isFlying = flyingNames.has(enemy.constructor?.name);
+                    this.game.physicsManager.registerEntity(enemy, {
+                        isFlying,
+                        hasGravity: !isFlying,
+                        mass: enemy.mass || 1,
+                        radius: enemy.radius || 0.3,
+                        height: enemy.height || 1.8,
+                        groundOffset: 0.1
+                    });
+                }
+            });
+
+            this.game.enemies.push(...enemies.filter(Boolean));
+        } else {
+            this.enemies.push(...enemies);
+        }
     }
 
     /**
@@ -424,7 +488,7 @@ export class SpawningGroundsLevel extends BaseLevel {
         if (!this.centralAltar) return;
 
         // Create explosion effect using BaseLevel method
-        this.createExplosionEffect(this.centralAltar.position, 10, 0xff0000);
+        this.createExplosionEffect(this.centralAltar.position, { radius: 10, color: 0xff0000, intensity: 3 });
         
         // Screen shake using BaseLevel method
         this.createScreenShake(1000, 10);

@@ -15,6 +15,7 @@ export class SubjectZero extends BaseEnemy {
         this.lastPhaseShift = 0;
         this.isPhased = false;
         this.telepathicRange = 25;
+        this.detectionRange = this.telepathicRange;
         this.psychicEnergy = 100;
         this.maxPsychicEnergy = 100;
         

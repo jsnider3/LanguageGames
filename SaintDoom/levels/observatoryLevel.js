@@ -9,9 +9,21 @@ export class ObservatoryLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
-    
+
+        this.name = 'Observatory Tower';
+        this.description = 'A vertical climb into an unstable, otherworldly observatory';
+
+        this.maxFloors = 6;
+        this.floors = [];
+        this.zeroGravityZones = [];
+        this.gravityFields = [];
+        this.elevators = [];
+        this.floatingObjects = [];
+        this.starMap = null;
+    }
+
     create() {
-        // Return required data structure for Game.js
+        this.init();
         return {
             walls: this.walls,
             enemies: this.enemies
@@ -693,7 +705,7 @@ export class ObservatoryLevel extends BaseLevel {
     triggerCorruptionEvent() {
         // Spawn corrupted entities
         for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
+            this.addTimeout(() => {
                 const spawnFloor = Math.floor(Math.random() * this.maxFloors);
                 const angle = Math.random() * Math.PI * 2;
                 const spawnPos = new THREE.Vector3(
@@ -705,14 +717,33 @@ export class ObservatoryLevel extends BaseLevel {
                 const enemy = Math.random() < 0.6 ? 
                     new ShadowWraith(this.scene, spawnPos) :
                     new Imp(this.scene, spawnPos);
-                
-                this.enemies.push(enemy);
+
+                if (this.game) enemy.game = this.game;
+
+                // Register with physics if available (both are flying types)
+                if (this.game && this.game.physicsManager && !enemy.physicsData) {
+                    this.game.physicsManager.registerEntity(enemy, {
+                        isFlying: true,
+                        hasGravity: false,
+                        mass: enemy.mass || 1,
+                        radius: enemy.radius || 0.3,
+                        height: enemy.height || 1.8,
+                        groundOffset: 0.1
+                    });
+                }
+
+                // Game combat/collision logic uses `game.enemies`
+                if (this.game && Array.isArray(this.game.enemies)) {
+                    this.game.enemies.push(enemy);
+                } else {
+                    this.enemies.push(enemy);
+                }
             }, i * 2000);
         }
         
         // Disrupt gravity fields
         this.zeroGravityZones.forEach((zone, index) => {
-            setTimeout(() => {
+            this.addTimeout(() => {
                 zone.userData.active = !zone.userData.active;
                 const field = zone.userData.field;
                 if (field) {
@@ -723,7 +754,7 @@ export class ObservatoryLevel extends BaseLevel {
         });
         
         // Complete corruption objective after event
-        setTimeout(() => {
+        this.addTimeout(() => {
             this.objectives[2].completed = true;
         }, 15000);
     }

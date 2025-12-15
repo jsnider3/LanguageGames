@@ -16,6 +16,39 @@ export class ContainmentLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
+
+        this.name = 'Containment Area';
+        this.description = 'Dangerous environment with multiple hazards and escaped specimens';
+
+        // Level state used by environmental logic / save-state integration
+        this.containmentStatus = {
+            cellBlock_A: 'breached',
+            cellBlock_B: 'compromised',
+            cellBlock_C: 'sealed',
+            cellBlock_D: 'critical'
+        };
+
+        this.escapedSpecimens = 0;
+        this.maxSpecimens = 20;
+        this.exitPortal = null;
+
+        // Save/restore hooks used in `modules/Game.js`
+        this.systemsRestored = 0;
+        this.emergencyProtocolActive = false;
+
+        // Containers used throughout level logic
+        this.hazards = {
+            fire: [],
+            radiation: [],
+            electricity: [],
+            corruption: [],
+            gravity: []
+        };
+        this.emergencySystems = {
+            fireSupression: false,
+            decontamination: false
+        };
+    }
     
     create() {
         // Initialize base level properties (since BaseLevel doesn't have create())
@@ -838,8 +871,8 @@ export class ContainmentLevel extends BaseLevel {
             animateSwirl();
         }
         
-        // Demon spawner
-        this.demonSpawner = setInterval(() => {
+        // Demon spawner (tracked for cleanup via BaseLevel interval management)
+        this.addInterval(() => {
             if (this.escapedSpecimens < this.maxSpecimens) {
                 this.spawnDemonFromPortal(position);
                 this.escapedSpecimens++;
@@ -891,7 +924,7 @@ export class ContainmentLevel extends BaseLevel {
     
     createEnvironmentalEffects() {
         // Alarm lights
-        const alarmInterval = setInterval(() => {
+        this.addInterval(() => {
             if (this.containmentStatus.cellBlock_A === 'breached') {
                 // Flash red lights
                 this.scene.traverse(child => {
@@ -1387,16 +1420,16 @@ export class ContainmentLevel extends BaseLevel {
         }
         
         // Animate portal
-        this.addInterval(setInterval(() => {
+        this.addInterval(() => {
             if (ring) {
                 ring.rotation.z += 0.02;
                 portal.rotation.z -= 0.01;
             }
-        }, 16));
+        }, 16);
     }
     
     checkExitPortalInteraction() {
-        if (!this.exitPortal || !this.game.player) return;
+        if (!this.exitPortal || !this.game.player) return false;
         
         const distance = this.game.player.position.distanceTo(this.exitPortal.position);
         if (distance < 4) {
@@ -1418,7 +1451,9 @@ export class ContainmentLevel extends BaseLevel {
                     this.game.loadNextLevel();
                 }
             }, 2000);
+            return true;
         }
+        return false;
     }
     
     // Helper methods

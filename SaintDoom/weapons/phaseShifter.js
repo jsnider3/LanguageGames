@@ -11,6 +11,7 @@ export class PhaseShifter extends BaseWeapon {
         this.fireRate = 400; // ms between shots
         this.ammoCapacity = 20;
         this.currentAmmo = this.ammoCapacity;
+        this.totalAmmo = 120;
         this.range = 80;
         this.accuracy = 0.92;
         

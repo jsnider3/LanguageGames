@@ -7,9 +7,38 @@ export class FinalArenaLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
-    
+
+        this.name = 'Final Arena';
+        this.description = 'The ultimate confrontation in a hellish arena';
+
+        this.arenaRadius = 60;
+        this.currentPhase = 1;
+        this.maxPhases = 3;
+        this.finalBossDefeated = false;
+
+        // Collections used throughout the level
+        this.outerRings = [];
+        this.bridgePlatforms = [];
+        this.lavaFields = [];
+        this.hellPortals = [];
+        this.sacrificialAltars = [];
+        this.demoniPillars = [];
+        this.hellfire = [];
+        this.soulOrbs = [];
+        this.corruptionZones = [];
+        this.realityRifts = [];
+        this.playerSafeZones = [];
+        this.weaponUpgradeStations = [];
+        this.holyRelicPedestals = [];
+        this.movingPlatforms = [];
+        this.fallingDebris = [];
+
+        this.centralPlatform = null;
+        this.atmosphericParticles = null;
+    }
+
     create() {
-        // Return required data structure for Game.js
+        this.init();
         return {
             walls: this.walls,
             enemies: this.enemies
@@ -142,7 +171,7 @@ export class FinalArenaLevel extends BaseLevel {
 
     animateHellfire(light) {
         const originalIntensity = light.intensity;
-        const animInterval = setInterval(() => {
+        this.addInterval(() => {
             light.intensity = originalIntensity + Math.sin(Date.now() * 0.01) * 0.5 + Math.random() * 0.3;
             light.color.setRGB(
                 1.0,
@@ -150,15 +179,12 @@ export class FinalArenaLevel extends BaseLevel {
                 Math.random() * 0.1
             );
         }, 100);
-        
-        // Track interval for cleanup
-        this.addInterval(animInterval);
     }
 
     animatePerimeterFire(light) {
         const originalIntensity = light.intensity;
         const phase = Math.random() * Math.PI * 2;
-        setInterval(() => {
+        this.addInterval(() => {
             light.intensity = originalIntensity + Math.sin(Date.now() * 0.008 + phase) * 0.3;
         }, 150);
     }
@@ -216,7 +242,7 @@ export class FinalArenaLevel extends BaseLevel {
     }
 
     animateSummoningCircle(circle) {
-        setInterval(() => {
+        this.addInterval(() => {
             circle.rotation.z += 0.01;
             circle.material.opacity = 0.6 + Math.sin(Date.now() * 0.005) * 0.2;
         }, 16);
@@ -437,7 +463,7 @@ export class FinalArenaLevel extends BaseLevel {
 
     animateLava(surface, light) {
         const originalIntensity = light.intensity;
-        setInterval(() => {
+        this.addInterval(() => {
             surface.rotation.z += 0.005;
             // Animate color for MeshBasicMaterial (no emissive property)
             if (surface.material && surface.material.color) {
@@ -555,7 +581,7 @@ export class FinalArenaLevel extends BaseLevel {
 
     animatePortal(frame, energy, light) {
         const originalIntensity = light.intensity;
-        setInterval(() => {
+        this.addInterval(() => {
             frame.rotation.x += 0.01;
             frame.rotation.z += 0.008;
             energy.rotation.z -= 0.02;
@@ -680,7 +706,7 @@ export class FinalArenaLevel extends BaseLevel {
     animateAltarPiece(piece, light) {
         const originalY = piece.position.y;
         const originalIntensity = light.intensity;
-        setInterval(() => {
+        this.addInterval(() => {
             piece.position.y = originalY + Math.sin(Date.now() * 0.003) * 0.3;
             piece.rotation.y += 0.02;
             light.intensity = originalIntensity + Math.sin(Date.now() * 0.005) * 0.3;
@@ -770,7 +796,7 @@ export class FinalArenaLevel extends BaseLevel {
 
     animatePillarFlame(flame, light) {
         const originalIntensity = light.intensity;
-        setInterval(() => {
+        this.addInterval(() => {
             flame.rotation.y += 0.03;
             flame.scale.y = 1 + Math.sin(Date.now() * 0.008) * 0.2;
             flame.material.opacity = 0.6 + Math.sin(Date.now() * 0.01) * 0.2;
@@ -825,7 +851,7 @@ export class FinalArenaLevel extends BaseLevel {
     }
 
     animateSoulOrb(orb) {
-        setInterval(() => {
+        this.addInterval(() => {
             const time = Date.now() * 0.001;
             orb.position.x = orb.userData.basePosition.x + 
                 Math.cos(time * orb.userData.driftSpeed + orb.userData.phase) * orb.userData.driftRadius;
@@ -874,7 +900,7 @@ export class FinalArenaLevel extends BaseLevel {
         this.createCorruptionParticles(zoneGroup, radius);
         
         // Animate corruption field
-        setInterval(() => {
+        this.addInterval(() => {
             field.rotation.y += 0.01;
             field.scale.y = 1 + Math.sin(Date.now() * 0.003) * 0.2;
             field.material.opacity = 0.1 + Math.sin(Date.now() * 0.004) * 0.05;
@@ -976,7 +1002,7 @@ export class FinalArenaLevel extends BaseLevel {
         this.createRiftParticles(riftGroup);
         
         // Animate rift
-        setInterval(() => {
+        this.addInterval(() => {
             rift.rotation.z += 0.005;
             border.material.opacity = 0.7 + Math.sin(Date.now() * 0.008) * 0.3;
         }, 16);
@@ -1127,7 +1153,7 @@ export class FinalArenaLevel extends BaseLevel {
         zoneGroup.add(zoneLight);
         
         // Animate safe zone
-        setInterval(() => {
+        this.addInterval(() => {
             field.rotation.y += 0.02;
             field.material.opacity = 0.08 + Math.sin(Date.now() * 0.005) * 0.03;
             zoneLight.intensity = 0.8 + Math.sin(Date.now() * 0.006) * 0.2;
@@ -1179,7 +1205,7 @@ export class FinalArenaLevel extends BaseLevel {
         stationGroup.add(holo);
         
         // Animate hologram
-        setInterval(() => {
+        this.addInterval(() => {
             holo.rotation.y += 0.03;
             holo.scale.setScalar(1 + Math.sin(Date.now() * 0.007) * 0.1);
         }, 16);
@@ -1257,7 +1283,7 @@ export class FinalArenaLevel extends BaseLevel {
         pedestalGroup.add(aura);
         
         // Animate relic
-        setInterval(() => {
+        this.addInterval(() => {
             relic.rotation.y += 0.02;
             relic.position.y = 4 + Math.sin(Date.now() * 0.004) * 0.2;
             aura.rotation.x += 0.01;

@@ -1,4 +1,5 @@
 import { BelialState } from '../../core/BelialState.js';
+import * as THREE from 'three';
 
 export class BelialPhaseOneState extends BelialState {
     constructor(belial) {

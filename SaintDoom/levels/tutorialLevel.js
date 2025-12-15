@@ -1171,6 +1171,7 @@ export class TutorialLevel extends BaseLevel {
         // Transition to Chapter 1
         if (this.game.narrativeSystem) {
             this.game.narrativeSystem.displaySubtitle("Seven times called, seven times I answer...");
+            this.game.narrativeSystem.setObjective("Find the desecrated chapel");
         }
         
         // Load Chapter 1

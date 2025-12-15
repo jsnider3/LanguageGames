@@ -506,6 +506,11 @@ Player: ${playerPos}`;
         this.updatePickups(deltaTime);
         this.checkLevelProgression();
         this.updateCollisions(deltaTime);
+
+        // Run per-frame level logic (objectives, hazards, animations, etc.)
+        if (this.currentLevelInstance && typeof this.currentLevelInstance.update === 'function') {
+            this.currentLevelInstance.update(deltaTime, input);
+        }
         
         
         // Throttle HUD updates to reduce DOM work
@@ -624,10 +629,6 @@ Player: ${playerPos}`;
     updateArmoryLevel(deltaTime) {
         this.armoryLevel.checkWeaponCollection(this.player.position);
         this.armoryLevel.checkExitCondition();
-        // Update pickup animations
-        if (this.armoryLevel.updatePickups) {
-            this.armoryLevel.updatePickups(deltaTime);
-        }
         
         // Check for return to chapel
         if (this.armoryLevel.checkChapelDoorCollision) {
@@ -650,11 +651,6 @@ Player: ${playerPos}`;
     }
     
     updateLaboratoryLevel(deltaTime) {
-        // Update the level (animations, etc)
-        if (this.currentLevelInstance.update) {
-            this.currentLevelInstance.update(deltaTime);
-        }
-        
         // Check for level exit
         if (this.currentLevelInstance.checkExitCollision && this.currentLevelInstance.checkExitCollision(this.player)) {
             console.log('Laboratory level complete! Loading next level...');
@@ -2139,16 +2135,14 @@ Player: ${playerPos}`;
             loadingScreen.style.zIndex = '100000'; // Ensure it's on top of everything
             
             // Random loading messages based on level
-            const loadingMessages = {
-                'tutorial': ['Blessing weapons...', 'Preparing holy water...', 'Loading sacred texts...'],
-                'chapel': ['Sanctifying the chapel...', 'Summoning divine protection...', 'Preparing for battle...'],
-                'armory': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
-                // Backward-compatible aliases
-                'armory': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
-                'laboratory': ['Analyzing specimens...', 'Securing keycards...', 'Initializing containment...'],
-                'containment': ['Securing perimeter...', 'Loading emergency protocols...', 'Preparing evacuation routes...'],
-                'tunnels': ['Mapping tunnel network...', 'Activating emergency lighting...', 'Scanning for threats...'],
-                'spawning': ['Detecting hell portals...', 'Preparing for swarm...', 'Loading heavy ordnance...'],
+                const loadingMessages = {
+                    'tutorial': ['Blessing weapons...', 'Preparing holy water...', 'Loading sacred texts...'],
+                    'chapel': ['Sanctifying the chapel...', 'Summoning divine protection...', 'Preparing for battle...'],
+                    'armory': ['Loading armory...', 'Checking ammunition...', 'Preparing heavy weapons...'],
+                    'laboratory': ['Analyzing specimens...', 'Securing keycards...', 'Initializing containment...'],
+                    'containment': ['Securing perimeter...', 'Loading emergency protocols...', 'Preparing evacuation routes...'],
+                    'tunnels': ['Mapping tunnel network...', 'Activating emergency lighting...', 'Scanning for threats...'],
+                    'spawning': ['Detecting hell portals...', 'Preparing for swarm...', 'Loading heavy ordnance...'],
                 'observatory': ['Calibrating sensors...', 'Scanning skies...', 'Preparing observation deck...'],
                 'communications': ['Establishing connection...', 'Restoring signal...', 'Decrypting messages...'],
                 'reactor': ['Stabilizing core...', 'Checking radiation levels...', 'Preparing hazmat protocols...'],
@@ -2355,9 +2349,9 @@ Player: ${playerPos}`;
             throw new Error(errorMsg);
         }
         
-        // Reset player state
-        this.player.velocity.set(0, 0, 0);
-        this.player.health = 100;
+            // Reset player state
+            this.player.velocity.set(0, 0, 0);
+            // Preserve player health across level loads
         
         // Update current level tracking
         this.previousLevel = this.currentLevel;

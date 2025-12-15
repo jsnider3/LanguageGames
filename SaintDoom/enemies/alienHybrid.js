@@ -21,6 +21,7 @@ export class AlienHybrid extends BaseEnemy {
         this.phaseShiftCooldown = 8000;
         this.lastPhaseShift = 0;
         this.isPhased = false;
+        this.detectionRange = 30;
         
         this.createMesh();
         this.createAlienTech();
@@ -203,7 +204,7 @@ export class AlienHybrid extends BaseEnemy {
             this.target = playerPosition.clone();
             
             // Choose attack based on distance and cooldowns
-            this.chooseAttackStrategy(player, distance);
+            this.chooseAttackStrategy(player, distance, deltaTime);
         } else {
             this.hover(deltaTime);
         }
@@ -218,7 +219,7 @@ export class AlienHybrid extends BaseEnemy {
         }
     }
 
-    chooseAttackStrategy(player, distance) {
+    chooseAttackStrategy(player, distance, deltaTime) {
         const currentTime = Date.now();
 
         // Phase shift if player is too close

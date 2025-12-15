@@ -99,7 +99,7 @@ export class AnimationManager {
                     this.updateShake(animData, elapsedTime);
                     break;
                 case 'spiral':
-                    this.updateSpiral(animData, elapsedTime);
+                    this.updateSpiral(animData, elapsedTime, deltaTime);
                     break;
                 case 'bounce':
                     this.updateBounce(animData, elapsedTime);
@@ -225,7 +225,7 @@ export class AnimationManager {
     /**
      * Spiral animation - object moves in a spiral
      */
-    updateSpiral(animData, elapsed) {
+    updateSpiral(animData, elapsed, deltaTime) {
         const radius = animData.options.radius || 2;
         const speed = animData.options.speed || 1;
         const height = animData.options.height || 5;

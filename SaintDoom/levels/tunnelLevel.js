@@ -14,6 +14,23 @@ export class TunnelLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
+
+        this.name = 'Tunnel Network';
+        this.description = 'Narrow passages designed for intense close-quarters combat';
+
+        // Core tuning values used throughout the generator
+        this.tunnelWidth = 2;
+        this.tunnelHeight = 4;
+
+        // Internal bookkeeping used by various generators
+        this.mainPaths = [];
+        this.secretPaths = [];
+        this.waterPipes = [];
+        this.emergencyLights = [];
+        this.ambushPoints = [];
+        this.chokePoints = [];
+        this.ventilationShafts = [];
+    }
     
     create() {
         // Initialize base level properties
@@ -277,15 +294,16 @@ export class TunnelLevel extends BaseLevel {
         
         // Create initial drops
         for (let i = 0; i < 5; i++) {
-            setTimeout(createDrop, i * 200);
+            this.addTimeout(createDrop, i * 200);
         }
         
         // Continuous dripping
-        const dripInterval = setInterval(() => {
+        const dripDelay = 500 + Math.random() * 1000;
+        this.addInterval(() => {
             if (drops.length < 10) {
                 createDrop();
             }
-        }, 500 + Math.random() * 1000);
+        }, dripDelay);
         
         // Update drops
         const updateDrops = () => {
@@ -963,7 +981,7 @@ export class TunnelLevel extends BaseLevel {
         };
         
         // Continuous steam
-        const steamInterval = setInterval(() => {
+        this.addInterval(() => {
             if (steamParticles.length < 10) {
                 createSteamParticle();
             }
@@ -1248,11 +1266,11 @@ export class TunnelLevel extends BaseLevel {
         this.scene.add(portal);
         
         // Animate portal
-        this.addInterval(setInterval(() => {
+        this.addInterval(() => {
             if (portal) {
                 portal.rotation.z += 0.02;
             }
-        }, 16));
+        }, 16);
         
         if (this.game.narrativeSystem) {
             this.game.narrativeSystem.displaySubtitle("All objectives complete! Surface exit activated!");

@@ -7,6 +7,7 @@ export class SecretArchive extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
+        this.player = game ? game.player : null;
         
         this.name = 'The Forbidden Archive';
         this.description = 'Ancient Vatican archives containing dangerous knowledge and sealed artifacts';
@@ -705,70 +706,111 @@ export class SecretArchive extends BaseLevel {
             
             this.scene.add(librarianGroup);
             
-            const librarian = {
-                mesh: librarianGroup,
-                position: librarianGroup.position,  // Reference to mesh position
-                velocity: new THREE.Vector3(0, 0, 0),  // Add velocity for collision system
-                path: [],
-                currentTarget: null,
-                speed: 1,
-                state: 'patrol',
-                alertRadius: 15,
-                attackRadius: 3,
-                damage: 20,
-                lastAttack: 0,
-                health: 30,
-                maxHealth: 30,
-                radius: 0.8,  // Add collision radius
-                floatingBooks: librarianGroup.children.filter(child => 
-                    child.geometry instanceof THREE.BoxGeometry),
-                // Add required update method
-                update: function(deltaTime, playerPosition) {
-                    if (!this.mesh) return;
-                    
-                    // Rotate floating books
-                    if (this.floatingBooks) {
-                        this.floatingBooks.forEach((book, index) => {
-                            const time = Date.now() * 0.001;
-                            const angle = (index / 3) * Math.PI * 2 + time;
-                            book.position.x = Math.cos(angle) * 1.5;
-                            book.position.z = Math.sin(angle) * 1.5;
-                            book.rotation.y += deltaTime * 2;
-                        });
-                    }
-                    
-                    // Reset velocity
-                    this.velocity.set(0, 0, 0);
-                    
-                    // Basic patrol/chase behavior
-                    if (playerPosition) {
-                        const dx = playerPosition.x - this.position.x;
-                        const dz = playerPosition.z - this.position.z;
-                        const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+                const librarian = {
+                    mesh: librarianGroup,
+                    position: librarianGroup.position,  // Reference to mesh position
+                    velocity: new THREE.Vector3(0, 0, 0),  // Add velocity for collision system
+                    path: [],
+                    currentTarget: null,
+                    speed: 1,
+                    state: 'patrol',
+                    alertRadius: 15,
+                    attackRadius: 3,
+                    damage: 20,
+                    lastAttack: 0,
+                    health: 30,
+                    maxHealth: 30,
+                    radius: 0.8,  // Add collision radius
+                    _animTime: Math.random() * Math.PI * 2,
+                    floatingBooks: librarianGroup.children.filter(child => 
+                        child.geometry instanceof THREE.BoxGeometry),
+                    // Add required update method
+                    update: function(deltaTime, player) {
+                        if (!this.mesh) return;
+                        const playerPos = player && (player.position || player.mesh?.position || player);
+                        const librarianPos = this.position;
                         
-                        if (distToPlayer < this.alertRadius) {
-                            this.state = 'chase';
-                            // Set velocity towards player
-                            if (distToPlayer > this.attackRadius) {
-                                this.velocity.x = (dx / distToPlayer) * this.speed;
-                                this.velocity.z = (dz / distToPlayer) * this.speed;
-                            }
-                            // Face player
-                            this.mesh.rotation.y = Math.atan2(dx, dz);
-                        } else {
-                            this.state = 'patrol';
+                        this._animTime = (this._animTime || 0) + deltaTime;
+                        
+                        // Rotate floating books
+                        if (this.floatingBooks) {
+                            this.floatingBooks.forEach((book, index) => {
+                                const angle = (index / 3) * Math.PI * 2 + this._animTime;
+                                book.position.x = Math.cos(angle) * 1.5;
+                                book.position.z = Math.sin(angle) * 1.5;
+                                book.rotation.y += deltaTime * 2;
+                            });
                         }
-                    }
-                    
-                    // Apply velocity (collision system will handle wall collisions)
-                    this.position.x += this.velocity.x * deltaTime;
-                    this.position.z += this.velocity.z * deltaTime;
-                    
-                    // Update attack cooldown
-                    if (this.lastAttack > 0) {
-                        this.lastAttack -= deltaTime;
-                    }
-                },
+                        
+                        // Reset velocity; Game's collision system applies movement based on velocity
+                        this.velocity.set(0, 0, 0);
+                        
+                        const distanceToPlayer = playerPos ? librarianPos.distanceTo(playerPos) : Infinity;
+                        
+                        if (this.state === 'patrol') {
+                            // Switch to chase when the player gets close
+                            if (playerPos && distanceToPlayer < this.alertRadius) {
+                                this.state = 'chase';
+                            }
+                            
+                            // Patrol between random points
+                            if (!this.currentTarget || librarianPos.distanceTo(this.currentTarget) < 2) {
+                                this.currentTarget = new THREE.Vector3(
+                                    (Math.random() - 0.5) * 60,
+                                    librarianPos.y,
+                                    (Math.random() - 0.5) * 60
+                                );
+                            }
+                            
+                            const patrolDir = new THREE.Vector3().subVectors(this.currentTarget, librarianPos);
+                            patrolDir.y = 0;
+                            const patrolDist = patrolDir.length();
+                            if (patrolDist > 0.001) {
+                                patrolDir.normalize();
+                                this.velocity.x = patrolDir.x * this.speed;
+                                this.velocity.z = patrolDir.z * this.speed;
+                            }
+                        } else {
+                            // Chase state
+                            if (!playerPos) {
+                                this.state = 'patrol';
+                            } else if (distanceToPlayer > this.alertRadius * 2) {
+                                this.state = 'patrol';
+                            } else {
+                                const dx = playerPos.x - librarianPos.x;
+                                const dz = playerPos.z - librarianPos.z;
+                                const dist = Math.sqrt(dx * dx + dz * dz);
+                                
+                                if (dist > this.attackRadius) {
+                                    this.velocity.x = (dx / dist) * (this.speed * 2);
+                                    this.velocity.z = (dz / dist) * (this.speed * 2);
+                                }
+                                
+                                // Attack if close (cooldown in ms)
+                                if (dist <= this.attackRadius) {
+                                    const now = Date.now();
+                                    if (!this.lastAttack || now - this.lastAttack > 2000) {
+                                        if (player.takeDamage) {
+                                            player.takeDamage(this.damage, "Corrupted Librarian");
+                                        }
+                                        this.lastAttack = now;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Face movement direction if moving, otherwise slowly rotate
+                        const moveX = this.velocity.x;
+                        const moveZ = this.velocity.z;
+                        if (Math.abs(moveX) > 0.001 || Math.abs(moveZ) > 0.001) {
+                            this.mesh.rotation.y = Math.atan2(moveX, moveZ);
+                        } else {
+                            this.mesh.rotation.y += deltaTime * 0.5;
+                        }
+                        
+                        // Float animation
+                        librarianPos.y = Math.sin(this._animTime * 2) * 0.5 + 1;
+                    },
                 // Add takeDamage method
                 takeDamage: function(amount) {
                     this.health = (this.health || 30) - amount;
@@ -799,88 +841,25 @@ export class SecretArchive extends BaseLevel {
                     }
                     this.mesh = null;
                 }
-            };
-            
-            this.ghostlyLibrarians.push(librarian);
-            this.enemies.push(librarian);
-            
-            // AI behavior
-            this.setupLibrarianAI(librarian);
-        }
-    }
-
-    setupLibrarianAI(librarian) {
-        const updateInterval = setInterval(() => {
-            if (!this.player) return;
-            
-            const playerPos = this.player.position || this.player.mesh.position;
-            const librarianPos = librarian.mesh.position;
-            const distance = librarianPos.distanceTo(playerPos);
-            
-            switch(librarian.state) {
-                case 'patrol':
-                    // Patrol between bookshelves
-                    if (!librarian.currentTarget || librarianPos.distanceTo(librarian.currentTarget) < 2) {
-                        librarian.currentTarget = new THREE.Vector3(
-                            (Math.random() - 0.5) * 60,
-                            0,
-                            (Math.random() - 0.5) * 60
-                        );
-                    }
-                    
-                    // Move toward target
-                    const patrolDir = new THREE.Vector3()
-                        .subVectors(librarian.currentTarget, librarianPos)
-                        .normalize();
-                    librarian.mesh.position.add(patrolDir.multiplyScalar(librarian.speed * 0.016));
-                    
-                    // Check for player
-                    if (distance < librarian.alertRadius) {
-                        librarian.state = 'chase';
-                        console.log('Librarian alerted!');
-                    }
-                    break;
-                    
-                case 'chase':
-                    // Chase player
-                    const chaseDir = new THREE.Vector3()
-                        .subVectors(playerPos, librarianPos)
-                        .normalize();
-                    librarian.mesh.position.add(chaseDir.multiplyScalar(librarian.speed * 2 * 0.016));
-                    
-                    // Attack if close
-                    if (distance < librarian.attackRadius) {
-                        const now = Date.now();
-                        if (now - librarian.lastAttack > 2000) {
-                            if (this.player.takeDamage) {
-                                this.player.takeDamage(librarian.damage, "Corrupted Librarian");
-                            }
-                            librarian.lastAttack = now;
-                            
-                            // Whisper attack
-                            this.playWhisperSound(librarianPos);
-                        }
-                    }
-                    
-                    // Lose interest if far
-                    if (distance > librarian.alertRadius * 2) {
-                        librarian.state = 'patrol';
-                    }
-                    break;
+                };
+                
+                this.ghostlyLibrarians.push(librarian);
+    
+                if (this.game) librarian.game = this.game;
+                librarian.scene = this.scene;
+    
+                // Game combat/collision logic uses `game.enemies`
+                if (this.game && Array.isArray(this.game.enemies)) {
+                    this.game.enemies.push(librarian);
+                } else {
+                    this.enemies.push(librarian);
+                }
             }
-            
-            // Float animation
-            librarian.mesh.position.y = Math.sin(Date.now() * 0.002) * 0.5 + 1;
-            librarian.mesh.rotation.y += 0.01;
-            
-        }, 50);
-        
-        librarian.updateInterval = updateInterval;
-    }
+        }
 
-    placeAncientTome(position) {
-        // Place a single ancient tome at the given position
-        const tomeGroup = new THREE.Group();
+        placeAncientTome(position) {
+            // Place a single ancient tome at the given position
+            const tomeGroup = new THREE.Group();
         
         // Book mesh
         const bookGeometry = new THREE.BoxGeometry(0.6, 0.15, 0.8);
@@ -1085,27 +1064,21 @@ export class SecretArchive extends BaseLevel {
         return scrollGroup;
     }
 
-    // Update and interaction methods
-    update(deltaTime) {
-        // Update ghostly librarians
-        this.ghostlyLibrarians.forEach(librarian => {
-            // Already handled in AI setup
-        });
-        
-        // Update floating books
-        this.cursedBooks.forEach((book, index) => {
-            // Already animated in creation
-        });
-        
-        // Check for tome collection
-        this.ancientTomes.forEach(tome => {
-            if (!tome.collected && this.player) {
-                const distance = tome.mesh.position.distanceTo(
-                    this.player.position || this.player.mesh.position
-                );
-                
-                if (distance < 2) {
-                    tome.collected = true;
+        // Update and interaction methods
+        update(deltaTime) {
+            // Keep local reference up-to-date (used by legacy helper methods in this file)
+            this.player = this.game ? this.game.player : this.player;
+            const player = this.player;
+            
+            // Check for tome collection
+            this.ancientTomes.forEach(tome => {
+                if (!tome.collected && player) {
+                    const distance = tome.mesh.position.distanceTo(
+                        player.position || player.mesh?.position
+                    );
+                    
+                    if (distance < 2) {
+                        tome.collected = true;
                     tome.mesh.visible = false;
                     this.onTomeCollected(tome);
                 }
@@ -1601,5 +1574,11 @@ export class SecretArchive extends BaseLevel {
         }
         
         return triggerGroup;
+    }
+
+    clearLevel() {
+        if (super.cleanup) {
+            super.cleanup();
+        }
     }
 }

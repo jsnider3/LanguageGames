@@ -11,6 +11,7 @@ export class PlasmaDisintegrator extends BaseWeapon {
         this.fireRate = 300; // ms between shots
         this.ammoCapacity = 25;
         this.currentAmmo = this.ammoCapacity;
+        this.totalAmmo = 150;
         this.range = 100;
         this.accuracy = 0.95;
         

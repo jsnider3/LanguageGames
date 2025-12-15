@@ -25,6 +25,7 @@ export class TheIronTyrant extends BaseEnemy {
             stomp: { damage: 100, cooldown: 5000, range: 8, lastFired: 0 },
             shockwave: { damage: 50, cooldown: 8000, range: 20, lastFired: 0 }
         };
+        this.detectionRange = 60;
         
         // Mech state
         this.berserkMode = false;

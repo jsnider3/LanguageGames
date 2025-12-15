@@ -1,0 +1,12 @@
+{
+  "name": "saintdoom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "three": "0.128.0",
+    "typescript": "^5.9.0"
+  }
+}

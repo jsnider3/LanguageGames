@@ -16,6 +16,7 @@ export class TheDefiler extends BaseEnemy {
         this.invulnerable = false;
         this.enraged = false;
         this.corruptionAura = 15; // Radius of corruption effect
+        this.detectionRange = 40;
         this.defilerAbilities = {
             corruption_blast: { damage: 40, cooldown: 3000, range: 12 },
             summon_minions: { cooldown: 8000, count: 4 },

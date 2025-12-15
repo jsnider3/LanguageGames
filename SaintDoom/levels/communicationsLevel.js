@@ -9,9 +9,37 @@ export class CommunicationsLevel extends BaseLevel {
         super(game);
         this.scene = scene;
         this.game = game;
+
+        this.name = 'Communications Tower';
+        this.description = 'Restore power and re-establish contact from the tower top';
+
+        // Core geometry tuning
+        this.towerHeight = 200;
+
+        // Collections referenced throughout the level
+        this.platforms = [];
+        this.antennaArray = [];
+        this.communicationNodes = [];
+        this.elevatorShafts = [];
+        this.stairwells = [];
+        this.transmissionEquipment = [];
+        this.lightningStorms = [];
+
+        // Effects / interaction points
+        this.windEffect = null;
+        this.exitPortal = null;
+        this.mainTransmitter = null;
+        this.interferenceActive = true;
+
+        // Objective counters
+        this.nodesActivated = 0;
+        this.totalNodes = 0;
+        this.signalStrength = 0;
+        this.maxSignalStrength = 100;
+    }
     
     create() {
-        // Return required data structure for Game.js
+        this.init();
         return {
             walls: this.walls,
             enemies: this.enemies
@@ -21,13 +49,13 @@ export class CommunicationsLevel extends BaseLevel {
 
     init() {
         this.createGeometry();
-        this.createLighting();
         this.createPlatforms();
         this.createStairwells();
         this.createElevatorShafts();
         this.createAntennaArray();
         this.createCommunicationNodes();
         this.createTransmissionEquipment();
+        this.createLighting();
         this.createEnvironmentalEffects();
         this.setupObjectives();
         this.createEnvironmentalDetails();
@@ -107,7 +135,7 @@ export class CommunicationsLevel extends BaseLevel {
         const originalIntensity = light.intensity;
         const blinkSpeed = 2000 + Math.random() * 1000; // Random blink timing
         
-        setInterval(() => {
+        this.addInterval(() => {
             light.intensity = light.intensity > 0 ? 0 : originalIntensity;
         }, blinkSpeed);
     }
@@ -584,7 +612,8 @@ export class CommunicationsLevel extends BaseLevel {
         antennaGroup.position.set(0, height, 0);
         antennaGroup.userData.height = height;
         antennaGroup.userData.index = index;
-        antennaGroup.userData.damaged = false;
+        // Antennas start damaged so the repair objective is completable.
+        antennaGroup.userData.damaged = true;
         
         return antennaGroup;
     }
@@ -610,6 +639,8 @@ export class CommunicationsLevel extends BaseLevel {
                 this.scene.add(node);
             }
         });
+
+        this.totalNodes = this.communicationNodes.length;
     }
 
     createCommNode(nodeIndex) {
@@ -1038,7 +1069,8 @@ export class CommunicationsLevel extends BaseLevel {
         // Animate wave expansion
         let scale = 1;
         let opacity = 0.8;
-        const waveInterval = setInterval(() => {
+        let waveInterval = null;
+        waveInterval = this.addInterval(() => {
             scale += 5;
             opacity -= 0.05;
             wave.scale.setScalar(scale);
@@ -1046,7 +1078,7 @@ export class CommunicationsLevel extends BaseLevel {
             
             if (opacity <= 0) {
                 this.scene.remove(wave);
-                this.clearInterval(waveInterval);
+                if (waveInterval) this.clearInterval(waveInterval);
             }
         }, 50);
     }
@@ -1104,18 +1136,18 @@ export class CommunicationsLevel extends BaseLevel {
                     const distance = this.game.player.position.distanceTo(node.position);
                     if (distance < 2) {
                         // Auto-activate node when close
-                        this.activateNode(node);
+                        this.activateCommNode(index);
                     }
                 }
             });
             
             // Check for antennas to repair
             if (!this.objectives[1].completed) {
-                this.antennaArray.forEach(antenna => {
+                this.antennaArray.forEach((antenna, antennaIndex) => {
                     if (antenna.userData.damaged && !antenna.userData.repaired) {
                         const distance = this.game.player.position.distanceTo(antenna.position);
                         if (distance < 3) {
-                            this.repairAntenna(antenna);
+                            this.repairAntenna(antennaIndex);
                         }
                     }
                 });
@@ -1181,7 +1213,7 @@ export class CommunicationsLevel extends BaseLevel {
         this.exitPortal = portalGroup;
         
         // Animate portal
-        this.addInterval(setInterval(() => {
+        this.addInterval(() => {
             if (ring) {
                 ring.rotation.z += 0.02;
                 portal.rotation.z -= 0.01;
@@ -1189,7 +1221,7 @@ export class CommunicationsLevel extends BaseLevel {
                 const scale = 1 + Math.sin(Date.now() * 0.003) * 0.1;
                 portalGroup.scale.set(scale, scale, scale);
             }
-        }, 16));
+        }, 16);
         
         if (this.game.narrativeSystem) {
             this.game.narrativeSystem.displaySubtitle("Communications restored! Exit portal activated!");
@@ -1213,46 +1245,6 @@ export class CommunicationsLevel extends BaseLevel {
         }, 2000);
     }
     
-    repairAntenna(antenna) {
-        antenna.userData.repaired = true;
-        
-        // Change antenna appearance
-        antenna.material.emissive = new THREE.Color(0x00ff00);
-        antenna.material.emissiveIntensity = 0.3;
-        
-        // Check if all antennas repaired
-        const allRepaired = this.antennaArray.every(a => 
-            !a.userData.damaged || a.userData.repaired
-        );
-        
-        if (allRepaired) {
-            this.objectives[1].completed = true;
-            if (this.game.narrativeSystem) {
-                this.game.narrativeSystem.displaySubtitle("All antennas repaired!");
-            }
-        }
-    }
-    
-    restorePower() {
-        this.objectives[2].completed = true;
-        
-        // Light up the tower
-        const towerLight = new THREE.PointLight(0xffffff, 2, 100);
-        towerLight.position.set(0, this.towerHeight, 0);
-        this.scene.add(towerLight);
-        
-        if (this.game.narrativeSystem) {
-            this.game.narrativeSystem.displaySubtitle("Main transmitter power restored!");
-        }
-        
-        // Check if ready to contact outside
-        if (this.objectives[0].completed && this.objectives[1].completed && this.objectives[2].completed) {
-            setTimeout(() => {
-                this.establishContact();
-            }, 2000);
-        }
-    }
-
     getSpawnPosition() {
         return new THREE.Vector3(0, 2, 15);
     }
