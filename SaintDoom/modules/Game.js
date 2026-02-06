@@ -17,7 +17,6 @@ import { GeometryBatcher } from './GeometryBatcher.js';
 import { TimerManager } from './TimerManager.js';
 import { PhysicsManager } from './PhysicsManager.js';
 import { ZoneManager } from './ZoneManager.js';
-import { TransitionZoneFactory } from './TransitionZones.js';
 import { AudioManager } from './Utils.js';
 import { Config } from './config/index.js';
 import { Hellhound } from '../enemies/hellhound.js';
@@ -33,7 +32,6 @@ import { PossessedMechSuit } from '../enemies/possessedMechSuit.js';
 import { AlienHybrid } from '../enemies/alienHybrid.js';
 
 import { FacilityMap } from './FacilityMap.js';
-import { Level as FallbackLevel } from '../level.js';
 import { Pickup } from './Pickup.js';
 
 export class Game {
@@ -504,7 +502,6 @@ Player: ${playerPos}`;
         this.updateEnemies(deltaTime);
         this.handlePlayerDamage();
         this.updatePickups(deltaTime);
-        this.checkLevelProgression();
         this.updateCollisions(deltaTime);
 
         // Run per-frame level logic (objectives, hazards, animations, etc.)
@@ -621,9 +618,6 @@ Player: ${playerPos}`;
         
         // Handle chapel cleansing
         this.handleChapelCleansing(input);
-        
-        // Check door interaction
-        this.handleDoorInteraction(input);
     }
     
     updateArmoryLevel(deltaTime) {
@@ -705,11 +699,6 @@ Player: ${playerPos}`;
                 }
             }
         }
-    }
-    
-    handleDoorInteraction(input) {
-        // This method is no longer needed for chapel door as it's handled in update
-        // Keep it for other door interactions if needed
     }
     
     cleanupDeadAndInvalidEnemies() {
@@ -918,27 +907,6 @@ Player: ${playerPos}`;
         });
     }
     
-    checkLevelProgression() {
-        // Skip if using tutorial or chapel level (they have their own progression)
-        if (this.tutorialLevel || this.chapelLevel) return;
-        
-        // Check if level has the required methods
-        if (!this.level || !this.level.openExitDoor || !this.level.checkExitCollision) {
-            return;
-        }
-        
-        // Check if all enemies are defeated to open exit
-        if (this.enemies.length === 0 && !this.level.isExitOpen) {
-            this.level.openExitDoor();
-            this.showMessage("The holy seal breaks! Exit opened!");
-        }
-        
-        // Check exit collision for level progression
-        if (this.level.checkExitCollision(this.player)) {
-            this.nextLevel();
-        }
-    }
-    
     updateCollisions(deltaTime) {
         // Check all collisions (walls and enemies)
         // Use currentLevelInstance for all levels, or fall back to this.level for tutorial
@@ -979,135 +947,7 @@ Player: ${playerPos}`;
             this.handlePlayerDeath();
         }
     }
-    
-    nextLevel() {
-        // Add level completion bonus
-        const levelBonus = this.level.levelNumber * 500;
-        this.addScore(levelBonus);
-        this.showMessage(`Level Complete! +${levelBonus} Score!`);
-        
-        // Clear current enemies and pickups
-        this.enemies.forEach(enemy => enemy.destroy());
-        this.enemies = [];
-        
-        this.pickups.forEach(pickup => pickup.destroy());
-        this.pickups = [];
-        
-        // Transition to next level
-        this.level.createNextLevel();
-        
-        // Reset player position - different for level 2 to avoid center pillar
-        if (this.level.levelNumber === 2) {
-            this.player.position.set(0, 1.7, 5);  // Spawn in front of center pillar
-        } else {
-            this.player.position.set(0, 1.7, 0);
-        }
-        this.player.velocity.set(0, 0, 0);
-        
-        // Spawn enemies based on level
-        if (this.level.levelNumber === 2) {
-            this.spawnLevel2Enemies();
-        } else if (this.level.levelNumber === 3) {
-            this.spawnBossEnemy();
-        } else {
-            this.spawnLevel1Enemies();
-        }
-        
-        // Spawn new pickups
-        this.spawnLevelPickups();
-        
-        // Delay the level start message slightly to avoid overlap
-        setTimeout(() => {
-            this.showMessage(`Level ${this.level.levelNumber} - Purge the unholy!`);
-        }, 500);
-    }
-    
-    spawnCorridorEnemies() {
-        const spawns = [
-            { x: 0, z: -5, type: 'scientist' },    // First encounter
-            { x: -3, z: -10, type: 'scientist' },  // Near first pillar
-            { x: 3, z: -12, type: 'scientist' },   // Other side
-            { x: 0, z: -18, type: 'hellhound' }    // Midway guard
-        ];
-        spawns.forEach(spawn => this.spawnEnemy(spawn.x, 0, spawn.z, spawn.type));
-    }
-    
-    spawnLevel1Enemies() {
-        const spawns = [
-            { x: 6, z: -6, type: 'scientist' },   // Right back corner
-            { x: -6, z: -6, type: 'scientist' },  // Left back corner
-            { x: 1, z: 7, type: 'hellhound' },    // Front center
-            { x: -8, z: 0, type: 'hellhound' }    // Left side
-        ];
-        spawns.forEach(spawn => this.spawnEnemy(spawn.x, 0, spawn.z, spawn.type));
-    }
-    
-    spawnLevel2Enemies() {
-        const spawns = [
-            // Scientists in corners
-            { x: 12, z: -12, type: 'scientist' },
-            { x: -12, z: -12, type: 'scientist' },
-            { x: 12, z: 12, type: 'scientist' },
-            { x: -12, z: 12, type: 'scientist' },
-            // Hellhounds around center
-            { x: 4, z: 0, type: 'hellhound' },
-            { x: -4, z: 0, type: 'hellhound' },
-            { x: 0, z: 4, type: 'hellhound' },
-            { x: 0, z: -11, type: 'hellhound' }
-        ];
-        spawns.forEach(spawn => this.spawnEnemy(spawn.x, 0, spawn.z, spawn.type));
-    }
-    
-    spawnBossEnemy() {
-        // Spawn boss enemy (stronger variant)
-        // TODO: Replace with a proper boss class
-        const boss = new PossessedScientist(this.scene, new THREE.Vector3(0, 0, -10));
-        boss.game = this;
-        boss.health = 500;
-        boss.maxHealth = 500;
-        boss.damage = 30;
-        boss.moveSpeed = 4;
-        
-        // Make boss bigger
-        boss.mesh.scale.set(2, 2, 2);
-        
-        this.enemies.push(boss);
-        
-        // Also spawn minions
-        this.spawnEnemy(10, 0, 0, 'hellhound');
-        this.spawnEnemy(-10, 0, 0, 'hellhound');
-    }
-    
-    spawnLevelPickups() {
-        const levelNum = this.level.levelNumber;
-        const pickupConfigs = {
-            1: [
-                { x: 3, z: 3, type: 'health' },
-                { x: -3, z: 3, type: 'shells' },
-                { x: 0, z: -3, type: 'armor' },
-                { x: 7, z: 7, type: 'shells' }
-            ],
-            2: [
-                { x: 10, z: 10, type: 'health' },
-                { x: -10, z: 10, type: 'health' },
-                { x: 10, z: -10, type: 'shells' },
-                { x: -10, z: -10, type: 'shells' },
-                { x: 0, z: 0, type: 'armor' }
-            ],
-            3: [ // Boss level
-                { x: 15, z: 0, type: 'health' },
-                { x: -15, z: 0, type: 'health' },
-                { x: 0, z: 15, type: 'shells' },
-                { x: 0, z: -15, type: 'shells' },
-                { x: 10, z: 10, type: 'armor' },
-                { x: -10, z: -10, type: 'armor' }
-            ]
-        };
-        
-        const pickups = pickupConfigs[levelNum] || pickupConfigs[3];
-        pickups.forEach(pickup => this.spawnPickup(pickup.x, 0, pickup.z, pickup.type));
-    }
-    
+
     showMessage(text) {
         // Clear any existing messages to prevent overlapping
         const existingMessages = document.querySelectorAll('.game-message');
@@ -1233,24 +1073,7 @@ Player: ${playerPos}`;
         
         this.showMessage("A door has unlocked in the corridor! Press E to enter the Armory.");
     }
-    
-    createTextSprite(text, color) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
-        const context = canvas.getContext('2d');
-        context.font = 'Bold 40px Arial';
-        context.fillStyle = '#' + color.toString(16).padStart(6, '0');
-        context.textAlign = 'center';
-        context.fillText(text, 128, 40);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(4, 1, 1);
-        return sprite;
-    }
-    
+
     cleanseAltar() {
         if (this.chapelLevel.chapelCleansed) return; // Already cleansed
         
@@ -2365,52 +2188,7 @@ Player: ${playerPos}`;
             this.hideLoadingScreen();
         }, 1000);
     }
-    
-    restartGame() {
-        // Reset all game state
-        this.currentLevel = 'tutorial';
-        this.deathCount = 0;
-        this.martyrdomMode = false;
-        this.divineWrathUsed = false;
-        this.score = 0;
-        this.enemiesKilled = 0;
-        this.gameOver = false;
-        this.isPaused = false; // Make sure game is unpaused
-        
-        // Reset player to initial state
-        this.player.health = 100;
-        this.player.maxHealth = 100;
-        this.player.armor = 0;
-        this.player.rage = 0;
-        this.player.position.set(0, 1.7, 5);
-        this.player.velocity.set(0, 0, 0);
-        this.player.ammo.shells = 10;
-        this.player.ammo.bullets = 30;
-        
-        // Clear all enemies
-        if (this.enemies) {
-            this.enemies.forEach(enemy => {
-                if (enemy && enemy.mesh) {
-                    this.scene.remove(enemy.mesh);
-                }
-            });
-            this.enemies = [];
-        }
-        
-        // Reload first level
-        this.loadLevel('tutorial');
-        
-        // Show restart message
-        this.showMessage("New crusade begins... Seven resurrections granted.");
-        
-        // Re-capture pointer lock
-        setTimeout(() => {
-            document.body.requestPointerLock().catch(err => {
-                // Ignore pointer lock errors
-            });
-        }, 100);
-    }
-    
+
     /**
      * Update performance statistics
      */

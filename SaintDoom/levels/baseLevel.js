@@ -80,52 +80,6 @@ export class BaseLevel {
     }
     
     /**
-     * Create warning lights at specified positions
-     * @param {Array} positions - Array of {x, y, z} positions
-     * @param {Object} options - Light options
-     */
-    createWarningLights(positions, options = {}) {
-        const {
-            color = 0xff4400,
-            intensity = 1,
-            distance = 20,
-            blinking = true,
-            blinkSpeed = 800
-        } = options;
-        
-        const warningLights = [];
-        
-        positions.forEach(pos => {
-            const warningLight = new THREE.PointLight(color, intensity, distance);
-            warningLight.position.set(pos.x, pos.y, pos.z);
-            this.scene.add(warningLight);
-            this.lights.push(warningLight);
-            warningLights.push(warningLight);
-            
-            if (blinking) {
-                this.addBlinkingEffect(warningLight, blinkSpeed);
-            }
-        });
-        
-        return warningLights;
-    }
-    
-    /**
-     * Add blinking effect to a light
-     * @param {THREE.Light} light - Light to animate
-     * @param {number} speed - Blink speed in milliseconds
-     */
-    addBlinkingEffect(light, speed = 1000) {
-        const originalIntensity = light.intensity;
-        const variation = speed * 0.5;
-        const actualSpeed = speed + (Math.random() - 0.5) * variation;
-        
-        this.addInterval(() => {
-            light.intensity = light.intensity === 0 ? originalIntensity : 0;
-        }, actualSpeed);
-    }
-
-    /**
      * Setup level objectives - override in subclasses
      */
     setupObjectives() {
@@ -404,33 +358,6 @@ export class BaseLevel {
         this.particles.push(particleSystem);
 
         return particleSystem;
-    }
-
-    /**
-     * Update particle system helper
-     */
-    updateParticleSystem(particleSystem, deltaTime, bounds = null) {
-        if (!particleSystem || !particleSystem.geometry) return;
-
-        const positions = particleSystem.geometry.attributes.position.array;
-        const velocities = particleSystem.geometry.userData.velocities;
-
-        if (!velocities) return;
-
-        for (let i = 0; i < positions.length; i += 3) {
-            positions[i] += velocities[i] * deltaTime;
-            positions[i + 1] += velocities[i + 1] * deltaTime;
-            positions[i + 2] += velocities[i + 2] * deltaTime;
-
-            // Apply bounds if specified
-            if (bounds) {
-                if (positions[i] < bounds.min.x || positions[i] > bounds.max.x) velocities[i] *= -1;
-                if (positions[i + 1] < bounds.min.y || positions[i + 1] > bounds.max.y) velocities[i + 1] *= -1;
-                if (positions[i + 2] < bounds.min.z || positions[i + 2] > bounds.max.z) velocities[i + 2] *= -1;
-            }
-        }
-
-        particleSystem.geometry.attributes.position.needsUpdate = true;
     }
 
     /**

@@ -1,5 +1,4 @@
 import { BaseLevel } from './baseLevel.js';
-import { COLORS, MATERIALS, Geometry, Lighting } from './levelUtils.js';
 import { EnemySpawner } from './enemySpawner.js';
 import * as THREE from 'three';
 

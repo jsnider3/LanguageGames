@@ -290,18 +290,6 @@ export class VisualEffectsManager {
             });
         }
 
-        // Handle damage and knockback (this would typically be handled by game logic, but for centralization, we can add it here)
-        // if (settings.damage > 0) {
-        //     // Apply damage to nearby entities
-        // }
-        // if (settings.knockback > 0) {
-        //     // Apply knockback to nearby entities
-        // }
-
-        // Play sound effect
-        // if (settings.soundEffect) {
-        //     // Play sound
-        // }
     }
 
     createLightningBolt(startPos, endPos, config = {}) {

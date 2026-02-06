@@ -659,10 +659,7 @@ export class ZoneManager {
         }
         
         console.log(`[ZoneManager] Starting transition: ${fromZone} -> ${toZone}`);
-        
-        // Don't show transition UI - it's immersion-breaking
-        // this.showTransitionUI(transition.name);
-        
+
         // Set transition state
         this.activeTransition = {
             from: fromZone,
@@ -1628,36 +1625,7 @@ export class ZoneManager {
         // Start loading the zone
         return this.loadZone(zoneId, ZoneManager.ZoneState.FULL);
     }
-    
-    /**
-     * Check if player has reached the end of transition corridor
-     */
-    checkTransitionCompletion(playerPosition) {
-        if (!this.activeTransition) return;
-        
-        // Check if player has moved far enough through the corridor
-        const corridorLength = this.activeTransition.transition?.length || 30;
-        
-        // For chapel to armory transition, corridor is at x=6, z=-20, rotated 90 degrees
-        // So we need to check based on the x position instead of z
-        if (this.activeTransition.from === 'chapel') {
-            // Corridor extends along X axis from x=6 to x=36
-            // Player starts at x=6.5 and needs to move to near x=36
-            if (playerPosition.x >= 6 + corridorLength - 2) {
-                // Player reached the end, complete transition
-                console.log('[ZoneManager] Player reached end of corridor, completing transition');
-                this.completeTransition(this.activeTransition.to);
-            }
-        } else {
-            // Default check for other corridors (z-based)
-            if (playerPosition.z >= corridorLength - 2) {
-                // Player reached the end, complete transition
-                console.log('[ZoneManager] Player reached end of corridor, completing transition');
-                this.completeTransition(this.activeTransition.to);
-            }
-        }
-    }
-    
+
     /**
      * Helper function to position player after transition
      */
@@ -1776,9 +1744,6 @@ export class ZoneManager {
         // Clear active transition
         this.activeTransition = null;
         
-        // Don't hide transition UI since we're not showing it anymore
-        // this.hideTransitionUI();
-        
         // Also hide the loading screen if it's showing
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen && loadingScreen.style.display !== 'none') {
@@ -1879,44 +1844,6 @@ export class ZoneManager {
         elevator.add(light);
         
         return elevator;
-    }
-    
-    /**
-     * Show transition UI
-     */
-    showTransitionUI(transitionName) {
-        if (!this.transitionUI) {
-            // Create transition UI element
-            this.transitionUI = document.createElement('div');
-            this.transitionUI.style.position = 'fixed';
-            this.transitionUI.style.top = '50%';
-            this.transitionUI.style.left = '50%';
-            this.transitionUI.style.transform = 'translate(-50%, -50%)';
-            this.transitionUI.style.padding = '20px';
-            this.transitionUI.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-            this.transitionUI.style.color = 'white';
-            this.transitionUI.style.fontSize = '24px';
-            this.transitionUI.style.fontFamily = 'monospace';
-            this.transitionUI.style.border = '2px solid #444';
-            this.transitionUI.style.zIndex = '10000';
-            document.body.appendChild(this.transitionUI);
-        }
-        
-        this.transitionUI.innerHTML = `
-            <div>ZONE TRANSITION</div>
-            <div style="font-size: 18px; margin-top: 10px; color: #aaa;">${transitionName}</div>
-            <div style="font-size: 14px; margin-top: 10px; color: #888;">Loading next area...</div>
-        `;
-        this.transitionUI.style.display = 'block';
-    }
-    
-    /**
-     * Hide transition UI
-     */
-    hideTransitionUI() {
-        if (this.transitionUI) {
-            this.transitionUI.style.display = 'none';
-        }
     }
     
     /**
@@ -2153,119 +2080,7 @@ export class ZoneManager {
             return null;
         }
     }
-    
-    /**
-     * Save entire game state
-     */
-    saveGameState() {
-        const saveData = {
-            version: 1,
-            timestamp: Date.now(),
-            currentZone: this.currentZone,
-            playerData: {
-                health: this.game.player.health,
-                maxHealth: this.game.player.maxHealth,
-                ammo: this.game.player.ammo,
-                weapons: this.game.player.weapons,
-                position: {
-                    x: this.game.player.position.x,
-                    y: this.game.player.position.y,
-                    z: this.game.player.position.z
-                }
-            },
-            zones: {}
-        };
-        
-        // Save all zone states
-        this.zoneStates.forEach((state, zoneId) => {
-            saveData.zones[zoneId] = {
-                firstVisit: this.zones.get(zoneId).firstVisit,
-                state: state
-            };
-        });
-        
-        try {
-            localStorage.setItem('saintdoom_savegame', JSON.stringify(saveData));
-            console.log('[ZoneManager] Game state saved');
-            
-            if (this.game.narrativeSystem) {
-                this.game.narrativeSystem.displaySubtitle('Game Saved');
-            }
-        } catch (error) {
-            console.error('[ZoneManager] Failed to save game:', error);
-        }
-    }
-    
-    /**
-     * Load entire game state
-     */
-    loadGameState() {
-        try {
-            const data = localStorage.getItem('saintdoom_savegame');
-            if (!data) return false;
-            
-            const saveData = JSON.parse(data);
-            
-            // Restore player data
-            if (this.game.player && saveData.playerData) {
-                this.game.player.health = saveData.playerData.health;
-                this.game.player.maxHealth = saveData.playerData.maxHealth;
-                this.game.player.ammo = saveData.playerData.ammo;
-                this.game.player.weapons = saveData.playerData.weapons;
-                this.game.player.position.set(
-                    saveData.playerData.position.x,
-                    saveData.playerData.position.y,
-                    saveData.playerData.position.z
-                );
-            }
-            
-            // Restore zone states
-            Object.entries(saveData.zones).forEach(([zoneId, zoneData]) => {
-                const zone = this.zones.get(zoneId);
-                if (zone) {
-                    zone.firstVisit = zoneData.firstVisit;
-                }
-                
-                const state = this.loadFromStorage(zoneId);
-                if (state) {
-                    this.zoneStates.set(zoneId, state);
-                }
-            });
-            
-            // Load the saved zone
-            if (saveData.currentZone) {
-                this.enterZone(saveData.currentZone);
-            }
-            
-            console.log('[ZoneManager] Game state loaded');
-            
-            if (this.game.narrativeSystem) {
-                this.game.narrativeSystem.displaySubtitle('Game Loaded');
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('[ZoneManager] Failed to load game:', error);
-            return false;
-        }
-    }
-    
-    /**
-     * Clear all saved data
-     */
-    clearSaveData() {
-        // Remove all zone saves
-        this.zones.forEach((zone, zoneId) => {
-            const key = `saintdoom_zone_${zoneId}`;
-            localStorage.removeItem(key);
-        });
-        
-        // Remove main save
-        localStorage.removeItem('saintdoom_savegame');
-        
-        console.log('[ZoneManager] Save data cleared');
-    }
-    
+
     /**
      * Debug info
      */

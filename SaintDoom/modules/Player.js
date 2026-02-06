@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from './GameConfig.js';
 import { GeometryCache, AudioManager } from './Utils.js';
 import logger, { LogCategory, logPlayerAction } from './Logger.js';
-import { VectorMath } from './VectorPool.js';
 
 export class Player {
     constructor(camera) {
@@ -314,26 +313,10 @@ export class Player {
         }
         return false;
     }
-    
-    nextWeapon() {
-        this.currentWeaponIndex = (this.currentWeaponIndex + 1) % this.weapons.length;
-        this.currentWeapon = this.weapons[this.currentWeaponIndex];
-    }
-    
-    previousWeapon() {
-        this.currentWeaponIndex = (this.currentWeaponIndex - 1 + this.weapons.length) % this.weapons.length;
-        this.currentWeapon = this.weapons[this.currentWeaponIndex];
-    }
-    
+
     getForwardVector() {
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyEuler(new THREE.Euler(0, this.yaw, 0));
         return forward;
-    }
-    
-    getRightVector() {
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyEuler(new THREE.Euler(0, this.yaw, 0));
-        return right;
     }
 }
