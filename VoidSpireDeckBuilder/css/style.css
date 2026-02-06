@@ -1,0 +1,38 @@
+:root {
+    --void-dark: #0a0514;
+    --void-mid: #150a28;
+    --void-purple: #6644aa;
+    --void-light: #aa66ff;
+    --void-glow: #cc88ff;
+    --text-primary: #ddddee;
+    --text-secondary: #887799;
+    --gold: #ffcc44;
+    --health-red: #cc2222;
+    --block-blue: #3366cc;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--void-dark);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    font-family: monospace;
+}
+
+#gameCanvas {
+    display: block;
+    max-width: 100vw;
+    max-height: 100vh;
+    image-rendering: auto;
+    cursor: default;
+    border: 1px solid var(--void-purple);
+    box-shadow: 0 0 40px rgba(102, 68, 170, 0.3);
+}

@@ -105,6 +105,13 @@ A browser-based ecosystem simulation with predator/prey dynamics.
 - **Features:** Herbivore/carnivore food chains, population graphs, adjustable parameters, auto-tune
 - **Location:** `VirtualEcosystem/`
 
+#### Void Spire (Opus46)
+A roguelike deck-builder where players ascend a corrupted tower through card-based combat.
+- **Genre:** Roguelike Deck Builder
+- **Platform:** Web Browser
+- **Features:** 35 cards, 14 enemies + 3 bosses, 15 relics, 8 events, 3 acts with branching maps, shop/rest/event nodes, save/load
+- **Location:** `VoidSpireDeckBuilder/`
+
 ### Tools
 
 #### Qwen Idea Generator
@@ -168,6 +175,7 @@ Games in this collection were created by different LLMs:
 | VirtualEcosystem | Claude Opus 4 |
 | ExplorerQuest | Claude Opus 4 |
 | StreetBrawler1992 | Claude Opus 4 |
+| VoidSpireDeckBuilder | Claude Opus 4.6 |
 
 ## Project Philosophy
 

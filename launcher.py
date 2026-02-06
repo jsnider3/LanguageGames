@@ -153,6 +153,8 @@ class GameLauncher:
              "An interactive 3D visualization of black hole physics"),
             ("VirtualEcosystem", "web", "index.html", "Simulation/Educational",
              "A browser-based ecosystem simulation"),
+            ("VoidSpireDeckBuilder", "web", "index.html", "Roguelike Deck Builder",
+             "A roguelike deck-builder - ascend the Void Spire through card combat"),
         ]
         
         for name, game_type, launch_file, genre, description in game_configs:
