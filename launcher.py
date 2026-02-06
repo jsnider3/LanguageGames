@@ -123,28 +123,36 @@ class GameLauncher:
         # Define games with their metadata
         game_configs = [
             # Python games
-            ("TheCrimsonCase", "python", "game.py", "Detective/Mystery", 
-             "An interactive detective game where players solve a murder mystery"),
-            ("TheShadowedKeep", "python", "shadowkeep.py", "Roguelike/RPG", 
+            ("TheShadowedKeep", "python", "shadowkeep.py", "Roguelike/RPG",
              "A text-based roguelike dungeon crawler with procedural generation"),
-            ("StarTrader", "python", "run_game.py", "Trading/Simulation", 
+            ("StarTrader", "python", "run_game.py", "Trading/Simulation",
              "A space trading simulation - build a trading empire in a dangerous galaxy"),
-            ("EchoBase", "python", "echobase.py", "Colony Simulation", 
+            ("CodeBreaker", "python", "main.py", "Puzzle/Programming",
+             "Decode an alien programming language across 50 puzzles"),
+            ("EchoBase", "python", "echobase.py", "Colony Simulation",
              "Command a base on a newly discovered planet"),
-            ("ExplorerQuest", "python", "main.py", "Adventure", 
+            ("TheCrimsonCase", "python", "game.py", "Detective/Mystery",
+             "An interactive detective game where players solve a murder mystery"),
+            ("ExplorerQuest", "python", "main.py", "Adventure",
              "A Python-based exploration game"),
-            
+
             # Web games
-            ("VectorDodger", "web", "index.html", "Arcade/Bullet Hell", 
-             "A minimalist bullet hell arcade game with vector graphics"),
-            ("TheShiftingSanity", "web", "index.html", "Interactive Fiction", 
-             "An interactive web-based experience with dynamic styling"),
-            ("BlackHoleSim", "web", "blackhole-simulation.html", "Educational/Simulation", 
-             "An interactive 3D visualization of black hole physics"),
-            ("VirtualEcosystem", "web", "index.html", "Simulation/Educational", 
-             "A browser-based ecosystem simulation"),
+            ("SaintDoom", "web", "index.html", "FPS/Action",
+             "A 3D first-person shooter with demonic combat and boss battles"),
+            ("SyntaxCity", "web", "index.html", "Tower Defense/Educational",
+             "Tower defense where towers and enemies are programming concepts"),
+            ("Petri", "web", "index.html", "Simulation",
+             "A programmable life simulator with customizable species"),
             ("StreetBrawler1992", "web", "index.html", "Arcade/Fighting",
-             "A retro-style street fighting game")
+             "A retro-style street fighting game"),
+            ("VectorDodger", "web", "index.html", "Arcade/Bullet Hell",
+             "A minimalist bullet hell arcade game with vector graphics"),
+            ("TheShiftingSanity", "web", "index.html", "Horror/Interactive Fiction",
+             "A psychological horror exploration game in a haunted mansion"),
+            ("BlackHoleSim", "web", "blackhole-simulation.html", "Educational/Simulation",
+             "An interactive 3D visualization of black hole physics"),
+            ("VirtualEcosystem", "web", "index.html", "Simulation/Educational",
+             "A browser-based ecosystem simulation"),
         ]
         
         for name, game_type, launch_file, genre, description in game_configs:
