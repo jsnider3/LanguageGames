@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EchoTrace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="frame">
+    <header class="topbar">
+      <div class="title">EchoTrace</div>
+      <div class="subtitle">Stealth by sound. Knowledge has a price.</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div class="panel-title">Mission</div>
+        <div class="panel-block" id="mission">
+          Use sonar pings to reveal the map. Each ping raises alert and draws sentries.
+        </div>
+        <div class="panel-title">Status</div>
+        <div class="panel-block">
+          <div class="stat"><span>Level</span><strong id="hud-level">-</strong></div>
+          <div class="stat"><span>Artifacts</span><strong id="hud-artifacts">0/0</strong></div>
+          <div class="stat"><span>Pings</span><strong id="hud-pings">0</strong></div>
+          <div class="stat"><span>Time</span><strong id="hud-time">0:00</strong></div>
+        </div>
+        <div class="panel-title">Alert</div>
+        <div class="panel-block">
+          <div class="alert-bar">
+            <div class="alert-fill" id="hud-alert"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage">
+        <canvas id="game"></canvas>
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card" id="overlay-card"></div>
+        </div>
+        <div id="toast" class="toast hidden"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Controls</div>
+        <div class="panel-block">
+          <div class="control">Move: <strong>WASD / Arrows</strong></div>
+          <div class="control">Ping: <strong>Hold + Release Space</strong></div>
+          <div class="control">Decoy Beacon: <strong>Q</strong></div>
+          <div class="control">Dampener: <strong>E</strong></div>
+          <div class="control">Phase Step: <strong>F</strong></div>
+          <div class="control">Restart: <strong>R</strong></div>
+          <div class="control">Menu: <strong>M</strong></div>
+          <div class="control">Audio: <strong>V</strong></div>
+        </div>
+        <div class="panel-title">Supplies</div>
+        <div class="panel-block supplies">
+          <div class="supply"><span>Beacon</span><strong id="hud-beacon">0</strong></div>
+          <div class="supply"><span>Dampener</span><strong id="hud-dampener">0</strong></div>
+          <div class="supply"><span>Phase</span><strong id="hud-phase">0</strong></div>
+        </div>
+        <div class="panel-title">Legend</div>
+        <div class="panel-block legend">
+          <div><span class="legend-dot player"></span> You</div>
+          <div><span class="legend-dot sentry"></span> Sentry</div>
+          <div><span class="legend-dot exit"></span> Exit</div>
+          <div><span class="legend-dot artifact"></span> Artifact</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script id="levels-data" type="application/json">
+  [
+    {
+      "id": 1,
+      "name": "Whisper Hall",
+      "starting": {"beacon": 0, "dampener": 0, "phase": 0},
+      "grid": [
+        "####################",
+        "#P....A....#......E#",
+        "#.####.###..#.####.#",
+        "#......#...........#",
+        "#.####.#.S#.#.####.#",
+        "#......#....#..B...#",
+        "#.######.##.#.####.#",
+        "#........#..#......#",
+        "#.######.#.#####.###",
+        "#......#.#.....#...#",
+        "#......#...#..#....#",
+        "####################"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Cold Vault",
+      "starting": {"beacon": 1, "dampener": 0, "phase": 0},
+      "grid": [
+        "####################",
+        "#P...........A....E#",
+        "#.##.#.#######.##..#",
+        "#....#.....#...#...#",
+        "####.#####.#.###.#.#",
+        "#....#...#.#...#.#.#",
+        "#.##.#.#.#.###.#.#.#",
+        "#..B.#.#.#.....#...#",
+        "#.####.#.#####.###.#",
+        "#.....#...D...#....#",
+        "#..S..#.......#..S.#",
+        "####################"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Glassworks",
+      "starting": {"beacon": 1, "dampener": 1, "phase": 0},
+      "grid": [
+        "####################",
+        "#P..A...#......#..E#",
+        "#.###.#.#.####.#.###",
+        "#...#.#.#....#.#...#",
+        "#.#.#.#.####.#.###.#",
+        "#.#...#......#...#.#",
+        "#.###.######.###.#.#",
+        "#..B..#..T...#...#.#",
+        "#.####.#.#######.#.#",
+        "#....#.#....D..#...#",
+        "#..S.#.#.S.....#...#",
+        "####################"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "The Array",
+      "starting": {"beacon": 1, "dampener": 1, "phase": 1},
+      "grid": [
+        "####################",
+        "#P..A........B....E#",
+        "#.###.#.#####.#.#.##",
+        "#...#.#....#.#.#...#",
+        "#.#.#.###.#.#.###..#",
+        "#.#.#...#.#.#...#..#",
+        "#.#.###.#.#.###.#..#",
+        "#...#...#..#....#..#",
+        "###.#.#####.#.####.#",
+        "#..D#....#.#...#...#",
+        "#..S..#S..#..T..S..#",
+        "####################"
+      ]
+    }
+  ]
+  </script>
+
+  <script src="game.js"></script>
+</body>
+</html>
