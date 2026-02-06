@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON LOGIC // SYSTEM ARCHITECT</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💠</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div id="crt-overlay"></div>
+    <div id="scanline"></div>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="menu-overlay" class="overlay active">
+        <div class="menu-content">
+            <h1 class="glitch" data-text="NEON LOGIC">NEON LOGIC</h1>
+            <p class="subtitle">SYSTEM ARCHITECT INTERFACE</p>
+
+            <div id="level-list">
+                <!-- Populated by JS -->
+            </div>
+
+            <button id="btn-start" class="cyber-btn huge glitch-hover">INITIALIZE</button>
+        </div>
+    </div>
+
+    <!-- VICTORY OVERLAY -->
+    <div id="victory-overlay" class="overlay">
+        <div class="menu-content">
+            <h1 class="glitch success" data-text="NODE REPAIRED">NODE REPAIRED</h1>
+            <div class="stats-box">
+                <div class="stat-row">
+                    <span>SILICON:</span> <span class="val" id="vic-silicon">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>CYCLES:</span> <span class="val" id="vic-cycles">0</span>
+                </div>
+            </div>
+            <button id="btn-next-level" class="cyber-btn huge">PROCEED TO NEXT NODE</button>
+            <button id="btn-menu" class="cyber-btn secondary">RETURN TO ROOT</button>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <header>
+            <h1 class="glitch small" data-text="NEON LOGIC">NEON LOGIC</h1>
+            <div class="system-status">
+                <span class="label">STATUS:</span> <span class="value online">SYSTEM READY</span>
+                <span class="label">CPU:</span> <span class="value" id="cpu-load">12%</span>
+            </div>
+            <button id="btn-home" class="cyber-btn small">ROOT</button>
+        </header>
+
+        <div id="main-interface">
+            <div id="toolbox">
+                <div class="panel-header">COMPONENTS</div>
+                <div class="tool-category">
+                    <div class="tool-item active" data-type="WIRE" title="Signal Wire">
+                        <div class="icon wire-icon"></div>
+                        <span class="name">WIRE</span>
+                    </div>
+                </div>
+                <div class="tool-category">
+                    <div class="tool-item" data-type="GATE_AND" title="AND Gate">
+                        <div class="icon gate-and">AND</div>
+                    </div>
+                    <div class="tool-item" data-type="GATE_OR" title="OR Gate">
+                        <div class="icon gate-or">OR</div>
+                    </div>
+                    <div class="tool-item" data-type="GATE_NOT" title="NOT Gate">
+                        <div class="icon gate-not">NOT</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="canvas-container">
+                <canvas id="game-canvas"></canvas>
+            </div>
+
+            <div id="info-panel">
+                <div class="panel-header">NODE STATUS</div>
+                <div class="status-content">
+                    <div class="objective">
+                        <h3>OBJECTIVE:</h3>
+                        <p id="level-objective">Loading...</p>
+                    </div>
+                    <div class="controls">
+                        <button id="btn-run" class="cyber-btn">EXECUTE</button>
+                        <button id="btn-stop" class="cyber-btn secondary">HALT</button>
+                        <button id="btn-clear" class="cyber-btn danger">FLUSH</button>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric">
+                            <span class="label">SILICON:</span>
+                            <span class="value" id="score-silicon">0</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">CYCLES:</span>
+                            <span class="value" id="score-cycles">0</span>
+                        </div>
+                    </div>
+                    <div class="instructions" style="margin-top: 20px; font-size: 0.8em; color: #667;">
+                        <p>LMB: Place/Draw</p>
+                        <p>MMB: Pan Grid</p>
+                        <p>RMB: Delete</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+
+</html>

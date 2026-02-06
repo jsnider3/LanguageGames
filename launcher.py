@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import shutil
 import time
+import socket
 
 class Game:
     """Represents a game in the collection."""
@@ -61,22 +62,52 @@ class Game:
                 return True
                 
             elif self.game_type == "web":
-                html_path = self.path / self.launch_file
-                print(f"\nOpening {self.name} in your default browser...")
+                # Use a deterministic port based on the game name
+                # Range 8000 - 8999
+                port_offset = sum(ord(c) for c in self.name) % 1000
+                target_port = 8000 + port_offset
                 
-                # Convert WSL path to Windows path for browser
+                # Verify port is free (simple check)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                result = sock.connect_ex(('localhost', target_port))
+                if result == 0:
+                    # Port is open (in use), try next one
+                    print(f"Port {target_port} in use, trying next...")
+                    target_port += 1
+                sock.close()
+                
+                port = target_port
+                
+                print(f"\nStarting local server for {self.name} on port {port}...")
+                
                 try:
-                    win_path = subprocess.check_output(['wslpath', '-w', str(html_path.absolute())]).decode().strip()
-                    # Try to open with Edge (most common on Windows)
-                    edge_path = '/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-                    if not Path(edge_path).exists():
-                        # Try 64-bit Edge location
-                        edge_path = '/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe'
+                    # Start server process
+                    # We use python -m http.server to avoid CORS issues with ES modules
+                    server_cmd = [sys.executable, "-m", "http.server", str(port)]
+                    process = subprocess.Popen(server_cmd, cwd=str(self.path), 
+                                             stdout=subprocess.DEVNULL, 
+                                             stderr=subprocess.DEVNULL)
                     
-                    subprocess.run([edge_path, win_path], stderr=subprocess.DEVNULL)
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    # Fallback to webbrowser module if wslpath or Edge not available
-                    webbrowser.open(f"file://{html_path.absolute()}")
+                    # Wait a moment for startup
+                    time.sleep(0.5)
+                    
+                    # Open browser
+                    url = f"http://localhost:{port}/{self.launch_file}"
+                    print(f"Opening {url}")
+                    print("Press Ctrl+C to stop server and return to menu.")
+                    
+                    webbrowser.open(url)
+                    
+                    # Wait for user to stop
+                    try:
+                        process.wait()
+                    except KeyboardInterrupt:
+                        print("\nStopping server...")
+                        process.terminate()
+                        process.wait()
+                        
+                except Exception as e:
+                    print(f"Error running web server: {e}")
                 
                 return True
                 
@@ -139,6 +170,8 @@ class GameLauncher:
             # Web games
             ("SaintDoom", "web", "index.html", "FPS/Action",
              "A 3D first-person shooter with demonic combat and boss battles"),
+            ("NeonLogic", "web", "index.html", "Puzzle/Logic",
+             "Cyberpunk circuit repair puzzle with drag-and-drop logic gates"),
             ("SyntaxCity", "web", "index.html", "Tower Defense/Educational",
              "Tower defense where towers and enemies are programming concepts"),
             ("Petri", "web", "index.html", "Simulation",
