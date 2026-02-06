@@ -71,3 +71,10 @@ export default defineConfig([
   },
 ])
 ```
+
+## Token Usage
+
+│  Model Usage                 Reqs   Input Tokens   Cache Reads  Output Tokens                                        │
+│  ────────────────────────────────────────────────────────────────────────────                                        │
+│  gemini-2.5-flash-lite          2          4,669             0            119                                        │
+│  gemini-3-flash-preview        13         53,072       125,548            767
