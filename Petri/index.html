@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petri - Programmable Life Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Petri</h1>
+            <p class="subtitle">Programmable Life Simulator</p>
+            <p class="hint" style="margin-left: auto; font-size: 0.75rem; color: #666;">
+                Space: play/pause | R: reset | Click dish: spawn food | Shift+click species: spawn mode
+            </p>
+        </header>
+
+        <main>
+            <div id="simulation-container">
+                <canvas id="petri-dish"></canvas>
+                <div id="dish-overlay">
+                    <div id="stats">
+                        <span id="population-count">Population: 0</span>
+                        <span id="generation-count">Generation: 0</span>
+                        <span id="time-elapsed">Time: 0s</span>
+                    </div>
+                </div>
+            </div>
+
+            <aside id="control-panel">
+                <section id="simulation-controls">
+                    <h2>Simulation</h2>
+                    <div class="button-row">
+                        <button id="btn-play" title="Play/Pause">
+                            <span class="icon">▶</span>
+                        </button>
+                        <button id="btn-step" title="Step">
+                            <span class="icon">⏭</span>
+                        </button>
+                        <button id="btn-reset" title="Reset">
+                            <span class="icon">↺</span>
+                        </button>
+                    </div>
+                    <div class="control-row">
+                        <label for="speed-slider">Speed</label>
+                        <input type="range" id="speed-slider" min="0.25" max="4" step="0.25" value="1">
+                        <span id="speed-value">1x</span>
+                    </div>
+                </section>
+
+                <section id="species-panel">
+                    <h2>Species</h2>
+                    <div id="species-list"></div>
+                    <div class="button-row" style="margin-top: 0.5rem;">
+                        <button id="btn-new-species">+ New</button>
+                        <select id="preset-select">
+                            <option value="">Add Preset...</option>
+                            <option value="grazer">Grazer</option>
+                            <option value="predator">Predator</option>
+                            <option value="swarmer">Swarmer</option>
+                            <option value="loner">Loner</option>
+                            <option value="blob">Blob</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section id="environment-panel">
+                    <h2>Environment</h2>
+                    <div class="control-row">
+                        <label for="food-rate">Food Spawn Rate</label>
+                        <input type="range" id="food-rate" min="0" max="10" step="0.5" value="2">
+                        <span id="food-rate-value">2/s</span>
+                    </div>
+                    <div class="control-row">
+                        <label for="food-energy">Food Energy</label>
+                        <input type="range" id="food-energy" min="10" max="100" step="5" value="30">
+                        <span id="food-energy-value">30</span>
+                    </div>
+                    <div class="control-row" style="margin-top: 0.5rem;">
+                        <label>Obstacles</label>
+                        <button id="btn-add-obstacle" class="small">+ Add</button>
+                        <button id="btn-clear-obstacles" class="small danger">Clear</button>
+                    </div>
+                    <p class="hint" id="obstacle-hint" style="display: none;">Click dish to place obstacle</p>
+                </section>
+
+                <section id="challenge-panel">
+                    <h2>Challenge</h2>
+                    <select id="challenge-select">
+                        <option value="sandbox">Sandbox Mode</option>
+                        <option value="survival">Survival</option>
+                        <option value="dominance">Dominance</option>
+                        <option value="ecosystem">Ecosystem</option>
+                        <option value="predatorPrey">Predator & Prey</option>
+                        <option value="swarm">Swarm Intelligence</option>
+                        <option value="extinction">Controlled Extinction</option>
+                    </select>
+                    <div id="challenge-description"></div>
+                    <div id="challenge-progress"></div>
+                </section>
+
+                <section id="graph-panel">
+                    <h2>Population</h2>
+                    <div id="graph-container">
+                        <canvas id="population-graph"></canvas>
+                    </div>
+                </section>
+            </aside>
+        </main>
+
+        <!-- Species Editor Modal -->
+        <div id="species-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Species Editor</h2>
+                    <button id="btn-close-modal" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="editor-section">
+                        <h3>Appearance</h3>
+                        <div class="control-row">
+                            <label for="species-name">Name</label>
+                            <input type="text" id="species-name" placeholder="Species name">
+                        </div>
+                        <div class="control-row">
+                            <label for="species-color">Color</label>
+                            <input type="color" id="species-color" value="#4CAF50">
+                        </div>
+                        <div class="control-row">
+                            <label for="species-size">Size</label>
+                            <input type="range" id="species-size" min="3" max="15" value="6">
+                            <span id="species-size-value">6</span>
+                        </div>
+                    </div>
+
+                    <div class="editor-section">
+                        <h3>Attributes</h3>
+                        <div class="control-row">
+                            <label for="species-speed">Max Speed</label>
+                            <input type="range" id="species-speed" min="20" max="200" value="80">
+                            <span id="species-speed-value">80</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="species-sense">Sense Range</label>
+                            <input type="range" id="species-sense" min="20" max="200" value="60">
+                            <span id="species-sense-value">60</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="species-energy">Starting Energy</label>
+                            <input type="range" id="species-energy" min="50" max="200" value="100">
+                            <span id="species-energy-value">100</span>
+                        </div>
+                    </div>
+
+                    <div class="editor-section">
+                        <h3>Behaviors</h3>
+                        <p class="hint">Configure how this species behaves. Higher weights = stronger influence.</p>
+
+                        <div id="behavior-list">
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-wander" checked>
+                                    <label for="beh-wander">Wander</label>
+                                    <span class="behavior-desc">Random exploration</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-wander-weight" min="0" max="2" step="0.1" value="0.5">
+                                    <span class="weight-value">0.5</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-seek-food" checked>
+                                    <label for="beh-seek-food">Seek Food</label>
+                                    <span class="behavior-desc">Move toward nearby food</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-seek-food-weight" min="0" max="2" step="0.1" value="1.0">
+                                    <span class="weight-value">1.0</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-avoid-edge">
+                                    <label for="beh-avoid-edge">Avoid Edge</label>
+                                    <span class="behavior-desc">Stay away from dish boundary</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-avoid-edge-weight" min="0" max="2" step="0.1" value="1.0">
+                                    <span class="weight-value">1.0</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-flock">
+                                    <label for="beh-flock">Flock</label>
+                                    <span class="behavior-desc">Stay near others of same species</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-flock-weight" min="0" max="2" step="0.1" value="0.5">
+                                    <span class="weight-value">0.5</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-align">
+                                    <label for="beh-align">Align</label>
+                                    <span class="behavior-desc">Match velocity with flock</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-align-weight" min="0" max="2" step="0.1" value="0.5">
+                                    <span class="weight-value">0.5</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-avoid-others">
+                                    <label for="beh-avoid-others">Avoid Crowding</label>
+                                    <span class="behavior-desc">Keep personal space</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-avoid-others-weight" min="0" max="2" step="0.1" value="0.8">
+                                    <span class="weight-value">0.8</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-flee-predator">
+                                    <label for="beh-flee-predator">Flee Predators</label>
+                                    <span class="behavior-desc">Run from larger organisms</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-flee-predator-weight" min="0" max="2" step="0.1" value="1.5">
+                                    <span class="weight-value">1.5</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-hunt">
+                                    <label for="beh-hunt">Hunt Prey</label>
+                                    <span class="behavior-desc">Chase smaller organisms</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-hunt-weight" min="0" max="2" step="0.1" value="1.0">
+                                    <span class="weight-value">1.0</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-seek-center">
+                                    <label for="beh-seek-center">Seek Center</label>
+                                    <span class="behavior-desc">Move toward dish center</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-seek-center-weight" min="0" max="2" step="0.1" value="0.3">
+                                    <span class="weight-value">0.3</span>
+                                </div>
+                            </div>
+
+                            <div class="behavior-item">
+                                <div class="behavior-header">
+                                    <input type="checkbox" id="beh-avoid-same">
+                                    <label for="beh-avoid-same">Avoid Own Kind</label>
+                                    <span class="behavior-desc">Territorial - avoid same species</span>
+                                </div>
+                                <div class="behavior-config">
+                                    <label>Weight</label>
+                                    <input type="range" id="beh-avoid-same-weight" min="0" max="2" step="0.1" value="1.0">
+                                    <span class="weight-value">1.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="editor-section">
+                        <h3>Reproduction</h3>
+                        <div class="control-row">
+                            <label for="repro-threshold">Energy Threshold</label>
+                            <input type="range" id="repro-threshold" min="100" max="300" value="150">
+                            <span id="repro-threshold-value">150</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="repro-cost">Reproduction Cost</label>
+                            <input type="range" id="repro-cost" min="30" max="150" value="60">
+                            <span id="repro-cost-value">60</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="mutation-rate">Mutation Rate</label>
+                            <input type="range" id="mutation-rate" min="0" max="0.3" step="0.01" value="0.05">
+                            <span id="mutation-rate-value">5%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-delete-species" class="danger">Delete</button>
+                    <button id="btn-spawn-species" class="secondary">Spawn 10</button>
+                    <button id="btn-save-species" class="primary">Save Species</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
