@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cinder Route — Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header>
+        <h1>Cinder Route</h1>
+        <p>Prototype: pilot a courier skiff through unstable districts, solve dispatch cards, and keep the city from boiling over.</p>
+      </header>
+
+      <main class="layout">
+        <section class="hud run-console-left">
+          <h2>Run Console</h2>
+          <div id="hud"></div>
+
+          <div class="meter">
+            <span>Grid Drift</span>
+            <div class="bar-track">
+              <div id="driftFill" class="fill"></div>
+            </div>
+          </div>
+
+          <div class="meter">
+            <span>District Completion</span>
+            <div class="bar-track">
+              <div id="completionFill" class="fill"></div>
+            </div>
+          </div>
+
+          <button id="newRunBtn" type="button">New Relay Run</button>
+
+          <div class="touch-controls" aria-label="Touch controls">
+            <button id="touchUp" type="button" aria-label="Move up">▲</button>
+            <button id="touchLeft" type="button" aria-label="Move left">◀</button>
+            <button id="touchDown" type="button" aria-label="Move down">▼</button>
+            <button id="touchRight" type="button" aria-label="Move right">▶</button>
+          </div>
+        </section>
+
+        <canvas id="mapCanvas" width="704" height="576" aria-label="Ashline district map"></canvas>
+
+        <section class="hud run-console-right">
+          <div id="runStatusPanel" class="muted">
+            <strong>Run status</strong>
+            <p id="runStatusLine">Start a run to begin.</p>
+            <p id="runMechanicsLine">Unlock Signal Lantern to gain one reroll on non-beacon cards.</p>
+          </div>
+
+          <div id="beaconCompass" class="muted">
+            <strong>Beacon Compass</strong>
+            <p id="beaconCompassLine">Waiting for run start.</p>
+          </div>
+
+          <div class="muted">
+            <strong>Best Run</strong>
+            <div id="bestStats"></div>
+          </div>
+
+          <div class="muted">
+            <strong>Unlocked Fragments</strong>
+            <ul id="fragments"></ul>
+          </div>
+
+          <div id="legend" class="muted">
+            <strong>How to play</strong>
+            <p>Goal: move to the relay beacon and solve its dispatch lock before Drift reaches 100.</p>
+            <p>Each move reveals a district: heat rises by 1 and drift rises by district hazard.</p>
+            <p>Dispatch tiles are mini puzzles. Correct answers grant heat/shards; incorrect answers raise drift.</p>
+            <p>Input: arrow keys / WASD, or touch D-pad. R restarts the run. Mouse for card answers.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <aside id="cardModal" class="card hidden" aria-live="polite">
+      <div class="card-inner">
+        <div id="cardRule" class="pill"></div>
+        <h3 id="cardTitle"></h3>
+        <p id="cardPrompt"></p>
+        <div id="cardOptions" class="options"></div>
+        <p id="cardMessage" class="muted"></p>
+      </div>
+    </aside>
+
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <h2 id="overlayTitle">Relay Lost</h2>
+        <p id="overlayText"></p>
+        <p id="runSummary" class="summary"></p>
+        <button id="retryBtn" type="button">Try another route</button>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
