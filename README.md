@@ -112,6 +112,13 @@ A roguelike deck-builder where players ascend a corrupted tower through card-bas
 - **Features:** 35 cards, 14 enemies + 3 bosses, 15 relics, 8 events, 3 acts with branching maps, shop/rest/event nodes, save/load
 - **Location:** `VoidSpireDeckBuilder/`
 
+#### NeonPulse
+A cyberpunk rhythm game with procedurally synthesized music and neon visuals.
+- **Genre:** Rhythm/Music
+- **Platform:** Web Browser
+- **Features:** 5 songs with 3 difficulties, 4-lane gameplay (D/F/J/K), procedural synth audio, tap and hold notes, combo system, high score persistence
+- **Location:** `NeonPulse/`
+
 ### Tools
 
 #### Qwen Idea Generator
@@ -176,6 +183,7 @@ Games in this collection were created by different LLMs:
 | ExplorerQuest | Claude Opus 4 |
 | StreetBrawler1992 | Claude Opus 4 |
 | VoidSpireDeckBuilder | Claude Opus 4.6 |
+| NeonPulse | Claude Opus 4.6 |
 
 ## Project Philosophy
 

@@ -188,6 +188,8 @@ class GameLauncher:
              "A browser-based ecosystem simulation"),
             ("VoidSpireDeckBuilder", "web", "index.html", "Roguelike Deck Builder",
              "A roguelike deck-builder - ascend the Void Spire through card combat"),
+            ("NeonPulse", "web", "index.html", "Rhythm/Music",
+             "A cyberpunk rhythm game with procedural synth music"),
         ]
         
         for name, game_type, launch_file, genre, description in game_configs:
