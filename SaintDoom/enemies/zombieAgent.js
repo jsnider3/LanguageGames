@@ -303,18 +303,33 @@ export class ZombieAgent extends BaseEnemy {
 
         this.scene.add(bullet);
 
-        // Animate bullet
-        const bulletInterval = setInterval(() => {
+        // Animate bullet using RAF (tracked for cleanup)
+        let bulletActive = true;
+        const animateBullet = () => {
+            if (!bulletActive) return;
             const age = Date.now() - bullet.userData.birthTime;
             if (age > bullet.userData.life) {
                 this.scene.remove(bullet);
-                clearInterval(bulletInterval);
+                bullet.geometry.dispose();
+                bullet.material.dispose();
+                bulletActive = false;
                 return;
             }
 
             const movement = velocity.clone().multiplyScalar(16 / 1000);
             bullet.position.add(movement);
-        }, 16);
+            requestAnimationFrame(animateBullet);
+        };
+        requestAnimationFrame(animateBullet);
+
+        // Store cleanup function so destroy() can stop the animation
+        if (!this._bulletCleanups) this._bulletCleanups = [];
+        this._bulletCleanups.push(() => {
+            bulletActive = false;
+            this.scene.remove(bullet);
+            bullet.geometry.dispose();
+            bullet.material.dispose();
+        });
     }
 
     meleeAttack(player) {
@@ -487,11 +502,11 @@ export class ZombieAgent extends BaseEnemy {
     }
 
     animateDecayEffects(deltaTime) {
-        // Flickering eyes
+        // Flickering eyes - use color brightness (MeshBasicMaterial has no emissiveIntensity)
         if (this.leftEye && this.rightEye) {
-            const flicker = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
-            this.leftEye.material.emissiveIntensity = flicker;
-            this.rightEye.material.emissiveIntensity = flicker;
+            const brightness = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+            this.leftEye.material.color.setScalar(brightness);
+            this.rightEye.material.color.setScalar(brightness);
         }
 
         // Subtle body sway (undead movement)
@@ -614,6 +629,14 @@ export class ZombieAgent extends BaseEnemy {
     }
 
     destroy() {
+        this._clearAllTimers();
+
+        // Clean up any active bullet animations
+        if (this._bulletCleanups) {
+            this._bulletCleanups.forEach(cleanup => cleanup());
+            this._bulletCleanups = [];
+        }
+
         if (this.mesh) {
             this.scene.remove(this.mesh);
         }

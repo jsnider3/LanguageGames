@@ -36,9 +36,7 @@ export class ShadowOptimizer {
      * Only the first MAX_SHADOW_CASTERS lights will cast shadows
      */
     registerShadowLight(light, priority = 0) {
-        if (!light.castShadow) {
-            light.castShadow = false; // Ensure it's off by default
-        }
+        // Don't modify castShadow here - updateShadowCasters() will set it based on priority
         
         const shadowData = {
             light: light,

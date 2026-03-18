@@ -186,7 +186,7 @@ export class Hellhound extends BaseEnemy {
             if (!member.isDead && member !== this) {
                 member.state = 'chasing';
                 member.moveSpeed *= 1.2; // Temporary speed boost
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     if (!member.isDead) {
                         member.moveSpeed /= 1.2;
                     }
@@ -226,6 +226,8 @@ export class Hellhound extends BaseEnemy {
                 requestAnimationFrame(animateRing);
             } else {
                 this.scene.remove(ring);
+                ring.geometry.dispose();
+                ring.material.dispose();
             }
         };
         animateRing();
@@ -433,6 +435,7 @@ export class Hellhound extends BaseEnemy {
     
     // Override parent's onDeath method to ensure proper death handling
     onDeath() {
+        this._clearAllTimers();
         this.state = 'dead';
         this.isDead = true;  // Ensure isDead is set for kill counting
         logEnemyAction('Hellhound', 'Died', { position: this.position });

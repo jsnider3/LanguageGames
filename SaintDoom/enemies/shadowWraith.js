@@ -316,7 +316,7 @@ export class ShadowWraith extends BaseEnemy {
         }
         
         // Schedule return to phase
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (!this.isDead) {
                 this.enterPhase();
             }
@@ -381,10 +381,12 @@ export class ShadowWraith extends BaseEnemy {
                 requestAnimationFrame(fadeStreak);
             } else {
                 this.scene.remove(streak);
+                streak.geometry.dispose();
+                streak.material.dispose();
             }
         };
         
-        setTimeout(fadeStreak, 100);
+        this._trackTimeout(fadeStreak, 100);
     }
     
     createShadowTrail() {
@@ -415,6 +417,8 @@ export class ShadowWraith extends BaseEnemy {
             
             if (age > trail.lifetime) {
                 this.scene.remove(trail.mesh);
+                if (trail.mesh.geometry) trail.mesh.geometry.dispose();
+                if (trail.mesh.material) trail.mesh.material.dispose();
                 this.shadowTrail.splice(i, 1);
             } else {
                 // Fade out
@@ -458,6 +462,8 @@ export class ShadowWraith extends BaseEnemy {
                     requestAnimationFrame(animateParticle);
                 } else {
                     this.scene.remove(particle);
+                    particle.geometry.dispose();
+                    particle.material.dispose();
                 }
             };
             animateParticle();
@@ -491,6 +497,8 @@ export class ShadowWraith extends BaseEnemy {
                 requestAnimationFrame(animateRing);
             } else {
                 this.scene.remove(ring);
+                ring.geometry.dispose();
+                ring.material.dispose();
             }
         };
         animateRing();
@@ -524,6 +532,8 @@ export class ShadowWraith extends BaseEnemy {
                     requestAnimationFrame(animateSlash);
                 } else {
                     this.scene.remove(slash);
+                    slash.geometry.dispose();
+                    slash.material.dispose();
                 }
             };
             animateSlash();
@@ -561,13 +571,15 @@ export class ShadowWraith extends BaseEnemy {
                     requestAnimationFrame(animateParticle);
                 } else {
                     this.scene.remove(particle);
-                    
+                    particle.geometry.dispose();
+                    particle.material.dispose();
+
                     // Heal wraith slightly
                     this.health = Math.min(this.maxHealth, this.health + 5);
                 }
             };
-            
-            setTimeout(() => animateParticle(), i * 50);
+
+            this._trackTimeout(() => animateParticle(), i * 50);
         }
     }
     
@@ -621,15 +633,20 @@ export class ShadowWraith extends BaseEnemy {
                 requestAnimationFrame(animatePass);
             } else {
                 this.scene.remove(pass);
+                pass.geometry.dispose();
+                pass.material.dispose();
             }
         };
         animatePass();
     }
     
     onDeath() {
+        this._clearAllTimers();
         // Clear shadow trail
         this.shadowTrail.forEach(trail => {
             this.scene.remove(trail.mesh);
+            if (trail.mesh.geometry) trail.mesh.geometry.dispose();
+            if (trail.mesh.material) trail.mesh.material.dispose();
         });
         this.shadowTrail = [];
         
@@ -688,6 +705,8 @@ export class ShadowWraith extends BaseEnemy {
                     requestAnimationFrame(animateFragment);
                 } else {
                     this.scene.remove(fragment);
+                    fragment.geometry.dispose();
+                    fragment.material.dispose();
                 }
             };
             animateFragment();

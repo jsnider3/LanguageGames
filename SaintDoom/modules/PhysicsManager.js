@@ -16,7 +16,11 @@ export class PhysicsManager {
         this.raycaster = new THREE.Raycaster();
         this.raycaster.near = 0;
         this.raycaster.far = 10;
-        
+
+        // Cached floor meshes for ground detection (avoid scene.traverse every frame)
+        this._floorMeshes = [];
+        this._floorCacheDirty = true;
+
         // Debug visualization
         this.debugMode = false;
         this.debugHelpers = [];
@@ -111,15 +115,20 @@ export class PhysicsManager {
         
         // Check against floors and static bodies
         const intersectObjects = [];
-        
-        // Add floor meshes
-        this.scene.traverse(child => {
-            if (child.isMesh && child.name && 
-                (child.name.includes('floor') || child.name.includes('ground'))) {
-                intersectObjects.push(child);
-            }
-        });
-        
+
+        // Use cached floor meshes instead of traversing every frame
+        if (this._floorCacheDirty) {
+            this._floorMeshes = [];
+            this.scene.traverse(child => {
+                if (child.isMesh && child.name &&
+                    (child.name.includes('floor') || child.name.includes('ground'))) {
+                    this._floorMeshes.push(child);
+                }
+            });
+            this._floorCacheDirty = false;
+        }
+        intersectObjects.push(...this._floorMeshes);
+
         // Add walls and level geometry (for standing on walls/floors)
         walls.forEach(wall => {
             if (wall.mesh) {
@@ -383,11 +392,20 @@ export class PhysicsManager {
     }
     
     /**
+     * Invalidate the floor mesh cache (call after level changes)
+     */
+    invalidateFloorCache() {
+        this._floorCacheDirty = true;
+        this._floorMeshes = [];
+    }
+
+    /**
      * Clear all physics entities
      */
     clear() {
         this.entities.clear();
         this.staticBodies.clear();
+        this.invalidateFloorCache();
         
         if (this.debugMode) {
             this.debugHelpers.forEach(helper => {

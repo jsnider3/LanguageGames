@@ -1540,25 +1540,47 @@ export class ZoneManager {
             });
         }
         
-        // Clear all scene children except player, camera, and corridor
+        // Also keep weapon meshes (attached to camera)
+        this.scene.traverse(child => {
+            if (child.userData && child.userData.isWeapon) {
+                keepObjects.add(child);
+            }
+        });
+
+        // Clear all scene children except player, camera, weapons, and corridor
         const toRemove = [];
         this.scene.traverse(child => {
             if (child.isMesh && !keepObjects.has(child) && !corridorObjects.has(child)) {
-                // Don't remove if it's part of player or camera
+                // Don't remove if it's a descendant of a keep object (e.g. weapon parts inside weapon group on camera)
                 let shouldRemove = true;
-                keepObjects.forEach(keeper => {
-                    if (keeper && child.parent === keeper) {
+                let ancestor = child.parent;
+                while (ancestor) {
+                    if (keepObjects.has(ancestor) || corridorObjects.has(ancestor)) {
                         shouldRemove = false;
+                        break;
                     }
-                });
+                    ancestor = ancestor.parent;
+                }
                 if (shouldRemove) {
                     toRemove.push(child);
                 }
             }
-            // Also remove lights from the level
-            if ((child.isLight || child.isPointLight || child.isDirectionalLight) && 
+            // Also remove lights from the level (but not weapon lights or corridor lights)
+            if ((child.isLight || child.isPointLight || child.isDirectionalLight) &&
                 !corridorObjects.has(child)) {
-                toRemove.push(child);
+                // Check if light is a descendant of a keep object (e.g. weapon glow)
+                let isKept = false;
+                let ancestor = child.parent;
+                while (ancestor) {
+                    if (keepObjects.has(ancestor)) {
+                        isKept = true;
+                        break;
+                    }
+                    ancestor = ancestor.parent;
+                }
+                if (!isKept) {
+                    toRemove.push(child);
+                }
             }
         });
         
@@ -1709,47 +1731,66 @@ export class ZoneManager {
      * Complete the transition to a new zone
      */
     async completeTransition(zoneId) {
-        // Load the actual level through the game's level system
-        if (this.game && this.game.loadLevelActual) {
+        // Check if prepareTargetZone already loaded the level via loadZoneFull
+        const zone = this.zones.get(zoneId);
+        const alreadyLoaded = zone && zone.state === ZoneManager.ZoneState.FULL && zone.levelInstance;
+
+        if (alreadyLoaded) {
+            // Level was already loaded by prepareTargetZone — just position the player
+            this.positionPlayerAfterTransition(zoneId);
+        } else if (this.game && this.game.loadLevelActual) {
             // Use loadLevelActual to bypass loading screen during transitions
             await this.game.loadLevelActual(zoneId);
-            
-            // Position player based on transition direction
             this.positionPlayerAfterTransition(zoneId);
         } else if (this.game && this.game.loadLevel) {
-            // Fallback to regular loadLevel if loadLevelActual not available
             await this.game.loadLevel(zoneId);
-            
-            // Position player based on transition direction
             this.positionPlayerAfterTransition(zoneId);
         } else {
-            // Fallback to zone-based loading
             await this.enterZone(zoneId);
-            
-            // Position player based on transition direction
             this.positionPlayerAfterTransition(zoneId);
-            
-            if (this.game.player && this.activeTransition) {
-                // Handle any other zone-specific positioning not covered in helper
-                if (false) { // Placeholder for future zone-specific positioning
-                    // Default to zone start position
-                    const zone = this.zones.get(zoneId);
-                    if (zone && zone.startPosition) {
-                        this.game.player.position.copy(zone.startPosition);
-                    }
-                }
-            }
         }
         
+        // Clean up any leftover corridor/transition objects from the scene
+        // Collect top-level corridor groups and remove them with full disposal
+        const corridorRoots = [];
+        this.scene.children.forEach(child => {
+            if (child.userData && child.userData.isTransitionCorridor) {
+                corridorRoots.push(child);
+            }
+        });
+        corridorRoots.forEach(root => {
+            root.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+            });
+            this.scene.remove(root);
+        });
+
+        // Remove transition lights
+        if (this._transitionAmbientLight) {
+            this.scene.remove(this._transitionAmbientLight);
+            this._transitionAmbientLight = null;
+        }
+        if (this._transitionDirLight) {
+            this.scene.remove(this._transitionDirLight);
+            this._transitionDirLight = null;
+        }
+
+        // Clear transition state
+        this.game.isTransitioning = false;
+
         // Clear active transition
         this.activeTransition = null;
-        
+
         // Also hide the loading screen if it's showing
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen && loadingScreen.style.display !== 'none') {
             loadingScreen.style.display = 'none';
         }
-        
+
         // Resume game
         if (this.game.isPaused) {
             this.game.isPaused = false;

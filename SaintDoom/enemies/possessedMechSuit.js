@@ -7,7 +7,7 @@ export class PossessedMechSuit extends BaseEnemy {
         super(scene, position);
         
         // Mech suit specific properties
-        this.armorPlating = 0.4; // 60% damage reduction
+        this.armorPlating = 0.4; // 40% damage reduction
         this.powerCore = 100;
         this.maxPowerCore = 100;
         this.overheated = false;

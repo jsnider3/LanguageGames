@@ -308,12 +308,17 @@ export class DemonKnight extends BaseEnemy {
         
         // Animate aura
         const animateAura = () => {
-            if (this.isDead) return;
-            
+            if (this.isDead || this._destroyed) {
+                if (aura.parent) aura.parent.remove(aura);
+                auraGeometry.dispose();
+                auraMaterial.dispose();
+                return;
+            }
+
             aura.scale.x = 1 + Math.sin(Date.now() * 0.002) * 0.1;
             aura.scale.y = 1 + Math.cos(Date.now() * 0.002) * 0.1;
             aura.scale.z = 1 + Math.sin(Date.now() * 0.003) * 0.1;
-            
+
             requestAnimationFrame(animateAura);
         };
         animateAura();
@@ -849,6 +854,7 @@ export class DemonKnight extends BaseEnemy {
         
         // Flash and fade
         const flashLine = () => {
+            if (!warningLine.parent) return; // Stop when removed from scene
             warningLine.material.opacity = 0.3 + Math.sin(Date.now() * 0.01) * 0.3;
             requestAnimationFrame(flashLine);
         };

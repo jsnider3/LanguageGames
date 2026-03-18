@@ -287,6 +287,8 @@ export class BrimstoneGolem extends BaseEnemy {
             const age = now - trail.startTime;
             if (age > trail.lifetime) {
                 this.scene.remove(trail.mesh);
+                if (trail.mesh.geometry) trail.mesh.geometry.dispose();
+                if (trail.mesh.material) trail.mesh.material.dispose();
                 this.lavaTrails.splice(i, 1);
                 continue;
             }
@@ -317,7 +319,7 @@ export class BrimstoneGolem extends BaseEnemy {
         this.telegraphSlam();
         
         // Perform slam after delay
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (!this.isDead) {
                 this.performGroundSlam(player);
             }
@@ -414,6 +416,8 @@ export class BrimstoneGolem extends BaseEnemy {
                 requestAnimationFrame(animateShockwave);
             } else {
                 this.scene.remove(shockwave);
+                shockwave.geometry.dispose();
+                shockwave.material.dispose();
             }
         };
         animateShockwave();
@@ -447,10 +451,12 @@ export class BrimstoneGolem extends BaseEnemy {
                 requestAnimationFrame(fadeCrack);
             } else {
                 this.scene.remove(crack);
+                crack.geometry.dispose();
+                crack.material.dispose();
             }
         };
-        
-        setTimeout(fadeCrack, 1000);
+
+        this._trackTimeout(fadeCrack, 1000);
     }
     
     takeDamage(damage, damageType = 'normal', hitPosition = null) {
@@ -481,7 +487,7 @@ export class BrimstoneGolem extends BaseEnemy {
             // Close vents temporarily after hit
             if (ventHit) {
                 this.ventsClosed = true;
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     this.ventsClosed = false;
                 }, 5000);
             }
@@ -534,6 +540,8 @@ export class BrimstoneGolem extends BaseEnemy {
                     requestAnimationFrame(animateSteam);
                 } else {
                     this.scene.remove(steam);
+                    steam.geometry.dispose();
+                    steam.material.dispose();
                 }
             };
             animateSteam();
@@ -541,13 +549,16 @@ export class BrimstoneGolem extends BaseEnemy {
     }
     
     onDeath() {
+        this._clearAllTimers();
         // Set death state
         this.state = 'dead';
         this.isDead = true;
-        
+
         // Clear lava trails
         this.lavaTrails.forEach(trail => {
             this.scene.remove(trail.mesh);
+            if (trail.mesh.geometry) trail.mesh.geometry.dispose();
+            if (trail.mesh.material) trail.mesh.material.dispose();
         });
         this.lavaTrails = [];
         
@@ -590,9 +601,11 @@ export class BrimstoneGolem extends BaseEnemy {
             flashCount++;
             
             if (flashCount < 6) {
-                setTimeout(flashWarning, 200);
+                this._trackTimeout(flashWarning, 200);
             } else {
                 this.scene.remove(warning);
+                warning.geometry.dispose();
+                warning.material.dispose();
                 this.explode();
             }
         };
@@ -652,6 +665,8 @@ export class BrimstoneGolem extends BaseEnemy {
                 requestAnimationFrame(animateExplosion);
             } else {
                 this.scene.remove(explosion);
+                explosion.geometry.dispose();
+                explosion.material.dispose();
             }
         };
         animateExplosion();
@@ -708,11 +723,15 @@ export class BrimstoneGolem extends BaseEnemy {
                         requestAnimationFrame(fadePuddle);
                     } else {
                         this.scene.remove(puddle);
+                        puddle.geometry.dispose();
+                        puddle.material.dispose();
                     }
                 };
                 setTimeout(fadePuddle, 1000);
-                
+
                 this.scene.remove(projectile);
+                projectile.geometry.dispose();
+                projectile.material.dispose();
             } else {
                 requestAnimationFrame(animateProjectile);
             }

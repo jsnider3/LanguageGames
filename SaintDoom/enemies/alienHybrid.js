@@ -256,10 +256,13 @@ export class AlienHybrid extends BaseEnemy {
         this.isPhased = true;
         this.psychicPower -= 30;
 
-        // Visual phase effect
+        // Store original opacities and set phase effect
         if (this.mesh) {
             this.mesh.children.forEach(child => {
                 if (child.material) {
+                    if (child.material._originalOpacity === undefined) {
+                        child.material._originalOpacity = child.material.opacity;
+                    }
                     child.material.opacity = 0.3;
                 }
             });
@@ -277,12 +280,12 @@ export class AlienHybrid extends BaseEnemy {
         this.createPhaseShiftEffect();
 
         // Return to normal after 2 seconds
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.isPhased = false;
             if (this.mesh) {
                 this.mesh.children.forEach(child => {
                     if (child.material) {
-                        child.material.opacity = child.material.originalOpacity || 0.9;
+                        child.material.opacity = child.material._originalOpacity || 0.9;
                     }
                 });
             }
@@ -304,7 +307,7 @@ export class AlienHybrid extends BaseEnemy {
         // Animate effect
         let scale = 0.1;
         let opacity = 0.8;
-        const effectInterval = setInterval(() => {
+        const effectInterval = this._trackInterval(() => {
             scale += 0.2;
             opacity -= 0.08;
             effect.scale.setScalar(scale);
@@ -312,6 +315,8 @@ export class AlienHybrid extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(effect);
+                effect.geometry.dispose();
+                effect.material.dispose();
                 clearInterval(effectInterval);
             }
         }, 50);
@@ -336,7 +341,7 @@ export class AlienHybrid extends BaseEnemy {
 
         // Mind blast waves
         for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 const waveGeometry = new THREE.RingGeometry(2 + i, 3 + i, 16);
                 const waveMaterial = new THREE.MeshBasicMaterial({
                     color: 0xaa00ff,
@@ -353,7 +358,7 @@ export class AlienHybrid extends BaseEnemy {
                 // Animate wave
                 let scale = 1;
                 let opacity = 0.6;
-                const waveInterval = setInterval(() => {
+                const waveInterval = this._trackInterval(() => {
                     scale += 0.5;
                     opacity -= 0.1;
                     wave.scale.setScalar(scale);
@@ -361,6 +366,8 @@ export class AlienHybrid extends BaseEnemy {
 
                     if (opacity <= 0) {
                         this.scene.remove(wave);
+                        wave.geometry.dispose();
+                        wave.material.dispose();
                         clearInterval(waveInterval);
                     }
                 }, 100);
@@ -382,8 +389,10 @@ export class AlienHybrid extends BaseEnemy {
         }
 
         // Remove blast effect
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.scene.remove(blast);
+            blast.geometry.dispose();
+            blast.material.dispose();
         }, 1000);
     }
 
@@ -395,7 +404,7 @@ export class AlienHybrid extends BaseEnemy {
         const debrisList = this.createPsychicDebris();
         
         debrisList.forEach((debris, index) => {
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.launchDebris(debris, player);
             }, index * 200);
         });
@@ -453,7 +462,7 @@ export class AlienHybrid extends BaseEnemy {
         const velocity = direction.multiplyScalar(speed);
 
         // Animate debris flight
-        const launchInterval = setInterval(() => {
+        const launchInterval = this._trackInterval(() => {
             const movement = velocity.clone().multiplyScalar(16 / 1000);
             debris.position.add(movement);
             debris.rotation.x += 0.1;
@@ -468,10 +477,14 @@ export class AlienHybrid extends BaseEnemy {
                 }
                 this.createDebrisImpact(debris.position);
                 this.scene.remove(debris);
+                debris.geometry.dispose();
+                debris.material.dispose();
                 clearInterval(launchInterval);
             } else if (debris.position.distanceTo(this.position) > 50) {
                 // Too far, remove
                 this.scene.remove(debris);
+                debris.geometry.dispose();
+                debris.material.dispose();
                 clearInterval(launchInterval);
             }
         }, 16);
@@ -491,7 +504,7 @@ export class AlienHybrid extends BaseEnemy {
         // Animate impact
         let scale = 1;
         let opacity = 0.8;
-        const impactInterval = setInterval(() => {
+        const impactInterval = this._trackInterval(() => {
             scale += 0.4;
             opacity -= 0.1;
             impact.scale.setScalar(scale);
@@ -499,6 +512,8 @@ export class AlienHybrid extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(impact);
+                impact.geometry.dispose();
+                impact.material.dispose();
                 clearInterval(impactInterval);
             }
         }, 50);
@@ -524,12 +539,12 @@ export class AlienHybrid extends BaseEnemy {
     animateTentacleAttack() {
         if (this.tentacles) {
             this.tentacles.forEach((tentacle, index) => {
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     // Strike animation
                     const originalRotation = tentacle.rotation.z;
                     tentacle.rotation.z += (index % 2 === 0 ? 1 : -1) * 0.8;
-                    
-                    setTimeout(() => {
+
+                    this._trackTimeout(() => {
                         tentacle.rotation.z = originalRotation;
                     }, 300);
                 }, index * 100);
@@ -554,7 +569,7 @@ export class AlienHybrid extends BaseEnemy {
         // Animate feedback
         let scale = 1;
         let opacity = 0.7;
-        const feedbackInterval = setInterval(() => {
+        const feedbackInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.07;
             feedback.scale.setScalar(scale);
@@ -562,6 +577,8 @@ export class AlienHybrid extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(feedback);
+                feedback.geometry.dispose();
+                feedback.material.dispose();
                 clearInterval(feedbackInterval);
             }
         }, 50);
@@ -702,8 +719,8 @@ export class AlienHybrid extends BaseEnemy {
                 if (child.material && child.material.color) {
                     const originalColor = child.material.color.getHex();
                     child.material.color.setHex(0x0088ff);
-                    
-                    setTimeout(() => {
+
+                    this._trackTimeout(() => {
                         if (child.material) {
                             child.material.color.setHex(originalColor);
                         }
@@ -731,7 +748,7 @@ export class AlienHybrid extends BaseEnemy {
         // Animate scream
         let scale = 0.1;
         let opacity = 0.3;
-        const screamInterval = setInterval(() => {
+        const screamInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.03;
             scream.scale.setScalar(scale);
@@ -739,12 +756,20 @@ export class AlienHybrid extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(scream);
+                scream.geometry.dispose();
+                scream.material.dispose();
                 clearInterval(screamInterval);
             }
         }, 50);
     }
 
+    onDeath() {
+        this._clearAllTimers();
+        super.onDeath();
+    }
+
     destroy() {
+        this._clearAllTimers();
         if (this.mesh) {
             this.scene.remove(this.mesh);
         }

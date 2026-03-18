@@ -501,6 +501,10 @@ export class Succubus extends BaseEnemy {
     
     clearIllusions() {
         this.illusions.forEach(illusion => {
+            illusion.mesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
             this.scene.remove(illusion.mesh);
         });
         this.illusions = [];
@@ -561,6 +565,8 @@ export class Succubus extends BaseEnemy {
                 requestAnimationFrame(animatePortal);
             } else {
                 this.scene.remove(portal);
+                portalGeometry.dispose();
+                portalMaterial.dispose();
             }
         };
         animatePortal();
@@ -621,6 +627,8 @@ export class Succubus extends BaseEnemy {
                 requestAnimationFrame(animateVortex);
             } else {
                 this.scene.remove(vortex);
+                vortexGeometry.dispose();
+                vortexMaterial.dispose();
             }
         };
         animateVortex();

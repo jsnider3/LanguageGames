@@ -250,9 +250,7 @@ export class VisualEffectsManager {
             const material = new THREE.MeshBasicMaterial({
                 color: settings.color,
                 transparent: true,
-                opacity: 1.0,
-                emissive: settings.color,
-                emissiveIntensity: settings.emissiveIntensity
+                opacity: 1.0
             });
             const sphere = new THREE.Mesh(geometry, material);
             sphere.position.copy(position);
@@ -596,6 +594,31 @@ export class VisualEffectsManager {
         };
         
         animateVortex();
+    }
+
+    /** Call each frame to update and clean up active effects */
+    update(deltaTime) {
+        const toRemove = [];
+        this.activeEffects.forEach(effect => {
+            effect.currentTime += deltaTime * 1000; // convert to ms
+            if (effect.currentTime >= effect.duration) {
+                toRemove.push(effect);
+            } else if (effect.mesh) {
+                // Animate the effect
+                const scale = effect.mesh.scale.x + effect.scaleRate;
+                effect.mesh.scale.setScalar(scale);
+                effect.mesh.material.opacity = Math.max(0, effect.mesh.material.opacity - effect.opacityRate);
+            }
+        });
+
+        toRemove.forEach(effect => {
+            if (effect.mesh && effect.mesh.parent) {
+                this.scene.remove(effect.mesh);
+                if (effect.mesh.geometry) effect.mesh.geometry.dispose();
+                if (effect.mesh.material) effect.mesh.material.dispose();
+            }
+            this.activeEffects.delete(effect);
+        });
     }
 
     cleanup() {

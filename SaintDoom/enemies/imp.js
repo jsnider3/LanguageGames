@@ -352,6 +352,8 @@ export class Imp extends BaseEnemy {
                     requestAnimationFrame(animateParticle);
                 } else {
                     this.scene.remove(particle);
+                    particle.geometry.dispose();
+                    particle.material.dispose();
                 }
             };
             animateParticle();
@@ -363,6 +365,12 @@ export class Imp extends BaseEnemy {
         this.scene.remove(projectile.mesh);
         this.scene.remove(projectile.trail);
         this.scene.remove(projectile.light);
+        // Dispose geometry/materials
+        projectile.mesh.geometry.dispose();
+        projectile.mesh.material.dispose();
+        projectile.trail.geometry.dispose();
+        projectile.trail.material.dispose();
+        projectile.light.dispose();
         this.projectiles.splice(index, 1);
     }
     
@@ -414,6 +422,8 @@ export class Imp extends BaseEnemy {
                 requestAnimationFrame(animateSmoke);
             } else {
                 this.scene.remove(smoke);
+                smokeGeometry.dispose();
+                smokeMaterial.dispose();
             }
         };
         animateSmoke();
@@ -435,7 +445,9 @@ export class Imp extends BaseEnemy {
     
     onDeath() {
         super.onDeath();
-        
+
+        this._clearAllTimers();
+
         // Clear any remaining projectiles
         while (this.projectiles.length > 0) {
             this.removeProjectile(0);
@@ -468,6 +480,8 @@ export class Imp extends BaseEnemy {
                 requestAnimationFrame(animateCloud);
             } else {
                 this.scene.remove(cloud);
+                cloudGeometry.dispose();
+                cloudMaterial.dispose();
             }
         };
         animateCloud();

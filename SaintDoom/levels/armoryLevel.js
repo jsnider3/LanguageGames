@@ -1115,14 +1115,26 @@ export class ArmoryLevel extends BaseLevel {
     }
     
     clearLevel() {
+        // Remove pickup meshes from scene before clearing array
+        if (this.pickups) {
+            this.pickups.forEach(pickup => {
+                if (pickup && pickup.parent) {
+                    this.scene.remove(pickup);
+                }
+                // Dispose pickup geometry/materials
+                if (pickup) {
+                    pickup.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    });
+                }
+            });
+        }
+        this.pickups = [];
+
         // Call parent cleanup to handle intervals, timeouts, walls, etc.
         if (super.cleanup) {
             super.cleanup();
         }
-        
-        // Additional armory-specific cleanup below
-        
-        // Clear pickups array
-        this.pickups = [];
     }
 }

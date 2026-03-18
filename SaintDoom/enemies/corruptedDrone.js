@@ -419,8 +419,10 @@ export class CorruptedDrone extends BaseEnemy {
         this.createLaserImpact(playerPosition);
 
         // Remove beam after short time
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.scene.remove(beam);
+            beam.geometry.dispose();
+            beam.material.dispose();
         }, 150);
 
         // Damage player
@@ -509,7 +511,7 @@ export class CorruptedDrone extends BaseEnemy {
         // Animate EMP pulse
         let scale = 0.1;
         let opacity = 0.3;
-        const empInterval = setInterval(() => {
+        const empInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.03;
             pulse.scale.setScalar(scale);
@@ -517,6 +519,8 @@ export class CorruptedDrone extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(pulse);
+                pulse.geometry.dispose();
+                pulse.material.dispose();
                 clearInterval(empInterval);
             }
         }, 50);
@@ -550,8 +554,10 @@ export class CorruptedDrone extends BaseEnemy {
             this.mesh.add(effect);
 
             // Fade effect
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.mesh.remove(effect);
+                effect.geometry.dispose();
+                effect.material.dispose();
             }, 500);
         });
     }
@@ -585,7 +591,7 @@ export class CorruptedDrone extends BaseEnemy {
             this.energyShield.material.opacity = 0.4;
             
             // Deactivate after 2 seconds
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.energyShield.visible = false;
             }, 2000);
         }
@@ -608,11 +614,11 @@ export class CorruptedDrone extends BaseEnemy {
                 break;
             case 'flight_instability':
                 this.speed *= 0.5;
-                setTimeout(() => { this.speed *= 2; }, 3000);
+                this._trackTimeout(() => { this.speed *= 2; }, 3000);
                 break;
             case 'sensor_glitch':
                 this.detectionRange *= 0.3;
-                setTimeout(() => { this.detectionRange /= 0.3; }, 2000);
+                this._trackTimeout(() => { this.detectionRange /= 0.3; }, 2000);
                 break;
             case 'power_fluctuation':
                 this.triggerPowerFluctuation();
@@ -627,28 +633,30 @@ export class CorruptedDrone extends BaseEnemy {
         if (this.corruptionSparks) {
             this.corruptionSparks.material.size = 0.2;
             this.corruptionSparks.material.opacity = 1.0;
-            
-            setTimeout(() => {
-                this.corruptionSparks.material.size = 0.05;
-                this.corruptionSparks.material.opacity = 0.8;
+
+            this._trackTimeout(() => {
+                if (this.corruptionSparks) {
+                    this.corruptionSparks.material.size = 0.05;
+                    this.corruptionSparks.material.opacity = 0.8;
+                }
             }, 1000);
         }
     }
 
     triggerPowerFluctuation() {
         // Systems randomly shut down and restart
-        const flickerInterval = setInterval(() => {
+        const flickerInterval = this._trackInterval(() => {
             if (this.sensorArray) {
-                this.sensorArray.material.emissiveIntensity = 
+                this.sensorArray.material.emissiveIntensity =
                     this.sensorArray.material.emissiveIntensity === 0.8 ? 0 : 0.8;
             }
-            
+
             if (this.energyShield) {
                 this.energyShield.visible = !this.energyShield.visible;
             }
         }, 200);
 
-        setTimeout(() => {
+        this._trackTimeout(() => {
             clearInterval(flickerInterval);
             // Restore normal operation
             if (this.sensorArray) {
@@ -744,18 +752,20 @@ export class CorruptedDrone extends BaseEnemy {
     }
 
     animatePlasmaBolt(bolt) {
-        const boltInterval = setInterval(() => {
+        const boltInterval = this._trackInterval(() => {
             const age = Date.now() - bolt.userData.birthTime;
             if (age > bolt.userData.life) {
                 this.createPlasmaExplosion(bolt.position);
                 this.scene.remove(bolt);
+                bolt.geometry.dispose();
+                bolt.material.dispose();
                 clearInterval(boltInterval);
                 return;
             }
 
             const movement = bolt.userData.velocity.clone().multiplyScalar(16 / 1000);
             bolt.position.add(movement);
-            
+
             // Bolt rotation
             bolt.rotation.x += 0.1;
             bolt.rotation.z += 0.05;
@@ -776,7 +786,7 @@ export class CorruptedDrone extends BaseEnemy {
         // Animate explosion
         let scale = 0.1;
         let opacity = 0.8;
-        const explosionInterval = setInterval(() => {
+        const explosionInterval = this._trackInterval(() => {
             scale += 0.4;
             opacity -= 0.08;
             explosion.scale.setScalar(scale);
@@ -784,6 +794,8 @@ export class CorruptedDrone extends BaseEnemy {
 
             if (opacity <= 0) {
                 this.scene.remove(explosion);
+                explosion.geometry.dispose();
+                explosion.material.dispose();
                 clearInterval(explosionInterval);
             }
         }, 50);
@@ -815,12 +827,14 @@ export class CorruptedDrone extends BaseEnemy {
                 (Math.random() - 0.5) * 3
             );
 
-            const sparkInterval = setInterval(() => {
+            const sparkInterval = this._trackInterval(() => {
                 spark.position.add(sparkVelocity.multiplyScalar(0.1));
                 spark.scale.multiplyScalar(0.9);
 
                 if (spark.scale.x < 0.1) {
                     this.scene.remove(spark);
+                    spark.geometry.dispose();
+                    spark.material.dispose();
                     clearInterval(sparkInterval);
                 }
             }, 50);
@@ -838,8 +852,10 @@ export class CorruptedDrone extends BaseEnemy {
         flash.position.copy(position);
         this.mesh.add(flash);
 
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.mesh.remove(flash);
+            flash.geometry.dispose();
+            flash.material.dispose();
         }, 100);
     }
 
@@ -858,7 +874,7 @@ export class CorruptedDrone extends BaseEnemy {
                 this.energyShield.material.opacity = 0.6;
                 this.energyShield.material.color.setHex(0xff4400);
                 
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     this.energyShield.visible = false;
                     this.energyShield.material.color.setHex(0x0066ff);
                 }, 300);
@@ -903,19 +919,27 @@ export class CorruptedDrone extends BaseEnemy {
             this.scene.add(spark);
 
             // Spark falls with gravity
-            const sparkInterval = setInterval(() => {
+            const sparkInterval = this._trackInterval(() => {
                 spark.position.y -= 0.05;
                 spark.scale.multiplyScalar(0.98);
 
                 if (spark.scale.x < 0.1 || spark.position.y < this.position.y - 2) {
                     this.scene.remove(spark);
+                    spark.geometry.dispose();
+                    spark.material.dispose();
                     clearInterval(sparkInterval);
                 }
             }, 50);
         }
     }
 
+    onDeath() {
+        this._clearAllTimers();
+        super.onDeath();
+    }
+
     destroy() {
+        this._clearAllTimers();
         if (this.mesh) {
             this.scene.remove(this.mesh);
         }
@@ -957,7 +981,7 @@ export class CorruptedDrone extends BaseEnemy {
                 (Math.random() - 0.5) * 5
             );
 
-            const debrisInterval = setInterval(() => {
+            const debrisInterval = this._trackInterval(() => {
                 debris.position.add(velocity.multiplyScalar(0.05));
                 velocity.y -= 0.1; // Gravity
                 debris.rotation.x += 0.1;
@@ -967,6 +991,8 @@ export class CorruptedDrone extends BaseEnemy {
                 // Remove when hits ground
                 if (debris.position.y <= this.position.y) {
                     this.scene.remove(debris);
+                    debris.geometry.dispose();
+                    debris.material.dispose();
                     clearInterval(debrisInterval);
                 }
             }, 50);

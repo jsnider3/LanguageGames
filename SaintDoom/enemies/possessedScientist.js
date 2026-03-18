@@ -580,6 +580,7 @@ export class PossessedScientist extends BaseEnemy {
         if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
             // Reset to a valid position
             this.position.set(0, 1, 0);
+            this.velocity.set(0, 0, 0); // Also reset velocity to prevent further NaN propagation
         }
     }
     

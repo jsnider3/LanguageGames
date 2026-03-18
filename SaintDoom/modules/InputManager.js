@@ -11,18 +11,19 @@ export class InputManager {
         this.mouseButtons = {};
         this.isPointerLocked = false;
         this.gameRef = gameRef;
-        
+        this._boundHandlers = {};
+
         this.setupEventListeners();
     }
-    
+
     setGame(gameRef) {
         this.gameRef = gameRef;
     }
-    
+
     setupEventListeners() {
-        window.addEventListener('keydown', (e) => {
+        this._boundHandlers.keydown = (e) => {
             this.keys[e.code] = true;
-            
+
             // F3 toggles debug mode
             if (e.code === 'F3') {
                 e.preventDefault();
@@ -33,48 +34,56 @@ export class InputManager {
                     if (game.debugMode) game.showDebugInfo();
                 }
             }
-            
+
             // E key handled silently
             if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyE'].includes(e.code)) {
                 e.preventDefault();
             }
-        });
-        
-        window.addEventListener('keyup', (e) => {
+        };
+
+        this._boundHandlers.keyup = (e) => {
             this.keys[e.code] = false;
-        });
-        
-        window.addEventListener('mousedown', (e) => {
+        };
+
+        this._boundHandlers.mousedown = (e) => {
             this.mouseButtons[e.button] = true;
-        });
-        
-        window.addEventListener('mouseup', (e) => {
+        };
+
+        this._boundHandlers.mouseup = (e) => {
             this.mouseButtons[e.button] = false;
-        });
-        
-        window.addEventListener('mousemove', (e) => {
+        };
+
+        this._boundHandlers.mousemove = (e) => {
             if (this.isPointerLocked) {
                 this.mouseDeltaX = e.movementX;
                 this.mouseDeltaY = e.movementY;
             }
-        });
-        
-        document.addEventListener('pointerlockchange', () => {
+        };
+
+        this._boundHandlers.pointerlockchange = () => {
             // Check both document.body and the canvas element for pointer lock
-            this.isPointerLocked = document.pointerLockElement === document.body || 
+            this.isPointerLocked = document.pointerLockElement === document.body ||
                                   document.pointerLockElement === document.getElementById('gameCanvas') ||
                                   document.pointerLockElement !== null;
             if (!this.isPointerLocked) {
                 this.mouseDeltaX = 0;
                 this.mouseDeltaY = 0;
             }
-        });
-        
-        window.addEventListener('contextmenu', (e) => {
+        };
+
+        this._boundHandlers.contextmenu = (e) => {
             e.preventDefault();
-        });
+        };
+
+        window.addEventListener('keydown', this._boundHandlers.keydown);
+        window.addEventListener('keyup', this._boundHandlers.keyup);
+        window.addEventListener('mousedown', this._boundHandlers.mousedown);
+        window.addEventListener('mouseup', this._boundHandlers.mouseup);
+        window.addEventListener('mousemove', this._boundHandlers.mousemove);
+        document.addEventListener('pointerlockchange', this._boundHandlers.pointerlockchange);
+        window.addEventListener('contextmenu', this._boundHandlers.contextmenu);
     }
-    
+
     getInput() {
         const input = {
             forward: this.keys['KeyW'] || false,
@@ -95,10 +104,10 @@ export class InputManager {
             mouseDeltaY: this.mouseDeltaY,
             pause: this.keys['Escape'] || false
         };
-        
+
         this.mouseDeltaX = 0;
         this.mouseDeltaY = 0;
-        
+
         // Clear weapon switch and rage inputs after reading
         this.keys['Digit1'] = false;
         this.keys['Digit2'] = false;
@@ -106,14 +115,27 @@ export class InputManager {
         this.keys['Digit4'] = false;
         this.keys['KeyR'] = false;
         // Don't clear KeyE here - let it be handled naturally
-        
+
         return input;
     }
-    
+
     reset() {
         this.keys = {};
         this.mouseButtons = {};
         this.mouseDeltaX = 0;
         this.mouseDeltaY = 0;
+    }
+
+    /** Remove all event listeners to prevent leaks across level changes */
+    destroy() {
+        window.removeEventListener('keydown', this._boundHandlers.keydown);
+        window.removeEventListener('keyup', this._boundHandlers.keyup);
+        window.removeEventListener('mousedown', this._boundHandlers.mousedown);
+        window.removeEventListener('mouseup', this._boundHandlers.mouseup);
+        window.removeEventListener('mousemove', this._boundHandlers.mousemove);
+        document.removeEventListener('pointerlockchange', this._boundHandlers.pointerlockchange);
+        window.removeEventListener('contextmenu', this._boundHandlers.contextmenu);
+        this._boundHandlers = {};
+        this.reset();
     }
 }

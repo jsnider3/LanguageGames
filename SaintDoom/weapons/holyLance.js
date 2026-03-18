@@ -98,7 +98,11 @@ export class HolyLance {
         this.glowLight = glowLight;
         
         this.mesh = group;
-        
+        this.mesh.userData.isWeapon = true;
+        this.mesh.traverse(child => {
+            if (child.isMesh) child.userData.isWeapon = true;
+        });
+
         // Position relative to player camera
         this.updatePosition();
     }
@@ -228,7 +232,7 @@ export class HolyLance {
     animateThrust(power) {
         const startPos = this.mesh.position.z;
         const thrustDistance = 0.5 + power * 0.5;
-        
+
         const thrust = () => {
             if (this.mesh.position.z > startPos - thrustDistance) {
                 this.mesh.position.z -= 0.1;
@@ -241,7 +245,7 @@ export class HolyLance {
                         requestAnimationFrame(returnAnim);
                     }
                 };
-                returnAnim();
+                requestAnimationFrame(returnAnim);
             }
         };
         thrust();
@@ -354,6 +358,8 @@ export class HolyLance {
                 requestAnimationFrame(animateWave);
             } else {
                 this.scene.remove(wave);
+                waveGeometry.dispose();
+                waveMaterial.dispose();
             }
         };
         animateWave();
@@ -409,6 +415,10 @@ export class HolyLance {
             } else {
                 this.scene.remove(beam);
                 this.scene.remove(glow);
+                beamGeometry.dispose();
+                beamMaterial.dispose();
+                glowGeometry.dispose();
+                glowMaterial.dispose();
             }
         };
         
@@ -546,6 +556,8 @@ export class HolyLance {
                 requestAnimationFrame(animateImpact);
             } else {
                 this.scene.remove(impact);
+                impactGeometry.dispose();
+                impactMaterial.dispose();
             }
         };
         animateImpact();
@@ -582,12 +594,14 @@ export class HolyLance {
                     requestAnimationFrame(animateParticle);
                 } else {
                     this.scene.remove(particle);
+                    particle.geometry.dispose();
+                    particle.material.dispose();
                 }
             };
             animateParticle();
         }
     }
-    
+
     playThrustSound() {
         // Swoosh sound
     }
@@ -656,6 +670,8 @@ export class HolyLance {
                 if (particle.parent) {
                     particle.parent.remove(particle);
                 }
+                particle.geometry.dispose();
+                particle.material.dispose();
             }
         };
         animateParticle();

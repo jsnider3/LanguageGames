@@ -4,7 +4,7 @@ import { Entity } from '../modules/Entity.js';
 export class BaseEnemy extends Entity {
     constructor(scene, position) {
         super(scene, position);
-        
+
         // Stats
         this.health = 50;
         this.maxHealth = 50;
@@ -13,7 +13,7 @@ export class BaseEnemy extends Entity {
         this.attackRange = 2;
         this.attackCooldown = 1.5; // seconds
         this.lastAttackTime = 0;
-        
+
         // AI state
         this.state = 'idle'; // idle, chasing, attacking, hurt, dead
         this.isDead = false;
@@ -21,16 +21,43 @@ export class BaseEnemy extends Entity {
         this.sightRange = 15;
         this.hearingRange = 20;
         this.target = null;
-        
+
         // Physics
         this.radius = 0.3;
         this.height = 1.8;
-        
+
         // Animation
         this.bobAmount = 0;
         this.hurtTime = 0;
 
         this.team = 'enemy';
+
+        // Track active intervals/timeouts for cleanup on death
+        this._activeIntervals = [];
+        this._activeTimeouts = [];
+        this._destroyed = false;
+    }
+
+    /** Wrapper around setInterval that auto-clears on destroy */
+    _trackInterval(callback, delay) {
+        const id = setInterval(callback, delay);
+        this._activeIntervals.push(id);
+        return id;
+    }
+
+    /** Wrapper around setTimeout that auto-clears on destroy */
+    _trackTimeout(callback, delay) {
+        const id = setTimeout(callback, delay);
+        this._activeTimeouts.push(id);
+        return id;
+    }
+
+    /** Clear all tracked intervals and timeouts */
+    _clearAllTimers() {
+        this._activeIntervals.forEach(id => clearInterval(id));
+        this._activeIntervals = [];
+        this._activeTimeouts.forEach(id => clearTimeout(id));
+        this._activeTimeouts = [];
     }
     
     createMesh() {
@@ -61,6 +88,8 @@ export class BaseEnemy extends Entity {
             case 'hurt':
                 this.updateHurt(deltaTime);
                 break;
+            case 'dead':
+                return; // Dead enemies should not process AI
         }
         
         // Update mesh position
@@ -208,10 +237,12 @@ export class BaseEnemy extends Entity {
     
     onDeath() {
         super.onDeath();
+        this._clearAllTimers();
+
         // Death animation - fall over
         if (this.mesh) {
             const fallAnimation = () => {
-                if (this.mesh.rotation.x < Math.PI / 2) {
+                if (this.mesh && this.mesh.rotation.x < Math.PI / 2) {
                     this.mesh.rotation.x += 0.1;
                     this.mesh.position.y -= 0.02;
                     requestAnimationFrame(fallAnimation);
@@ -219,9 +250,32 @@ export class BaseEnemy extends Entity {
             };
             fallAnimation();
         }
-        
+
         // Spawn death particles
         this.createDeathParticles();
+    }
+
+    /** Clean up all resources - call when removing enemy from the game */
+    destroy() {
+        if (this._destroyed) return;
+        this._destroyed = true;
+        this._clearAllTimers();
+
+        // Dispose mesh hierarchy
+        if (this.mesh) {
+            this.scene.remove(this.mesh);
+            this.mesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            this.mesh = null;
+        }
     }
     
     createDeathParticles() {

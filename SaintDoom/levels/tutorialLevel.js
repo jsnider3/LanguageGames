@@ -865,12 +865,13 @@ export class TutorialLevel extends BaseLevel {
                 ns.displaySubtitle("Remember: holy water heals, ammunition is blessed, and death is temporary.");
                 ns.setObjective("Listen to final instructions");
                 this.addTimeout(() => {
-                    this.nextTutorialStep(); // Go to case 7
-                    this.nextTutorialStep(); // Skip case 7, go to case 8
+                    this.tutorialStep++; // Skip step 7 without executing its code
+                    this.nextTutorialStep(); // Go directly to step 8
                 }, 4000);
                 break;
-                
+
             case 7:
+                // Skipped by step 6, but kept as fallback
                 ns.displaySubtitle("\"The Americans have opened a portal. Area 51. You know what to do.\"");
                 ns.setObjective("Proceed to the missile");
                 this.addTimeout(() => this.nextTutorialStep(), 4000);

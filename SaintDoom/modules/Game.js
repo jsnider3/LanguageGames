@@ -183,6 +183,7 @@ export class Game {
         
         // Show initial weapon (but not in tutorial)
         if (levelName !== 'tutorial') {
+            this.player.switchWeapon(0); // Set player.currentWeapon to 'sword'
             this.weaponSystem.switchToWeapon('sword');
         } else {
             // Hide all weapons in tutorial until instructed
@@ -2090,10 +2091,10 @@ Player: ${playerPos}`;
             }
         });
         
-        // Remove all meshes and lights except those we want to keep
+        // Remove all meshes, lights, and groups except those we want to keep
         const objectsToRemove = [];
         this.scene.traverse((child) => {
-            if ((child.isMesh || child.isLight) && !objectsToKeep.has(child)) {
+            if ((child.isMesh || child.isLight || child.isGroup) && !objectsToKeep.has(child)) {
                 // Don't remove ambient or directional lights (keep basic lighting)
                 if (child.isLight && (child.isAmbientLight || child.isDirectionalLight)) {
                     return;
@@ -2121,7 +2122,9 @@ Player: ${playerPos}`;
             this.currentLevelInstance = levelInstance;
             
             // Also set specific level references for compatibility
-            if (levelName === 'chapel') {
+            if (levelName === 'tutorial') {
+                this.tutorialLevel = levelInstance;
+            } else if (levelName === 'chapel') {
                 this.chapelLevel = levelInstance;
                 // If returning from armory, position near the door (door is at x=5, z=-20)
                 if (this.returningFromArmory) {
@@ -2156,8 +2159,9 @@ Player: ${playerPos}`;
             this.restoreLevelState(levelName);
 
             // Ensure the active weapon is visible after level load
-            if (this.player && this.weaponSystem && this.player.currentWeapon) {
-                this.weaponSystem.switchToWeapon(this.player.currentWeapon);
+            if (this.player && this.weaponSystem) {
+                const weaponToRestore = this.player.currentWeapon || this.weaponSystem.activeWeaponType || 'sword';
+                this.weaponSystem.switchToWeapon(weaponToRestore);
             }
         } else {
             const errorMsg = `[Game] Failed to load level: ${levelName}`;

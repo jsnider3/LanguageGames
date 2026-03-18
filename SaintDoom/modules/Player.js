@@ -185,9 +185,10 @@ export class Player {
     }
     
     endRage() {
+        if (!this.isRaging) return; // Prevent double deactivation corrupting speed
         this.isRaging = false;
         this.rageTimer = 0;
-        
+
         // Remove buffs
         this.moveSpeed /= GAME_CONFIG.PLAYER.RAGE.SPEED_BOOST;
     }
@@ -199,9 +200,6 @@ export class Player {
     }
     
     updateMovement(input, deltaTime) {
-        // Debug: Track if this method changes position
-        const startX = this.position.x;
-        
         const moveVector = new THREE.Vector3();
         
         // Get forward and right vectors based on camera yaw
