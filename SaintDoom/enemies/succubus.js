@@ -364,7 +364,7 @@ export class Succubus extends BaseEnemy {
                 }
             };
             
-            setTimeout(() => animateHeart(), i * 100);
+            this._trackTimeout(() => animateHeart(), i * 100);
         }
         
         // Apply charm effect (reverse controls)
@@ -413,7 +413,7 @@ export class Succubus extends BaseEnemy {
                 }
             };
             
-            setTimeout(() => animateParticle(), i * 50);
+            this._trackTimeout(() => animateParticle(), i * 50);
         }
         
         // Damage target and heal self

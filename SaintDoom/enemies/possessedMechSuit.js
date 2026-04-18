@@ -413,7 +413,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.scene.add(ring);
 
         let opacity = 0.6;
-        const interval = setInterval(() => {
+        const interval = this._trackInterval(() => {
             opacity -= 0.1;
             ring.scale.multiplyScalar(1.1);
             ring.material.opacity = Math.max(0, opacity);
@@ -481,7 +481,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.scene.add(flash);
 
         let opacity = 1.0;
-        const interval = setInterval(() => {
+        const interval = this._trackInterval(() => {
             opacity -= 0.25;
             flash.scale.multiplyScalar(1.15);
             flash.material.opacity = Math.max(0, opacity);
@@ -498,7 +498,7 @@ export class PossessedMechSuit extends BaseEnemy {
 
         const originalY = this.chaingunMesh.rotation.y;
         this.chaingunMesh.rotation.y += 0.5;
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (this.chaingunMesh) this.chaingunMesh.rotation.y = originalY;
         }, 60);
     }
@@ -575,7 +575,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.scene.add(burst);
 
         let opacity = 0.8;
-        const interval = setInterval(() => {
+        const interval = this._trackInterval(() => {
             opacity -= 0.15;
             burst.scale.multiplyScalar(1.2);
             burst.material.opacity = Math.max(0, opacity);
@@ -592,7 +592,7 @@ export class PossessedMechSuit extends BaseEnemy {
 
         const originalZ = this.rocketLauncherMesh.position.z;
         this.rocketLauncherMesh.position.z -= 0.15;
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (this.rocketLauncherMesh) this.rocketLauncherMesh.position.z = originalZ;
         }, 80);
     }
@@ -682,7 +682,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.createLaserImpact(endPos);
 
         // Remove beam after short duration
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.scene.remove(beam);
         }, 200);
 
@@ -706,7 +706,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Animate impact
         let scale = 1;
         let opacity = 0.8;
-        const impactInterval = setInterval(() => {
+        const impactInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.1;
             impact.scale.setScalar(scale);
@@ -790,7 +790,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Animate shake
         let scale = 1;
         let opacity = 0.6;
-        const shakeInterval = setInterval(() => {
+        const shakeInterval = this._trackInterval(() => {
             scale += 0.5;
             opacity -= 0.06;
             shake.scale.setScalar(scale);
@@ -833,7 +833,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.scene.add(particleSystem);
 
         // Animate dust
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.scene.remove(particleSystem);
         }, 2000);
     }
@@ -851,7 +851,7 @@ export class PossessedMechSuit extends BaseEnemy {
         this.createEmergencyEffect();
 
         // Arm self-destruct after 30 seconds
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (this.health > 0) {
                 this.armSelfDestruct();
             }
@@ -871,7 +871,7 @@ export class PossessedMechSuit extends BaseEnemy {
             this.scene.add(warningLight);
 
             // Flash the lights
-            setInterval(() => {
+            this._trackInterval(() => {
                 warningLight.intensity = warningLight.intensity === 2 ? 0 : 2;
             }, 500);
         }
@@ -894,13 +894,13 @@ export class PossessedMechSuit extends BaseEnemy {
 
         // Pulsing countdown
         let pulseScale = 3;
-        const countdownInterval = setInterval(() => {
+        const countdownInterval = this._trackInterval(() => {
             pulseScale += 0.2;
             countdown.scale.setScalar(pulseScale);
         }, 200);
 
         // Self-destruct after 10 seconds
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.selfDestruct();
             this.scene.remove(countdown);
             clearInterval(countdownInterval);
@@ -922,7 +922,7 @@ export class PossessedMechSuit extends BaseEnemy {
 
         // Multiple shock waves
         for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 const shockwave = this.createShockwave(i * 3);
             }, i * 200);
         }
@@ -930,7 +930,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Animate main explosion
         let scale = 0.1;
         let opacity = 1.0;
-        const explosionInterval = setInterval(() => {
+        const explosionInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.05;
             explosion.scale.setScalar(scale);
@@ -964,7 +964,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Animate shockwave
         let scale = 1;
         let opacity = 0.8;
-        const shockwaveInterval = setInterval(() => {
+        const shockwaveInterval = this._trackInterval(() => {
             scale += 0.5;
             opacity -= 0.05;
             shockwave.scale.setScalar(scale);
@@ -1003,7 +1003,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Overheating
         if (this.heatLevel >= this.maxHeat) {
             this.overheated = true;
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.overheated = false;
                 this.heatLevel = this.maxHeat * 0.3; // Cool down to 30%
             }, 5000); // 5 second cooldown
@@ -1036,7 +1036,7 @@ export class PossessedMechSuit extends BaseEnemy {
 
         // Animate smoke rising and fading
         let opacity = 0.6;
-        const smokeInterval = setInterval(() => {
+        const smokeInterval = this._trackInterval(() => {
             smoke.position.y += 0.1;
             smoke.scale.multiplyScalar(1.05);
             opacity -= 0.03;
@@ -1080,7 +1080,7 @@ export class PossessedMechSuit extends BaseEnemy {
             this.leftArm.rotation.z = armTwitch;
             this.rightArm.rotation.z = -armTwitch;
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.leftArm.rotation.z = 0;
                 this.rightArm.rotation.z = 0;
             }, 200);
@@ -1111,7 +1111,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Visual damage feedback
         if (this.mesh) {
             this.chassis.material.color.setHex(0xff4400);
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.chassis.material.color.setHex(0x3a3a3a);
             }, 200);
         }
@@ -1142,7 +1142,7 @@ export class PossessedMechSuit extends BaseEnemy {
                 (Math.random() - 0.5) * 5
             );
 
-            const sparkInterval = setInterval(() => {
+            const sparkInterval = this._trackInterval(() => {
                 spark.position.add(sparkVelocity.multiplyScalar(0.1));
                 sparkVelocity.y -= 0.2; // Gravity
                 spark.scale.multiplyScalar(0.95);
@@ -1183,7 +1183,7 @@ export class PossessedMechSuit extends BaseEnemy {
     }
 
     animateBullet(bullet) {
-        const bulletInterval = setInterval(() => {
+        const bulletInterval = this._trackInterval(() => {
             const age = Date.now() - bullet.userData.birthTime;
             if (age > bullet.userData.life) {
                 this.scene.remove(bullet);
@@ -1197,7 +1197,7 @@ export class PossessedMechSuit extends BaseEnemy {
     }
 
     animateRocket(rocket) {
-        const rocketInterval = setInterval(() => {
+        const rocketInterval = this._trackInterval(() => {
             const age = Date.now() - rocket.userData.birthTime;
             if (age > rocket.userData.life) {
                 // Explode rocket
@@ -1226,7 +1226,7 @@ export class PossessedMechSuit extends BaseEnemy {
         // Animate explosion
         let scale = 0.1;
         let opacity = 1.0;
-        const explosionInterval = setInterval(() => {
+        const explosionInterval = this._trackInterval(() => {
             scale += 0.4;
             opacity -= 0.08;
             explosion.scale.setScalar(scale);
@@ -1240,20 +1240,25 @@ export class PossessedMechSuit extends BaseEnemy {
     }
 
     destroy() {
+        if (this._destroyed) return;
         if (this.selfDestructArmed) return; // Already handling self-destruct
+        this._destroyed = true;
+
+        // Clear any prior attack/animation timers before queuing death effects
+        this._clearAllTimers();
 
         if (this.mesh) {
             this.scene.remove(this.mesh);
         }
-        
-        // Dramatic mech destruction
+
+        // Dramatic mech destruction — effects are short-lived and self-clearing
         this.createMechExplosion();
     }
 
     createMechExplosion() {
         // Multiple explosions for dramatic effect
         for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 const offset = new THREE.Vector3(
                     (Math.random() - 0.5) * 4,
                     Math.random() * 3,

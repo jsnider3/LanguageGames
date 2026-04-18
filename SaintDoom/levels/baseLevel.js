@@ -50,7 +50,23 @@ export class BaseLevel {
         const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
         floor.rotation.x = -Math.PI / 2;
+        this.markAsFloor(floor);
         this.scene.add(floor);
+    }
+
+    /**
+     * Tag a mesh so PhysicsManager treats it as a floor for ground detection.
+     * Safe to call on levels that don't have a PhysicsManager attached.
+     */
+    markAsFloor(mesh) {
+        if (!mesh) return mesh;
+        if (!mesh.userData) mesh.userData = {};
+        mesh.userData.isFloor = true;
+        const physics = this.game && this.game.physicsManager;
+        if (physics && typeof physics.registerFloor === 'function') {
+            physics.registerFloor(mesh);
+        }
+        return mesh;
     }
 
     /**
@@ -101,10 +117,13 @@ export class BaseLevel {
     }
 
     /**
-     * Update level state - called every frame
+     * Update level state - called every frame.
+     * @param {number} deltaTime
+     * @param {object} [input] - InputManager snapshot for this frame (interact, fire, etc.)
+     * @param {object} [player] - Player entity (falls back to this.game.player)
      */
-    update(deltaTime) {
-        const player = this.game ? this.game.player : null;
+    update(deltaTime, input, player) {
+        player = player || (this.game ? this.game.player : null);
 
         // Update enemies and filter out dead ones
         this.enemies = this.enemies.filter(enemy => {

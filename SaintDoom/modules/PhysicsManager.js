@@ -63,16 +63,43 @@ export class PhysicsManager {
     
     /**
      * Register a static body (walls, floors, etc.)
+     * @param {THREE.Mesh} mesh
+     * @param {string|{type?: string, isFloor?: boolean}} [optionsOrType]
+     *   Pass a string for the legacy `type` parameter, or an options object.
+     *   Set `isFloor: true` to include the mesh in ground-contact raycasts
+     *   regardless of its name. Also tags `mesh.userData.isFloor = true`.
      */
-    registerStaticBody(mesh, type = 'box') {
+    registerStaticBody(mesh, optionsOrType = 'box') {
+        const options = (typeof optionsOrType === 'string')
+            ? { type: optionsOrType }
+            : (optionsOrType || {});
+
+        if (options.isFloor) {
+            if (!mesh.userData) mesh.userData = {};
+            mesh.userData.isFloor = true;
+            this._floorCacheDirty = true;
+        }
+
         const staticBody = {
             mesh: mesh,
-            type: type,
+            type: options.type || 'box',
+            isFloor: !!options.isFloor,
             bounds: new THREE.Box3().setFromObject(mesh)
         };
-        
+
         this.staticBodies.add(staticBody);
         return staticBody;
+    }
+
+    /**
+     * Mark a mesh as a floor for ground detection without registering it as a
+     * static collision body. Idempotent.
+     */
+    registerFloor(mesh) {
+        if (!mesh) return;
+        if (!mesh.userData) mesh.userData = {};
+        mesh.userData.isFloor = true;
+        this._floorCacheDirty = true;
     }
     
     /**
@@ -116,16 +143,28 @@ export class PhysicsManager {
         // Check against floors and static bodies
         const intersectObjects = [];
 
-        // Use cached floor meshes instead of traversing every frame
+        // Use cached floor meshes instead of traversing every frame.
+        // Prefer explicit userData.isFloor tags; fall back to name-based match
+        // so levels that haven't migrated keep working.
         if (this._floorCacheDirty) {
             this._floorMeshes = [];
             this.scene.traverse(child => {
-                if (child.isMesh && child.name &&
-                    (child.name.includes('floor') || child.name.includes('ground'))) {
+                if (!child.isMesh) return;
+                if (child.userData && child.userData.isFloor) {
+                    this._floorMeshes.push(child);
+                    return;
+                }
+                if (child.name && (child.name.includes('floor') || child.name.includes('ground'))) {
                     this._floorMeshes.push(child);
                 }
             });
             this._floorCacheDirty = false;
+            if (this._floorMeshes.length === 0 && !this._warnedNoFloors) {
+                this._warnedNoFloors = true;
+                console.warn('[PhysicsManager] No floor meshes found. Tag meshes with userData.isFloor or call physicsManager.registerFloor(mesh).');
+            } else if (this._floorMeshes.length > 0) {
+                this._warnedNoFloors = false;
+            }
         }
         intersectObjects.push(...this._floorMeshes);
 

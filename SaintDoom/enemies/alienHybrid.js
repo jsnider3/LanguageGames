@@ -809,7 +809,7 @@ export class AlienHybrid extends BaseEnemy {
                 (Math.random() - 0.5) * 10
             );
 
-            const energyInterval = setInterval(() => {
+            const energyInterval = this._trackInterval(() => {
                 energy.position.add(energyVelocity.multiplyScalar(0.02));
                 energy.scale.multiplyScalar(0.98);
 
@@ -823,7 +823,7 @@ export class AlienHybrid extends BaseEnemy {
         // Main death effect
         let scale = 1;
         let opacity = 0.9;
-        const deathInterval = setInterval(() => {
+        const deathInterval = this._trackInterval(() => {
             scale += 0.2;
             opacity -= 0.06;
             deathEffect.scale.setScalar(scale);

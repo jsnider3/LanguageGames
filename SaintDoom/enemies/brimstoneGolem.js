@@ -727,7 +727,7 @@ export class BrimstoneGolem extends BaseEnemy {
                         puddle.material.dispose();
                     }
                 };
-                setTimeout(fadePuddle, 1000);
+                this._trackTimeout(fadePuddle, 1000);
 
                 this.scene.remove(projectile);
                 projectile.geometry.dispose();

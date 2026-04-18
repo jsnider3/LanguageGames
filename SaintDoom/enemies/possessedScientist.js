@@ -404,7 +404,7 @@ export class PossessedScientist extends BaseEnemy {
             if (flicker) {
                 this.leftEye.material.color.setHex(THEME.ui.health.medium); // Bright yellow
                 this.rightEye.material.color.setHex(THEME.ui.health.medium);
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     this.leftEye.material.color.setHex(THEME.ui.health.low); // Back to red
                     this.rightEye.material.color.setHex(THEME.ui.health.low);
                 }, 100);
@@ -414,7 +414,7 @@ export class PossessedScientist extends BaseEnemy {
         // Twitch head occasionally when idle
         if (this.state === 'idle' && Math.random() > 0.99) {
             this.headMesh.rotation.z = (Math.random() - 0.5) * 0.3;
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.headMesh.rotation.z = 0;
             }, 200);
         }

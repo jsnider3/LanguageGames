@@ -487,7 +487,7 @@ export class DemonKnight extends BaseEnemy {
         
         // Stun briefly
         this.state = 'stunned';
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (!this.isDead) {
                 this.state = 'hostile';
             }
@@ -505,7 +505,7 @@ export class DemonKnight extends BaseEnemy {
             const originalPos = this.shieldMesh.position.x;
             this.shieldMesh.position.x -= 0.3;
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 if (this.shieldMesh) {
                     this.shieldMesh.position.x = originalPos;
                 }
@@ -545,7 +545,7 @@ export class DemonKnight extends BaseEnemy {
         this.createChargeTelegraph();
         
         // Start charge after delay
-        setTimeout(() => {
+        this._trackTimeout(() => {
             if (!this.isDead) {
                 this.performCharge();
             }
@@ -605,7 +605,7 @@ export class DemonKnight extends BaseEnemy {
                 this.isCharging = false;
                 // Missed - brief recovery
                 this.state = 'stunned';
-                setTimeout(() => {
+                this._trackTimeout(() => {
                     if (!this.isDead) {
                         this.state = 'hostile';
                     }
@@ -630,7 +630,7 @@ export class DemonKnight extends BaseEnemy {
                     requestAnimationFrame(raiseSword);
                 } else {
                     // Slam down
-                    setTimeout(() => this.performSwordSlam(player), 200);
+                    this._trackTimeout(() => this.performSwordSlam(player), 200);
                 }
             };
             raiseSword();
@@ -861,13 +861,13 @@ export class DemonKnight extends BaseEnemy {
         flashLine();
         
         // Remove after charge starts
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.scene.remove(warningLine);
         }, 500);
     }
     
     createChargeTrail() {
-        const trailInterval = setInterval(() => {
+        const trailInterval = this._trackInterval(() => {
             if (!this.isCharging) {
                 clearInterval(trailInterval);
                 return;
@@ -956,7 +956,7 @@ export class DemonKnight extends BaseEnemy {
                     this.scene.remove(crack);
                 }
             };
-            setTimeout(fadeCrack, 1000);
+            this._trackTimeout(fadeCrack, 1000);
         }
     }
     

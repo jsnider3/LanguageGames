@@ -258,7 +258,7 @@ export class Hellhound extends BaseEnemy {
         // Crouch animation
         if (this.mesh) {
             this.mesh.scale.y = 0.6;
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 if (this.mesh) {
                     this.mesh.scale.y = 1;
                 }

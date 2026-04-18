@@ -264,7 +264,7 @@ export class ZombieAgent extends BaseEnemy {
         this.mesh.add(flash);
 
         // Remove flash after short time
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.mesh.remove(flash);
         }, 100);
 
@@ -348,7 +348,7 @@ export class ZombieAgent extends BaseEnemy {
         }
 
         // Remove effect after animation
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.mesh.remove(attackEffect);
         }, 500);
 
@@ -437,7 +437,7 @@ export class ZombieAgent extends BaseEnemy {
         // Animate infection spread
         let scale = 1;
         let opacity = 0.6;
-        const infectionInterval = setInterval(() => {
+        const infectionInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.06;
             infection.scale.setScalar(scale);
@@ -456,7 +456,7 @@ export class ZombieAgent extends BaseEnemy {
             const originalRotation = this.weapon.rotation.x;
             this.weapon.rotation.x = -0.3;
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.weapon.rotation.x = originalRotation;
             }, 100);
         }
@@ -465,7 +465,7 @@ export class ZombieAgent extends BaseEnemy {
         const originalScale = this.mesh.scale.clone();
         this.mesh.scale.set(1.1, 0.95, 1.1);
         
-        setTimeout(() => {
+        this._trackTimeout(() => {
             this.mesh.scale.copy(originalScale);
         }, 150);
     }
@@ -484,7 +484,7 @@ export class ZombieAgent extends BaseEnemy {
             this.position.add(lungeDirection);
             
             // Return to original position
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.position.copy(originalPosition);
             }, 300);
         }
@@ -495,7 +495,7 @@ export class ZombieAgent extends BaseEnemy {
             const originalRotation = leftArm.rotation.z;
             leftArm.rotation.z = -Math.PI / 4;
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 leftArm.rotation.z = originalRotation;
             }, 200);
         }
@@ -522,7 +522,7 @@ export class ZombieAgent extends BaseEnemy {
             this.head.rotation.x = twitchX;
             this.head.rotation.y = twitchY;
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 this.head.rotation.x = 0;
                 this.head.rotation.y = 0;
             }, 200);
@@ -571,7 +571,7 @@ export class ZombieAgent extends BaseEnemy {
             const originalColor = this.mesh.children[0].material.color.getHex();
             this.mesh.children[0].material.color.setHex(THEME.ui.health.low);
             
-            setTimeout(() => {
+            this._trackTimeout(() => {
                 if (this.mesh && this.mesh.children[0]) {
                     this.mesh.children[0].material.color.setHex(originalColor);
                 }
@@ -608,7 +608,7 @@ export class ZombieAgent extends BaseEnemy {
         // Animate reanimation
         let scale = 0.1;
         let opacity = 0.7;
-        const reanimationInterval = setInterval(() => {
+        const reanimationInterval = this._trackInterval(() => {
             scale += 0.2;
             opacity -= 0.07;
             reanimation.scale.setScalar(scale);
@@ -654,7 +654,7 @@ export class ZombieAgent extends BaseEnemy {
 
         let scale = 1;
         let opacity = 0.8;
-        const deathInterval = setInterval(() => {
+        const deathInterval = this._trackInterval(() => {
             scale += 0.3;
             opacity -= 0.08;
             deathEffect.scale.setScalar(scale);

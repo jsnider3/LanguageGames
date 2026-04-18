@@ -324,32 +324,151 @@ export class ChapelLevel extends BaseLevel {
         return false;
     }
     
-    update(deltaTime) {
+    update(deltaTime, input, player) {
         // Call parent update
         if (super.update) {
-            super.update(deltaTime);
+            super.update(deltaTime, input, player);
         }
-        
+
+        player = player || (this.game && this.game.player);
+        const game = this.game;
+        if (!game || !player) return;
+
+        // Trigger chapel entry the first time the player crosses the threshold
+        if (!this.chapelReached) {
+            this.checkChapelTrigger(player.position);
+        }
+
+        // Skip interaction handling during zone transitions
+        const inTransition = !!(game.zoneManager && game.zoneManager.activeTransition);
+
         // Update objective based on enemy count
-        if (this.chapelReached && !this.chapelCleansed) {
-            if (this.game && this.game.enemies) {
-                const enemyCount = this.game.enemies.length;
-                
-                if (enemyCount === 0 && !this.objectiveUpdated) {
-                    // All enemies defeated
-                    if (this.game.narrativeSystem) {
-                        this.game.narrativeSystem.setObjective("All demons defeated! Approach the altar to cleanse it");
-                        this.game.narrativeSystem.displaySubtitle("The demons are vanquished. Now cleanse the altar.");
-                    }
-                    this.objectiveUpdated = true;
-                } else if (enemyCount > 0 && this.lastEnemyCount !== enemyCount) {
-                    // Update enemy count in objective
-                    if (this.game.narrativeSystem) {
-                        this.game.narrativeSystem.setObjective(`Cleanse the altar - defeat all demons (${enemyCount} remaining)`);
-                    }
-                    this.lastEnemyCount = enemyCount;
+        if (this.chapelReached && !this.chapelCleansed && game.enemies) {
+            const enemyCount = game.enemies.length;
+
+            if (enemyCount === 0 && !this.objectiveUpdated) {
+                if (game.narrativeSystem) {
+                    game.narrativeSystem.setObjective("All demons defeated! Approach the altar to cleanse it");
+                    game.narrativeSystem.displaySubtitle("The demons are vanquished. Now cleanse the altar.");
+                }
+                this.objectiveUpdated = true;
+            } else if (enemyCount > 0 && this.lastEnemyCount !== enemyCount) {
+                if (game.narrativeSystem) {
+                    game.narrativeSystem.setObjective(`Cleanse the altar - defeat all demons (${enemyCount} remaining)`);
+                }
+                this.lastEnemyCount = enemyCount;
+            }
+        }
+
+        // Altar cleansing interaction
+        if (!inTransition && this.chapelReached && !this.chapelCleansed && game.enemies && game.enemies.length === 0) {
+            const altarPos = new THREE.Vector3(0, 0, -48);
+            const distanceToAltar = player.position.distanceTo(altarPos);
+
+            if (!this.altarCanBeCleansed) {
+                this.altarCanBeCleansed = true;
+                if (game.narrativeSystem) {
+                    game.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
+                    game.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
                 }
             }
+
+            if (distanceToAltar < 5) {
+                if (game.showInteractPrompt) game.showInteractPrompt("Press E to cleanse the altar");
+                if (input && input.interact) {
+                    this.cleanseAltar();
+                    if (game.hideInteractPrompt) game.hideInteractPrompt();
+                }
+            } else if (game.hideInteractPrompt) {
+                game.hideInteractPrompt();
+            }
+        }
+
+        // Exit-door interaction (unified source of truth)
+        if (!inTransition && this.exitDoor) {
+            const doorDistance = player.position.distanceTo(this.exitDoor.position);
+            if (doorDistance < 3) {
+                const door = this.exitDoor;
+                if (door.userData.locked && door.userData.requiresCleansing) {
+                    if (game.showInteractPrompt) game.showInteractPrompt("The door is sealed. Cleanse the chapel first.");
+                } else if (!door.userData.locked) {
+                    if (game.showInteractPrompt) game.showInteractPrompt("Press E to enter the Armory");
+                    if (input && input.interact && !game.isTransitioning) {
+                        if (game.zoneManager) {
+                            game.isTransitioning = true;
+                            if (game.hideInteractPrompt) game.hideInteractPrompt();
+                            game.zoneManager.triggerTransition('chapel', 'armory', player);
+                        } else if (game.loadLevel) {
+                            game.loadLevel('armory');
+                        }
+                    }
+                }
+            } else if (game.hideInteractPrompt) {
+                game.hideInteractPrompt();
+            }
+        }
+    }
+
+    cleanseAltar() {
+        if (this.chapelCleansed) return;
+        this.chapelCleansed = true;
+
+        const game = this.game;
+        const scene = this.scene;
+
+        // Visual effect - holy light from altar
+        const holyLight = new THREE.PointLight(0xffffaa, 3, 30);
+        holyLight.position.set(0, 3, -48);
+        scene.add(holyLight);
+
+        // Animate holy light expanding, then fading to a gentle white
+        let lightIntensity = 3;
+        const animateLight = setInterval(() => {
+            lightIntensity += 0.5;
+            holyLight.intensity = lightIntensity;
+            holyLight.distance = 30 + lightIntensity * 2;
+
+            if (lightIntensity >= 10) {
+                clearInterval(animateLight);
+                const fadeLight = setInterval(() => {
+                    holyLight.intensity -= 0.2;
+                    if (holyLight.intensity <= 1) {
+                        clearInterval(fadeLight);
+                        holyLight.intensity = 1;
+                        holyLight.color.setHex(0xffffff);
+                    }
+                }, 50);
+            }
+        }, 50);
+
+        // Purify altar visuals
+        scene.traverse((child) => {
+            if (child.userData && child.userData.isAltar) {
+                child.material.color.setHex(0xffffff);
+                child.material.emissive.setHex(0xffffaa);
+                child.material.emissiveIntensity = 0.1;
+            }
+        });
+
+        if (game && game.narrativeSystem) {
+            game.narrativeSystem.setObjective("Chapel cleansed! Proceed deeper into the facility");
+            game.narrativeSystem.displaySubtitle("Another desecration cleansed. How many more times must I do this?");
+            game.narrativeSystem.advanceChapter();
+        }
+
+        this.unlockExitDoor();
+
+        // Unlock Armory in level select
+        const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapel"]');
+        if (!unlockedLevels.includes('armory')) {
+            unlockedLevels.push('armory');
+            localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
+        }
+
+        if (game) {
+            if (game.addScore) game.addScore(1000);
+            if (game.showMessage) game.showMessage("Chapel Cleansed! +1000 Score!");
+            if (game.player) game.player.health = Math.min(game.player.health + 50, 100);
         }
     }
     

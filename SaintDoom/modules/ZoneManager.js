@@ -733,23 +733,30 @@ export class ZoneManager {
         
         // Handle different transition types
         try {
+            let result;
             switch (transition.type) {
                 case 'corridor':
-                    await this.transitionCorridor(transition, loadPromise);
+                    result = await this.transitionCorridor(transition, loadPromise);
                     break;
                 case 'elevator':
-                    await this.transitionElevator(transition, loadPromise);
+                    result = await this.transitionElevator(transition, loadPromise);
                     break;
                 case 'vent':
-                    await this.transitionVent(transition, loadPromise);
+                    result = await this.transitionVent(transition, loadPromise);
                     break;
                 default:
                     await loadPromise;
             }
-            
+
+            // If the player aborted mid-transition, the source level was
+            // already reloaded by cancelTransition — don't run completeTransition.
+            if (result && result.cancelled) {
+                return true;
+            }
+
             // Complete transition
             await this.completeTransition(toZone);
-            
+
         } catch (error) {
             console.error('[ZoneManager] Transition failed:', error);
             // Fallback to regular loading
@@ -831,13 +838,14 @@ export class ZoneManager {
                 // Temporarily disable collision checking to allow teleportation
                 this.game.skipCollisionCheck = true;
                 
-                let targetX, targetZ;
+                let targetX, targetZ, targetYaw;
                 if (this.activeTransition.from === 'chapel') {
                     // Coming from chapel: place near entrance (chapel side)
                     // Corridor extends from x=5.5 (entrance) to x=35.5 (exit) after rotation
                     // Place player at x=10 to be inside but closer to entrance
                     targetX = 10;
                     targetZ = -20;
+                    targetYaw = -Math.PI / 2; // Face +X, toward armory
                     console.log('[ZoneManager] Positioned player from CHAPEL at x=10 (near entrance at x=5.5)');
                 } else if (this.activeTransition.from === 'armory') {
                     // Coming from armory: place near that entrance (armory side)
@@ -845,11 +853,17 @@ export class ZoneManager {
                     // Place player at x=31 to be inside but closer to armory entrance
                     targetX = 31;
                     targetZ = -20;
+                    targetYaw = Math.PI / 2; // Face -X, toward chapel
                     console.log('[ZoneManager] Positioned player from ARMORY at x=31 (near entrance at x=35.5)');
                 }
-                
+
                 // Set player position
                 this.game.player.position.set(targetX, 1.7, targetZ);
+
+                // Face the player along corridor toward the destination
+                if (targetYaw !== undefined && this.game.player.yaw !== undefined) {
+                    this.game.player.yaw = targetYaw;
+                }
                 
                 // ALSO set the camera position to match
                 if (this.game.camera) {
@@ -1037,6 +1051,7 @@ export class ZoneManager {
         
         // Set up door interaction flag
         let doorOpened = false;
+        let transitionCancelled = false;
         
         // Monitor player progress through corridor and door interaction
         const checkProgress = async () => {
@@ -1105,19 +1120,19 @@ export class ZoneManager {
                         if (this.game.showMessage) {
                             this.game.showMessage(`Press E to return to ${this.zones.get(this.activeTransition.from).name}`);
                         }
-                        
+
                         // Check for E key press
                         if (this.game.inputManager) {
-                            const ePressed = this.game.inputManager.keys['e'] || 
-                                           this.game.inputManager.keys['E'] || 
+                            const ePressed = this.game.inputManager.keys['e'] ||
+                                           this.game.inputManager.keys['E'] ||
                                            this.game.inputManager.keys['KeyE'];
                             if (ePressed) {
                                 console.log('[ZoneManager] Player returning to previous level');
-                                // Save the from level before canceling transition
                                 const fromLevel = this.activeTransition.from;
-                                // Cancel transition and return to previous level
-                                this.activeTransition = null;
-                                this.game.loadLevel(fromLevel);
+                                // Full cleanup + reload of the source level.
+                                // Signals to startTransition that completeTransition should be skipped.
+                                transitionCancelled = true;
+                                await this.cancelTransition(fromLevel);
                                 return;
                             }
                         }
@@ -1193,11 +1208,17 @@ export class ZoneManager {
         
         // Wait for player to walk through corridor and open the exit door
         await checkProgress();
-        
+
+        // If the player backed out via cancelTransition, everything is already
+        // cleaned up and the source level has been reloaded — bail out.
+        if (transitionCancelled) {
+            return { cancelled: true };
+        }
+
         // Only proceed if door was opened
         if (!doorOpened) {
-            console.log('[ZoneManager] Transition cancelled');
-            return;
+            console.log('[ZoneManager] Transition cancelled (door never opened)');
+            return { cancelled: true };
         }
         
         // Show completion message
@@ -1655,11 +1676,15 @@ export class ZoneManager {
         if (!this.game.player || !this.activeTransition) return;
         
         if (zoneId === 'chapel' && this.activeTransition.from === 'armory') {
-            // Coming from armory, place near the door (door is at x=5, z=-20)
-            this.game.player.position.set(4, 1.7, -20);  // Near door on corridor side
-            // Face towards the chapel interior
-            if (this.game.player.rotation) {
-                this.game.player.rotation.y = 0;
+            // Coming from armory, place well away from the door (door is at x=5, z=-20)
+            // so we don't re-trigger the "Press E to enter the Armory" prompt on spawn.
+            this.game.player.position.set(0, 1.7, -22);
+            // Face into the chapel interior (toward -Z where altar sits at z=-48)
+            if (this.game.player.yaw !== undefined) {
+                this.game.player.yaw = Math.PI;
+            }
+            if (this.game.player.velocity) {
+                this.game.player.velocity.set(0, 0, 0);
             }
         } else if (zoneId === 'armory' && this.activeTransition.from === 'chapel') {
             // Temporarily disable collision to allow positioning
@@ -1730,6 +1755,162 @@ export class ZoneManager {
     /**
      * Complete the transition to a new zone
      */
+    /**
+     * Abort an in-progress transition and return the player to the source zone.
+     * Cleans up corridor geometry, transition lights, any pending deferred load,
+     * and reloads the source level. Caller (transitionCorridor) must signal its
+     * caller to skip completeTransition after this runs.
+     */
+    async cancelTransition(returnToZone) {
+        console.log('[ZoneManager] Cancelling transition, returning to', returnToZone);
+
+        // Snapshot the source level's in-memory progress flags BEFORE any
+        // cleanup so we can re-apply them to the freshly-loaded instance.
+        // We don't rely on saveLevelState/restoreLevelState here because:
+        //   (a) saveLevelState is skipped when currentLevel === target, and
+        //   (b) restoreLevelState fires from a setTimeout, leaving a window
+        //       where a fresh (reached=false, cleansed=false) chapel is live.
+        //
+        // Read from currentLevelInstance — the compatibility refs like
+        // this.game.chapelLevel are nulled by ZoneManager.clearCurrentLevel()
+        // during transitionCorridor, so they're gone by the time we get here.
+        const snapshot = {};
+        const sourceLevel = this.game.currentLevelInstance;
+        if (returnToZone === 'chapel' && sourceLevel) {
+            snapshot.chapelReached = !!sourceLevel.chapelReached;
+            snapshot.chapelCleansed = !!sourceLevel.chapelCleansed;
+        } else if (returnToZone === 'armory' && sourceLevel) {
+            snapshot.weaponsCollected = sourceLevel.weaponsCollected || 0;
+            snapshot.collectedWeapons = Array.isArray(sourceLevel.collectedWeapons)
+                ? [...sourceLevel.collectedWeapons]
+                : [];
+            snapshot.sealedDoorUnlocked = !!(sourceLevel.sealedDoor &&
+                !sourceLevel.sealedDoor.userData.locked);
+        }
+
+        // Drop the pending target-zone load so it never fires.
+        if (this._deferredLoadResolve) {
+            delete this._deferredLoadResolve;
+        }
+
+        // Dispose corridor geometry and transition lights before reloading the
+        // source level — otherwise they'd collide with the reloaded geometry.
+        const corridorRoots = [];
+        this.scene.children.forEach(child => {
+            if (child.userData && child.userData.isTransitionCorridor) {
+                corridorRoots.push(child);
+            }
+        });
+        corridorRoots.forEach(root => {
+            root.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+            });
+            this.scene.remove(root);
+        });
+        if (this._transitionAmbientLight) {
+            this.scene.remove(this._transitionAmbientLight);
+            this._transitionAmbientLight = null;
+        }
+        if (this._transitionDirLight) {
+            this.scene.remove(this._transitionDirLight);
+            this._transitionDirLight = null;
+        }
+
+        // Consume the E keypress so the source level doesn't instantly re-trigger.
+        if (this.game.inputManager && this.game.inputManager.keys) {
+            this.game.inputManager.keys['KeyE'] = false;
+            this.game.inputManager.keys['e'] = false;
+            this.game.inputManager.keys['E'] = false;
+        }
+
+        // IMPORTANT: leave this.activeTransition set (and isTransitioning true)
+        // while the reload is in flight. The main game loop's transition guard
+        // at Game.update keys off activeTransition and early-exits, which keeps
+        // the OLD level's update() from running against stale scene refs during
+        // the awaited reload. We clear both flags at the end.
+
+        // Reload the source level.
+        if (this.game.loadLevelActual) {
+            await this.game.loadLevelActual(returnToZone);
+        } else if (this.game.loadLevel) {
+            await this.game.loadLevel(returnToZone);
+        }
+
+        // Apply the snapshot directly to the freshly-created level instance.
+        // Synchronous — no setTimeout race with the game loop.
+        if (returnToZone === 'chapel' && this.game.chapelLevel) {
+            const cl = this.game.chapelLevel;
+            if (snapshot.chapelReached) cl.chapelReached = true;
+            if (snapshot.chapelCleansed) {
+                cl.chapelCleansed = true;
+                cl.altarCanBeCleansed = true;
+                cl.objectiveUpdated = true;
+                if (cl.unlockExitDoor) cl.unlockExitDoor();
+                this.scene.traverse(child => {
+                    if (child.userData && child.userData.isAltar && child.material) {
+                        if (child.material.color) child.material.color.setHex(0xffffff);
+                        if (child.material.emissive) child.material.emissive.setHex(0xffffaa);
+                        if ('emissiveIntensity' in child.material) child.material.emissiveIntensity = 0.1;
+                    }
+                });
+            } else if (snapshot.chapelReached) {
+                if (cl.spawnChapelEnemies) cl.spawnChapelEnemies();
+            }
+        } else if (returnToZone === 'armory' && this.game.armoryLevel) {
+            const al = this.game.armoryLevel;
+            if (snapshot.weaponsCollected) al.weaponsCollected = snapshot.weaponsCollected;
+            if (snapshot.collectedWeapons) al.collectedWeapons = snapshot.collectedWeapons;
+            if (snapshot.sealedDoorUnlocked && al.sealedDoor) {
+                al.sealedDoor.userData.locked = false;
+                if (al.elevatorButton && al.elevatorButton.material.emissive) {
+                    al.elevatorButton.material.emissive.setHex(0x00ff00);
+                }
+            }
+            if (snapshot.collectedWeapons && al.pickups) {
+                al.pickups.forEach(pickup => {
+                    if (snapshot.collectedWeapons.includes(pickup.userData?.weaponType)) {
+                        pickup.visible = false;
+                        pickup.userData.collected = true;
+                    }
+                });
+            }
+        }
+
+        // Drop the player back into the source-level entrance so they aren't
+        // stuck at the corridor coordinates, which are outside the level bounds.
+        if (this.game.player) {
+            if (returnToZone === 'chapel') {
+                this.game.player.position.set(0, 1.7, -22);
+                if (this.game.player.yaw !== undefined) this.game.player.yaw = Math.PI;
+            } else if (returnToZone === 'armory') {
+                this.game.player.position.set(0, 1.7, 7);
+                if (this.game.player.yaw !== undefined) this.game.player.yaw = 0;
+            }
+            if (this.game.player.velocity) this.game.player.velocity.set(0, 0, 0);
+            if (this.game.camera) this.game.camera.position.copy(this.game.player.position);
+        }
+
+        // Now release the main game loop from transition-safe mode.
+        this.activeTransition = null;
+        this.game.isTransitioning = false;
+        this.corridorEntranceDoor = null;
+        this.corridorExitDoor = null;
+
+        // Clear E once more in case the reload reset input state.
+        if (this.game.inputManager && this.game.inputManager.keys) {
+            this.game.inputManager.keys['KeyE'] = false;
+            this.game.inputManager.keys['e'] = false;
+            this.game.inputManager.keys['E'] = false;
+        }
+
+        // Hide any stale prompt left behind by the corridor UI.
+        if (this.game.showMessage) this.game.showMessage('');
+    }
+
     async completeTransition(zoneId) {
         // Check if prepareTargetZone already loaded the level via loadZoneFull
         const zone = this.zones.get(zoneId);
@@ -1784,6 +1965,14 @@ export class ZoneManager {
 
         // Clear active transition
         this.activeTransition = null;
+
+        // Clear any latched interact key so the destination level doesn't
+        // immediately re-trigger a prompt (e.g. spawning near a return door)
+        if (this.game.inputManager && this.game.inputManager.keys) {
+            this.game.inputManager.keys['KeyE'] = false;
+            this.game.inputManager.keys['e'] = false;
+            this.game.inputManager.keys['E'] = false;
+        }
 
         // Also hide the loading screen if it's showing
         const loadingScreen = document.getElementById('loadingScreen');

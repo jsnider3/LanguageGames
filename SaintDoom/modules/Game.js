@@ -507,7 +507,7 @@ Player: ${playerPos}`;
 
         // Run per-frame level logic (objectives, hazards, animations, etc.)
         if (this.currentLevelInstance && typeof this.currentLevelInstance.update === 'function') {
-            this.currentLevelInstance.update(deltaTime, input);
+            this.currentLevelInstance.update(deltaTime, input, this.player);
         }
         
         
@@ -531,94 +531,28 @@ Player: ${playerPos}`;
         
         // Clean up broken enemies or handle deaths that weren't caught by combat
         this.cleanupDeadAndInvalidEnemies();
-        if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
-            // Check if all enemies are dead
-            if (this.enemies.length === 0) {
-                // Enemies defeated, now check if player is near altar to cleanse it
-                const altarPos = new THREE.Vector3(0, 0, -48);
-                const distanceToAltar = this.player.position.distanceTo(altarPos);
-                
-                if (!this.altarCanBeCleansed) {
-                    this.altarCanBeCleansed = true;
-                    if (this.narrativeSystem) {
-                        this.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
-                        this.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
-                    }
-                }
-                
-                // Show interaction prompt when close to altar
-                if (distanceToAltar < 5) {
-                    this.showInteractPrompt("Press E to cleanse the altar");
-                    
-                    // Check if player is pressing E (use the input we already got)
-                    if (input.interact) {
-                        this.cleanseAltar();
-                        this.hideInteractPrompt();
-                    }
-                } else {
-                    this.hideInteractPrompt();
-                }
-            }
-        }
-        
-        // Check chapel exit door interaction
-        if (this.chapelLevel && this.chapelLevel.exitDoor) {
-            const doorPos = this.chapelLevel.exitDoor.position;
-            const doorDistance = this.player.position.distanceTo(doorPos);
-            
-            // Show prompt when near door
-            if (doorDistance < 3) {
-                const door = this.chapelLevel.exitDoor;
-                
-                if (door.userData.locked && door.userData.requiresCleansing) {
-                    this.showInteractPrompt("The door is sealed. Cleanse the chapel first.");
-                } else if (!door.userData.locked) {
-                    this.showInteractPrompt("Press E to enter the Armory");
-                    
-                    if (input.interact && !this.isTransitioning) {
-                        // Use zone transition instead of direct loading
-                        if (this.zoneManager) {
-                            this.isTransitioning = true;
-                            this.hideInteractPrompt();
-                            this.zoneManager.triggerTransition('chapel', 'armory', this.player);
-                        } else {
-                            // Fallback to direct loading
-                            this.loadLevel('armory');
-                        }
-                    }
-                }
-            } else {
-                this.hideInteractPrompt();
-            }
-        }
-        
+
         this.applyCameraEffects();
         this.checkPlayerDeath();
     }
-    
+
     updateLevelSpecificLogic(deltaTime, input) {
-        // Check tutorial progress
+        // Tutorial still uses its own hook (checkTutorialProgress)
         if (this.tutorialLevel && this.tutorialLevel.checkTutorialProgress) {
             this.tutorialLevel.checkTutorialProgress(input, this.player);
         }
-        
-        // Check chapel trigger if chapel level exists
-        if (this.chapelLevel && !this.chapelLevel.chapelReached) {
-            this.chapelLevel.checkChapelTrigger(this.player.position);
-        }
-        
-        // Check armory weapon collection
+
+        // Armory: weapon collection + chapel/elevator doors
         if (this.armoryLevel && this.armoryLevel.checkWeaponCollection) {
             this.updateArmoryLevel(deltaTime);
         }
-        
-        // Update laboratory level if active
+
+        // Laboratory: exit check
         if (this.currentLevelInstance && this.currentLevelInstance.levelName === 'Laboratory Complex') {
             this.updateLaboratoryLevel(deltaTime);
         }
-        
-        // Handle chapel cleansing
-        this.handleChapelCleansing(input);
+
+        // Chapel per-frame logic now lives on ChapelLevel.update()
     }
     
     updateArmoryLevel(deltaTime) {
@@ -650,55 +584,6 @@ Player: ${playerPos}`;
         if (this.currentLevelInstance.checkExitCollision && this.currentLevelInstance.checkExitCollision(this.player)) {
             console.log('Laboratory level complete! Loading next level...');
             this.loadLevel('containment'); // Load the Containment level
-        }
-    }
-    
-    handleChapelCleansing(input) {
-        // Skip if no chapel level or if in transition
-        if (!this.chapelLevel) return;
-        if (this.zoneManager && this.zoneManager.activeTransition) return;
-        
-        if (this.chapelLevel) {
-            // Let the chapel level handle its own exit door
-            if (this.chapelLevel.checkExitDoorCollision) {
-                const transitionLevel = this.chapelLevel.checkExitDoorCollision(this.player);
-                if (transitionLevel && transitionLevel !== 'transition') {
-                    // Only load level if not a transition (transition handles itself)
-                    this.loadLevel(transitionLevel);
-                    return;
-                }
-            }
-            
-            // Original cleansing logic
-            if (this.chapelLevel && this.chapelLevel.chapelReached && !this.chapelLevel.chapelCleansed) {
-                // Check if all enemies are dead
-                if (this.enemies.length === 0) {
-                    // Enemies defeated, now check if player is near altar to cleanse it
-                    const altarPos = new THREE.Vector3(0, 0, -48);
-                    const distanceToAltar = this.player.position.distanceTo(altarPos);
-                    
-                    if (!this.altarCanBeCleansed) {
-                        this.altarCanBeCleansed = true;
-                        if (this.narrativeSystem) {
-                            this.narrativeSystem.setObjective("Approach the altar and press E to cleanse it");
-                            this.narrativeSystem.displaySubtitle("The demons are banished. Now to cleanse this desecration.");
-                        }
-                    }
-                
-                    // Show interaction prompt when close to altar
-                    if (distanceToAltar < 5) {
-                        this.showInteractPrompt("Press E to cleanse the altar");
-                        
-                        // Check if player is pressing E (use the input we already got)
-                        if (input.interact) {
-                            this.cleanseAltar();
-                            this.hideInteractPrompt();
-                        }
-                    } else {
-                        this.hideInteractPrompt();
-                    }
-                }
-            }
         }
     }
     
@@ -1075,74 +960,6 @@ Player: ${playerPos}`;
         this.showMessage("A door has unlocked in the corridor! Press E to enter the Armory.");
     }
 
-    cleanseAltar() {
-        if (this.chapelLevel.chapelCleansed) return; // Already cleansed
-        
-        this.chapelLevel.chapelCleansed = true;
-        
-        // Visual effect - holy light from altar
-        const holyLight = new THREE.PointLight(0xffffaa, 3, 30);
-        holyLight.position.set(0, 3, -48);
-        this.scene.add(holyLight);
-        
-        // Animate holy light expanding
-        let lightIntensity = 3;
-        const animateLight = setInterval(() => {
-            lightIntensity += 0.5;
-            holyLight.intensity = lightIntensity;
-            holyLight.distance = 30 + lightIntensity * 2;
-            
-            if (lightIntensity >= 10) {
-                clearInterval(animateLight);
-                // Fade out
-                const fadeLight = setInterval(() => {
-                    holyLight.intensity -= 0.2;
-                    if (holyLight.intensity <= 1) {
-                        clearInterval(fadeLight);
-                        holyLight.intensity = 1;
-                        holyLight.color.setHex(0xffffff);
-                    }
-                }, 50);
-            }
-        }, 50);
-        
-        // Remove demonic symbol
-        this.scene.traverse((child) => {
-            if (child.userData && child.userData.isAltar) {
-                // Change altar color to purified
-                child.material.color.setHex(0xffffff);
-                child.material.emissive.setHex(0xffffaa);
-                child.material.emissiveIntensity = 0.1;
-            }
-        });
-        
-        // Update narrative
-        if (this.narrativeSystem) {
-            this.narrativeSystem.setObjective("Chapel cleansed! Proceed deeper into the facility");
-            this.narrativeSystem.displaySubtitle("Another desecration cleansed. How many more times must I do this?");
-            this.narrativeSystem.advanceChapter();
-        }
-        
-        // Unlock the existing exit door to Armory (don't create a new one)
-        if (this.chapelLevel && this.chapelLevel.unlockExitDoor) {
-            this.chapelLevel.unlockExitDoor();
-        }
-        
-        // Unlock Armory in level select
-        const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapel"]');
-        if (!unlockedLevels.includes('armory')) {
-            unlockedLevels.push('armory');
-            localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
-        }
-        
-        // Add score bonus
-        this.addScore(1000);
-        this.showMessage("Chapel Cleansed! +1000 Score!");
-        
-        // Heal player as reward
-        this.player.health = Math.min(this.player.health + 50, 100);
-    }
-    
     handlePlayerDeath() {
         this.gameOver = true;
         this.deathCount++;
@@ -2294,7 +2111,7 @@ Player: ${playerPos}`;
      */
     saveLevelState() {
         if (!this.currentLevel || !this.currentLevelInstance) return;
-        
+
         const state = {
             level: this.currentLevel,
             timestamp: Date.now(),
@@ -2302,41 +2119,40 @@ Player: ${playerPos}`;
             enemiesKilled: [],
             pickupsCollected: []
         };
-        
-        // Save Chapel specific state
-        if (this.currentLevel === 'chapel' && this.chapelLevel) {
-            state.objectives.chapelReached = this.chapelLevel.chapelReached || false;
-            state.objectives.chapelCleansed = this.chapelLevel.chapelCleansed || false;
-            // Don't respawn enemies in chapel if cleansed
-            if (this.chapelLevel.chapelCleansed) {
-                state.enemiesCleared = true;
+
+        // `currentLevelInstance` is authoritative — the compatibility refs
+        // (this.chapelLevel, this.armoryLevel, etc.) get nulled by
+        // ZoneManager.clearCurrentLevel() before this runs during a corridor
+        // transition. Reading from them would write blank state and overwrite
+        // the real cleansed/collected flags.
+        const level = this.currentLevelInstance;
+
+        if (this.currentLevel === 'chapel') {
+            const chapel = this.chapelLevel || level;
+            if (!chapel) return; // refuse to overwrite good state with blanks
+            state.objectives.chapelReached = !!chapel.chapelReached;
+            state.objectives.chapelCleansed = !!chapel.chapelCleansed;
+            if (chapel.chapelCleansed) state.enemiesCleared = true;
+        } else if (this.currentLevel === 'armory') {
+            const armory = this.armoryLevel || level;
+            if (!armory) return;
+            state.objectives.weaponsCollected = armory.weaponsCollected || 0;
+            state.objectives.cacheLock = armory.cacheLock ? true : false;
+            state.objectives.sealedDoorUnlocked = !!(armory.sealedDoor && !armory.sealedDoor.userData.locked);
+            if (Array.isArray(armory.collectedWeapons)) {
+                state.pickupsCollected = [...armory.collectedWeapons];
             }
+        } else if (this.currentLevel === 'laboratory') {
+            const lab = this.laboratoryLevel || level;
+            if (!lab) return;
+            state.objectives.keycards = {...(lab.keycards || {})};
+            state.objectives.exitPortalActive = !!lab.exitPortal;
+        } else if (this.currentLevel === 'containment') {
+            if (!level) return;
+            state.objectives.systemsRestored = level.systemsRestored || 0;
+            state.objectives.emergencyProtocolActive = !!level.emergencyProtocolActive;
         }
-        
-        // Save Armory specific state
-        if (this.currentLevel === 'armory' && this.armoryLevel) {
-            state.objectives.weaponsCollected = this.armoryLevel.weaponsCollected || 0;
-            state.objectives.cacheLock = this.armoryLevel.cacheLock ? true : false;
-            state.objectives.sealedDoorUnlocked = this.armoryLevel.sealedDoor && !this.armoryLevel.sealedDoor.userData.locked;
-            // Track collected weapons
-            if (this.armoryLevel.collectedWeapons) {
-                state.pickupsCollected = [...this.armoryLevel.collectedWeapons];
-            }
-        }
-        
-        // Save Laboratory specific state
-        if (this.currentLevel === 'laboratory' && this.laboratoryLevel) {
-            state.objectives.keycards = {...(this.laboratoryLevel.keycards || {})};
-            state.objectives.exitPortalActive = this.laboratoryLevel.exitPortal ? true : false;
-        }
-        
-        // Save Containment specific state
-        if (this.currentLevel === 'containment' && this.currentLevelInstance) {
-            state.objectives.systemsRestored = this.currentLevelInstance.systemsRestored || 0;
-            state.objectives.emergencyProtocolActive = this.currentLevelInstance.emergencyProtocolActive || false;
-        }
-        
-        // Store in memory and localStorage
+
         this.levelStates.set(this.currentLevel, state);
         this.saveLevelStatesToStorage();
     }
@@ -2347,78 +2163,82 @@ Player: ${playerPos}`;
     restoreLevelState(levelName) {
         const state = this.levelStates.get(levelName);
         if (!state) return;
-        
+
         console.log(`[Game] Restoring state for level: ${levelName}`, state);
-        
-        // Wait for level to be fully loaded
-        setTimeout(() => {
-            // Restore Chapel state
-            if (levelName === 'chapel' && this.chapelLevel) {
-                if (state.objectives.chapelReached) {
-                    this.chapelLevel.chapelReached = true;
-                }
-                if (state.objectives.chapelCleansed) {
-                    this.chapelLevel.chapelCleansed = true;
-                    // Don't spawn enemies if chapel is cleansed
-                    console.log('[Game] Chapel already cleansed - not spawning enemies');
-                } else if (state.objectives.chapelReached) {
-                    // Chapel reached but not cleansed - spawn enemies
-                    this.chapelLevel.spawnChapelEnemies();
-                }
+
+        // Apply synchronously — loadLevelActual has already created the new
+        // level instance by the time this runs. A setTimeout here created a
+        // window where a fresh (uncleansed) chapel was live, so the player
+        // could re-trigger enemy spawns before restoration applied.
+        if (levelName === 'chapel' && this.chapelLevel) {
+            if (state.objectives.chapelReached) {
+                this.chapelLevel.chapelReached = true;
             }
-            
-            // Restore Armory state
-            if (levelName === 'armory' && this.armoryLevel) {
-                if (state.objectives.weaponsCollected) {
-                    this.armoryLevel.weaponsCollected = state.objectives.weaponsCollected;
+            if (state.objectives.chapelCleansed) {
+                this.chapelLevel.chapelCleansed = true;
+                this.chapelLevel.altarCanBeCleansed = true;
+                this.chapelLevel.objectiveUpdated = true;
+                if (this.chapelLevel.unlockExitDoor) {
+                    this.chapelLevel.unlockExitDoor();
                 }
-                if (state.objectives.sealedDoorUnlocked && this.armoryLevel.sealedDoor) {
-                    this.armoryLevel.sealedDoor.userData.locked = false;
-                    // Update elevator visuals
-                    if (this.armoryLevel.elevatorButton) {
-                        this.armoryLevel.elevatorButton.material.emissive.setHex(0x00ff00);
+                this.scene.traverse((child) => {
+                    if (child.userData && child.userData.isAltar && child.material) {
+                        if (child.material.color) child.material.color.setHex(0xffffff);
+                        if (child.material.emissive) child.material.emissive.setHex(0xffffaa);
+                        if ('emissiveIntensity' in child.material) child.material.emissiveIntensity = 0.1;
                     }
-                    if (this.armoryLevel.elevatorDisplay) {
-                        this.armoryLevel.elevatorDisplay.material.emissive.setHex(0x003300);
+                });
+                console.log('[Game] Chapel already cleansed - unlocked exit door, no enemy respawn');
+            } else if (state.objectives.chapelReached) {
+                this.chapelLevel.spawnChapelEnemies();
+            }
+        }
+
+        if (levelName === 'armory' && this.armoryLevel) {
+            if (state.objectives.weaponsCollected) {
+                this.armoryLevel.weaponsCollected = state.objectives.weaponsCollected;
+            }
+            if (state.objectives.sealedDoorUnlocked && this.armoryLevel.sealedDoor) {
+                this.armoryLevel.sealedDoor.userData.locked = false;
+                if (this.armoryLevel.elevatorButton) {
+                    this.armoryLevel.elevatorButton.material.emissive.setHex(0x00ff00);
+                }
+                if (this.armoryLevel.elevatorDisplay) {
+                    this.armoryLevel.elevatorDisplay.material.emissive.setHex(0x003300);
+                }
+            }
+            if (state.pickupsCollected && this.armoryLevel.pickups) {
+                this.armoryLevel.pickups.forEach(pickup => {
+                    if (state.pickupsCollected.includes(pickup.userData.weaponType)) {
+                        pickup.visible = false;
+                        pickup.userData.collected = true;
                     }
-                }
-                // Hide already collected pickups
-                if (state.pickupsCollected && this.armoryLevel.pickups) {
-                    this.armoryLevel.pickups.forEach(pickup => {
-                        if (state.pickupsCollected.includes(pickup.userData.weaponType)) {
-                            pickup.visible = false;
-                            pickup.userData.collected = true;
-                        }
-                    });
-                }
+                });
             }
-            
-            // Restore Laboratory state
-            if (levelName === 'laboratory' && this.laboratoryLevel) {
-                if (state.objectives.keycards) {
-                    this.laboratoryLevel.keycards = {...state.objectives.keycards};
-                    // Open corresponding doors
-                    Object.keys(state.objectives.keycards).forEach(color => {
-                        if (state.objectives.keycards[color]) {
-                            this.laboratoryLevel.openSecurityDoor(color);
-                        }
-                    });
-                }
-                if (state.objectives.exitPortalActive) {
-                    this.laboratoryLevel.createExitPortal();
-                }
+        }
+
+        if (levelName === 'laboratory' && this.laboratoryLevel) {
+            if (state.objectives.keycards) {
+                this.laboratoryLevel.keycards = {...state.objectives.keycards};
+                Object.keys(state.objectives.keycards).forEach(color => {
+                    if (state.objectives.keycards[color]) {
+                        this.laboratoryLevel.openSecurityDoor(color);
+                    }
+                });
             }
-            
-            // Restore Containment state
-            if (levelName === 'containment' && this.currentLevelInstance) {
-                if (state.objectives.systemsRestored) {
-                    this.currentLevelInstance.systemsRestored = state.objectives.systemsRestored;
-                }
-                if (state.objectives.emergencyProtocolActive) {
-                    this.currentLevelInstance.emergencyProtocolActive = true;
-                }
+            if (state.objectives.exitPortalActive) {
+                this.laboratoryLevel.createExitPortal();
             }
-        }, 100);
+        }
+
+        if (levelName === 'containment' && this.currentLevelInstance) {
+            if (state.objectives.systemsRestored) {
+                this.currentLevelInstance.systemsRestored = state.objectives.systemsRestored;
+            }
+            if (state.objectives.emergencyProtocolActive) {
+                this.currentLevelInstance.emergencyProtocolActive = true;
+            }
+        }
     }
     
     /**
