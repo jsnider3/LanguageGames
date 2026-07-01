@@ -119,6 +119,13 @@ A cyberpunk rhythm game with procedurally synthesized music and neon visuals.
 - **Features:** 5 songs with 3 difficulties, 4-lane gameplay (D/F/J/K), procedural synth audio, tap and hold notes, combo system, high score persistence
 - **Location:** `NeonPulse/`
 
+#### Tidewrought
+A decipherment adventure: shipwrecked on a strange coast, you must learn the locals' constructed language — with no translations, ever — to find your way home.
+- **Genre:** Language/Puzzle Adventure
+- **Platform:** Web Browser
+- **Features:** Full working conlang (VSO grammar, agglutinative morphology, procedural glyph script), grammar engine that generates and parses all dialogue, field notebook with player-written glosses, sentence composer, comprehension-gated puzzles, day/night cycle, 829-assertion test suite proving every puzzle is solvable
+- **Location:** `Tidewrought/`
+
 ### Tools
 
 #### Qwen Idea Generator
@@ -184,6 +191,7 @@ Games in this collection were created by different LLMs:
 | StreetBrawler1992 | Claude Opus 4 |
 | VoidSpireDeckBuilder | Claude Opus 4.6 |
 | NeonPulse | Claude Opus 4.6 |
+| Tidewrought | Claude Fable 5 |
 
 ## Project Philosophy
 

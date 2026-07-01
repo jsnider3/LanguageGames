@@ -190,6 +190,8 @@ class GameLauncher:
              "A roguelike deck-builder - ascend the Void Spire through card combat"),
             ("NeonPulse", "web", "index.html", "Rhythm/Music",
              "A cyberpunk rhythm game with procedural synth music"),
+            ("Tidewrought", "web", "index.html", "Language/Adventure",
+             "Shipwrecked among strangers - decipher their language to get home"),
         ]
         
         for name, game_type, launch_file, genre, description in game_configs:
