@@ -1,0 +1,662 @@
+:root {
+  color: #e6edf3;
+  background: #15202b;
+  --cream: #e6edf3;
+  --muted: #9daebf;
+  --amber: #efa762;
+  --line: #aac8e530;
+  --panel: #14202eef;
+}
+.assault-deploy,
+.workshop-link {
+  pointer-events: auto;
+}
+.menu {
+  background: linear-gradient(
+    90deg,
+    #0b1422ef 0%,
+    #111d2ba6 29%,
+    #16233420 58%,
+    transparent
+  );
+}
+.menu-copy {
+  top: 17%;
+}
+.menu-copy h1 {
+  font-size: clamp(102px, 10vw, 158px);
+  margin: 20px 0 16px;
+  color: #f1f4f7;
+}
+.menu-copy h1 span {
+  color: #efa762;
+}
+.menu-copy h2 {
+  color: #e2ebf5;
+  font-size: 23px;
+  margin: 0 0 12px;
+}
+.menu-copy p {
+  color: #b4c4d4;
+  margin-bottom: 20px;
+}
+.menu-copy .title-rule {
+  background: #efa762;
+  margin-bottom: 16px;
+}
+.deploy {
+  padding: 16px 21px;
+  width: 310px;
+}
+.primary {
+  background: #eaa363;
+  color: #14202b;
+}
+.primary:hover:not(:disabled) {
+  background: #fac084;
+}
+.assault-deploy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 310px;
+  margin-top: 8px;
+  padding: 16px 21px;
+  background: #294052e6;
+  border: 1px solid #84bad470;
+  font: 10px var(--mono);
+  letter-spacing: 1.3px;
+  color: #e5f3ff;
+}
+.assault-deploy span {
+  color: #8fcaf0;
+  font-size: 18px;
+  line-height: 10px;
+}
+.workshop-link {
+  display: flex;
+  width: 310px;
+  justify-content: space-between;
+  padding: 13px 2px;
+  background: none;
+  color: #c8d6e1;
+  font: 9px var(--mono);
+  letter-spacing: 0.8px;
+}
+.workshop-link span {
+  color: #86a1b7;
+  font-size: 7px;
+}
+.continue {
+  width: 310px;
+  margin-top: 0;
+  padding: 11px 20px;
+  color: #b9d6e9;
+  border-color: #84bad450;
+}
+.menu-links {
+  margin-top: 13px;
+  color: #92a8bd;
+}
+.menu-header,
+.wordmark,
+.hud-brand {
+  color: #d3e2ef;
+}
+.wordmark-sub,
+.hud-brand small,
+.edition,
+.menu-footer,
+.scene-caption {
+  color: #92a9bf;
+}
+.status-dot {
+  background: #88c7f1;
+  box-shadow: 0 0 9px #88c7f155;
+}
+.scene-caption b {
+  color: #e7edf2;
+}
+.hud-top {
+  background: linear-gradient(#0c1624ed, #14212daa, transparent);
+}
+.hud-bottom-line {
+  color: #a9bfd1;
+  border-color: #aac8e52b;
+}
+.wave-top,
+.resource b,
+.objective b {
+  color: #e8edf3;
+}
+.resource small,
+.wave-top b,
+.objective p,
+.objective-key,
+.tactical-controls,
+.minimap-footer,
+.dock-heading {
+  color: #adc2d3;
+}
+.resource .icon,
+.mode-button > .icon {
+  color: #8fc8ea;
+}
+.wave-progress {
+  background: #7699b333;
+}
+.wave-progress > span {
+  background: #efaa69;
+}
+.minimap-panel,
+.field-mode .minimap-panel,
+.context-panel,
+.mode-button {
+  background: #132333e8;
+  border-color: #8ebdd348;
+}
+.minimap-heading,
+.mode-button,
+.mode-button small,
+.context-title span,
+.context-panel > p {
+  color: #bfd3e3;
+}
+.tower-card,
+.field-mode .tower-card {
+  background: linear-gradient(135deg, #263b4bec, #152332f5);
+  border-color: #8cacbd50;
+  color: #dbe6ef;
+}
+.tower-card.selected {
+  background: linear-gradient(135deg, #355568ee, #1d3448ee);
+  border-color: #8bb9d3;
+  box-shadow: inset 0 2px 0 #8bb9d3;
+}
+.card-name,
+.tower-stats b {
+  color: #e0ebf4;
+}
+.card-role,
+.card-key,
+.tower-stats span,
+.context-heading {
+  color: #9cb7cc;
+}
+.card-cost,
+.context-title > .icon {
+  color: #e7ad76;
+}
+.overlay {
+  background: #060e1bbc;
+}
+.overlay-card {
+  background: linear-gradient(140deg, #263a4b, #101c2b);
+  border-color: #a4c8e045;
+  width: 590px;
+}
+.overlay-card h2 {
+  color: #e8f0f6;
+}
+.overlay-card > p,
+.guide-tip,
+.guide-grid p {
+  color: #b7c8d9;
+}
+.overlay-card .eyebrow,
+.guide-grid h3 {
+  color: #ecb681;
+}
+.overlay-buttons > button:not(.primary) {
+  color: #c5d9e9;
+}
+.settings-fields select {
+  background: #152333;
+  color: #d5e7f5;
+}
+#notice {
+  background: #132335ed;
+  border-color: #99c6e157;
+  color: #d9ebf6;
+}
+#wave-banner {
+  background: radial-gradient(ellipse, #0d1b2ba8, transparent 70%);
+  text-shadow: 0 2px 20px #071221;
+}
+#wave-banner h2 {
+  color: #e6eff7;
+}
+#wave-banner p {
+  color: #cfdfeb;
+}
+.health-track {
+  background: #a6c6dc44;
+}
+.health-track i {
+  background: #c2deec;
+}
+.health-block,
+.weapon-block {
+  text-shadow: 0 1px 5px #061324;
+}
+.health-block > small,
+.weapon-block > small,
+.health-block > span,
+.weapon-block > span {
+  color: #c8dce9;
+}
+.health-block > div > span,
+.weapon-block > div > span {
+  color: #a3bfd4;
+}
+#loading {
+  background: #101d2a;
+  color: #dae8f4;
+}
+.base-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0;
+}
+.base-options button {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 14px 11px;
+  background: #0c1826a3;
+  border: 1px solid #859db342;
+}
+.base-options button.selected {
+  border-color: #86c7ed;
+  background: #38556b65;
+}
+.base-options span {
+  font: 7px var(--mono);
+  letter-spacing: 1px;
+  color: #9cb8cd;
+}
+.base-options b {
+  font:
+    800 23px/1.1 Condensed,
+    sans-serif;
+  text-transform: uppercase;
+  margin: 10px 0;
+}
+.base-options small {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #a9bdce;
+}
+.selected-base {
+  padding: 14px 0;
+  border-block: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.selected-base span {
+  display: block;
+  font: 8px var(--mono);
+  letter-spacing: 1px;
+  color: #98bed5;
+}
+.selected-base b {
+  display: block;
+  font-size: 21px;
+  margin: 7px 0;
+}
+.selected-base small {
+  color: #b2c8db;
+}
+.import-base {
+  margin: 18px 0;
+}
+.import-base summary {
+  cursor: pointer;
+  font: 9px var(--mono);
+  letter-spacing: 0.7px;
+  color: #b9d5e9;
+  padding: 9px 0;
+}
+.import-base p,
+#copy-status {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9fb8cc;
+}
+.import-base label,
+.form-label {
+  display: block;
+  font: 8px var(--mono);
+  letter-spacing: 1px;
+  color: #b4cddd;
+  margin: 16px 0 7px;
+}
+textarea,
+.base-name {
+  display: block;
+  width: 100%;
+  background: #0d1928;
+  border: 1px solid #8faab955;
+  color: #d9e8f4;
+  padding: 12px;
+  font: 11px/1.5 var(--mono);
+  resize: vertical;
+}
+textarea {
+  min-height: 85px;
+  max-height: 170px;
+}
+textarea:focus,
+.base-name:focus {
+  outline: 1px solid #89c9f2;
+}
+.secondary {
+  padding: 12px 16px;
+  background: #354d62;
+  color: #d8edfa;
+  margin-top: 10px;
+  font: 9px var(--mono);
+}
+#base-error {
+  color: #ffaf8d;
+}
+.raid-objectives,
+.squad-panel,
+.shield-hud,
+.share-base {
+  display: none;
+}
+.raid-mode .raid-objectives {
+  display: block;
+  position: absolute;
+  left: 34px;
+  top: 119px;
+  width: 220px;
+}
+.raid-objectives .eyebrow {
+  color: #abc8db;
+  font-size: 8px;
+}
+#relay-status {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
+}
+#relay-status span {
+  border: 1px solid #bb826866;
+  padding: 7px;
+  font: 7px var(--mono);
+  color: #f4ba93;
+  background: #271f2690;
+}
+#relay-status .complete {
+  color: #82c4e6;
+  border-color: #82c4e666;
+  background: #1c344a90;
+  text-decoration: line-through;
+}
+#raid-task {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #bdcfdd;
+}
+.raid-mode .squad-panel {
+  display: block;
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 66px;
+  width: 348px;
+  padding: 14px;
+  background: linear-gradient(120deg, #172839ed, #0c1724d9);
+  border: 1px solid #93b6cf45;
+  border-top: 2px solid #82bbdf;
+}
+.squad-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 8px var(--mono);
+  color: #c1d7e8;
+  letter-spacing: 0.6px;
+}
+.squad-heading b {
+  color: #8fcdf0;
+  font-size: 15px;
+}
+#order-label {
+  font-size: 7px;
+  color: #88b4d0;
+}
+.squad-roster {
+  display: flex;
+  gap: 4px;
+  margin: 11px 0;
+  min-height: 22px;
+}
+.squad-roster > div {
+  flex: 1;
+  min-width: 0;
+}
+.squad-roster span {
+  display: block;
+  font: 7px var(--mono);
+  color: #a5bfd3;
+}
+.squad-roster i {
+  display: block;
+  height: 3px;
+  background: #7094ab40;
+  margin-top: 5px;
+}
+.squad-roster b {
+  display: block;
+  height: 100%;
+  background: #85c9ed;
+}
+.squad-orders {
+  display: flex;
+  gap: 4px;
+}
+.squad-orders button {
+  flex: 1;
+  padding: 8px 3px;
+  border: 1px solid #8aa8c137;
+  background: #29415644;
+  font: 8px var(--mono);
+  color: #bfd0de;
+}
+.squad-orders button.selected {
+  background: #557f9866;
+  border-color: #91c9eaba;
+  color: #eaf5fc;
+}
+.squad-orders kbd,
+.squad-hint kbd,
+#reinforce-button kbd {
+  font-size: 8px;
+  min-width: 17px;
+  min-height: 16px;
+  padding: 1px 3px;
+}
+#reinforce-button {
+  display: block;
+  width: 100%;
+  background: #b77f4740;
+  border: 1px solid #d39b5b55;
+  padding: 8px;
+  font: 8px var(--mono);
+  margin-top: 7px;
+  text-align: left;
+}
+#reinforce-button span {
+  float: right;
+  color: #e6b486;
+  line-height: 18px;
+}
+.squad-hint {
+  text-align: center;
+  margin-top: 9px;
+  color: #89a7bd;
+  font: 7px var(--mono);
+}
+.raid-mode .build-dock,
+.raid-mode .wave-action,
+.raid-mode #context-panel,
+.raid-mode #objective {
+  display: none !important;
+}
+.raid-mode .shield-hud {
+  display: block;
+  position: absolute;
+  left: 35px;
+  bottom: 238px;
+  width: 170px;
+  font: 8px var(--mono);
+  color: #9cd5f5;
+}
+.shield-hud b {
+  float: right;
+}
+.shield-hud > div {
+  height: 5px;
+  margin-top: 9px;
+  background: #77c9ff30;
+}
+.shield-hud i {
+  display: block;
+  height: 100%;
+  background: #8ed6ff;
+  box-shadow: 0 0 10px #80d1ff60;
+}
+.raid-mode:not(.field-mode) .shield-hud {
+  display: none;
+}
+.raid-mode:not(.field-mode) .right-stack {
+  bottom: 68px;
+}
+.raid-mode .wave-top {
+  min-width: 290px;
+}
+.raid-mode #wave-name {
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workshop-mode .share-base {
+  display: block;
+  position: absolute;
+  top: 270px;
+  left: 35px;
+  pointer-events: auto;
+  padding: 13px 16px;
+  background: #294357ec;
+  border: 1px solid #8abbd965;
+  font: 9px var(--mono);
+  letter-spacing: 0.6px;
+}
+.workshop-mode.field-mode .share-base {
+  top: 112px;
+}
+@media (max-height: 820px) {
+  .menu-copy {
+    top: 17%;
+  }
+  .menu-copy h1 {
+    font-size: 110px;
+    margin: 15px 0 12px;
+  }
+  .menu-copy h2 {
+    font-size: 20px;
+  }
+  .menu-copy p {
+    margin-bottom: 15px;
+    font-size: 12px;
+  }
+  .deploy,
+  .assault-deploy {
+    padding: 13px 20px;
+  }
+  .menu-copy .title-rule {
+    margin-bottom: 12px;
+  }
+  .workshop-link {
+    padding: 11px 2px;
+  }
+  .menu-links {
+    margin-top: 7px;
+  }
+}
+@media (max-height: 680px) {
+  .menu-copy {
+    top: 18%;
+  }
+  .menu-copy h1 {
+    font-size: 80px;
+    margin: 10px 0;
+    line-height: 0.8;
+  }
+  .menu-copy h1 br {
+    display: none;
+  }
+  .menu-copy h2 {
+    margin-bottom: 8px;
+  }
+  .menu-copy p {
+    margin-bottom: 13px;
+  }
+  .menu-copy .title-rule {
+    display: none;
+  }
+  .continue {
+    padding: 8px 15px;
+  }
+}
+@media (max-width: 1050px) {
+  .raid-mode .wave-top {
+    left: 44%;
+    min-width: 235px;
+  }
+  .raid-mode #wave-name {
+    max-width: 130px;
+  }
+  .raid-mode .squad-panel {
+    width: 304px;
+    bottom: 62px;
+    padding: 10px;
+  }
+  .raid-mode .raid-objectives {
+    left: 22px;
+    width: 185px;
+  }
+  .raid-mode .shield-hud {
+    left: 22px;
+    width: 110px;
+    bottom: 216px;
+  }
+  .raid-mode .right-stack {
+    width: 160px;
+  }
+}
+@media (max-width: 750px) {
+  .raid-mode .squad-panel {
+    width: 254px;
+  }
+  .squad-hint {
+    font-size: 6px;
+  }
+  .base-options {
+    grid-template-columns: 1fr;
+  }
+  .base-options button {
+    padding: 10px;
+  }
+  .base-options b {
+    margin: 5px 0;
+  }
+  .raid-mode .raid-objectives {
+    width: 175px;
+  }
+}

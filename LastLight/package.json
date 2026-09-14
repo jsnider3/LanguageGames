@@ -1,0 +1,24 @@
+{
+  "name": "last-light",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "First-person bunker defense with manual repairs, plus outdoor squad assaults and a base workshop.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node scripts/browser-test.mjs",
+    "test:raid-browser": "node scripts/raid-browser-test.mjs",
+    "test:sights": "node scripts/sight-browser-test.mjs",
+    "test:breaches": "node scripts/breach-browser-test.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "vite": "7.1.7",
+    "@playwright/test": "1.55.0"
+  }
+}

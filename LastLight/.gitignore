@@ -1,0 +1,6 @@
+node_modules/
+dist/
+artifacts/
+.DS_Store
+LastLight-Playable.zip
+__pycache__/
