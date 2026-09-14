@@ -103,11 +103,7 @@ export class BrimstoneGolem extends BaseEnemy {
         // Lava drip particles
         this.createLavaDrips(group);
         
-        // Add glow light
-        const glowLight = new THREE.PointLight(0xff3300, 0.5, 5);
-        glowLight.position.y = 1;
-        group.add(glowLight);
-        this.glowLight = glowLight;
+        // The emissive core supplies the glow without a transient scene light.
         
         this.mesh = group;
         this.mesh.position.copy(this.position);
@@ -205,7 +201,6 @@ export class BrimstoneGolem extends BaseEnemy {
         if (this.core) {
             this.coreTemperature = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
             this.core.material.emissiveIntensity = this.coreTemperature * 2;
-            this.glowLight.intensity = this.coreTemperature * 0.5;
         }
         
         // Update lava drips

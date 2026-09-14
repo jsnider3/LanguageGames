@@ -474,7 +474,7 @@ export class Hellhound extends BaseEnemy {
         oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + duration);
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
@@ -496,7 +496,7 @@ export class Hellhound extends BaseEnemy {
         oscillator.frequency.exponentialRampToValueAtTime(80, audioContext.currentTime + duration);
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
@@ -519,7 +519,7 @@ export class Hellhound extends BaseEnemy {
         oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + duration);
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);

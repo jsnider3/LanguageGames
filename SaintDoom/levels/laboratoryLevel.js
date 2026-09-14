@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
 import { THEME } from '../modules/config/theme.js';
+import { createPickupGlow } from '../utils/PickupGlow.js';
+import { createFacilityTexture, createFacilitySign, setWallPanelUVs } from '../utils/FacilityTextures.js';
 // Laboratory Complex Level - Fixed version with connected rooms
 // High-tech research facility with keycard access system
 
@@ -40,9 +42,12 @@ export class LaboratoryLevel extends BaseLevel {
         // Clear any existing level
         this.clearLevel();
         
+        this.surfaceTextures = [createFacilityTexture('wall'), createFacilityTexture('floor')];
+        this.surfaceTextures[1].repeat.set(40, 50);
         // Materials
         const concreteMaterial = new THREE.MeshStandardMaterial({
             color: THEME.materials.wall.laboratory,
+            map: this.surfaceTextures[0],
             roughness: 0.9,
             metalness: 0.1
         });
@@ -61,6 +66,7 @@ export class LaboratoryLevel extends BaseLevel {
             roughness: 0.1
         });
         
+        this.wallMaterial = concreteMaterial;
         // Create connected lab layout
         this.createConnectedLayout(concreteMaterial, glassMaterial, metalMaterial);
         
@@ -93,7 +99,10 @@ export class LaboratoryLevel extends BaseLevel {
     createConnectedLayout(concreteMaterial, glassMaterial, metalMaterial) {
         // Create one large connected floor
         const mainFloor = new THREE.PlaneGeometry(80, 100);
-        const floor = new THREE.Mesh(mainFloor, concreteMaterial);
+        const floor = new THREE.Mesh(mainFloor, new THREE.MeshStandardMaterial({
+            color: 0xc0ccce, map: this.surfaceTextures[1], roughness: 0.86, metalness: 0.1
+        }));
+        this.markAsFloor(floor);
         floor.rotation.x = -Math.PI / 2;
         floor.position.set(0, 0, -30);
         floor.receiveShadow = true;
@@ -102,7 +111,9 @@ export class LaboratoryLevel extends BaseLevel {
         this.scene.add(floor);
         
         // Create ceiling
-        const ceiling = new THREE.Mesh(mainFloor, concreteMaterial);
+        const ceiling = new THREE.Mesh(mainFloor, new THREE.MeshStandardMaterial({
+            color: 0x515e66, roughness: 1
+        }));
         ceiling.rotation.x = Math.PI / 2;
         ceiling.position.set(0, 4, -30);
         ceiling.matrixAutoUpdate = false;
@@ -430,18 +441,19 @@ export class LaboratoryLevel extends BaseLevel {
         doorLight.position.set(x, y + 1, z);
         this.scene.add(doorLight);
         
-        // Add "LOCKED" text indicator (on the corridor side)
+        const signTexture = createFacilitySign(label, keycard,
+            keycard === 'blue' ? '#65c8eb' : keycard === 'red' ? '#ee826c' : '#e7c866');
+        this.surfaceTextures.push(signTexture);
+        // Put readable room signage below the ceiling, facing the corridor.
         const lockedText = new THREE.Mesh(
-            new THREE.PlaneGeometry(2, 0.5),
+            new THREE.PlaneGeometry(2.8, 0.7),
             new THREE.MeshBasicMaterial({
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.8
+                map: signTexture
             })
         );
         // Position text facing the corridor
         const textX = isLeftWall ? x + 0.3 : x - 0.3;
-        lockedText.position.set(textX, y + 2.3, z);
+        lockedText.position.set(textX, y + 1.25, z);
         lockedText.rotation.y = isLeftWall ? Math.PI / 2 : -Math.PI / 2;  // Face the corridor
         lockedText.userData.isLockedIndicator = true;
         lockedText.matrixAutoUpdate = false;
@@ -480,15 +492,8 @@ export class LaboratoryLevel extends BaseLevel {
         card.castShadow = false;
         card.matrixAutoUpdate = false;
         card.updateMatrix();
-        // Add brighter glow light
-        const cardLight = new THREE.PointLight(
-            color === 'blue' ? 0x0066cc : 
-            color === 'red' ? 0xcc0000 : 0xcccc00,
-            1.5, 10  // Much brighter and wider light
-        );
-        cardLight.position.set(x, y + 0.5, z);
-        this.scene.add(cardLight);
-        
+        card.add(createPickupGlow(cardMaterial.emissive.getHex(), 0.6));
+
         // Add a vertical beacon to make keycards easier to spot
         const beaconGeometry = new THREE.CylinderGeometry(0.05, 0.2, 4, 8);
         const beaconMaterial = new THREE.MeshBasicMaterial({
@@ -503,13 +508,12 @@ export class LaboratoryLevel extends BaseLevel {
         beacon.updateMatrix();
         this.scene.add(beacon);
         
-        // Store references to light and beacon for removal
+        // Store the beacon for removal with the card
         card.userData = {
             isKeycard: true,
             color: color,
             collected: false,
             baseY: y,  // Store the base Y position for animation
-            light: cardLight,  // Store light reference
             beacon: beacon     // Store beacon reference
         };
         this.scene.add(card);
@@ -517,6 +521,10 @@ export class LaboratoryLevel extends BaseLevel {
     }
     
     createLaboratoryLighting() {
+        // Reserve the exit light now; unlocking it only changes intensity.
+        this.portalLight = new THREE.PointLight(0x00ff00, 0, 20);
+        this.portalLight.position.set(0, 2, -75);
+        this.scene.add(this.portalLight);
         // Main corridor lights - reduced intensity
         for (let z = 10; z >= -70; z -= 10) {
             const light = new THREE.PointLight(0xffffff, 0.3, 15);
@@ -625,14 +633,7 @@ export class LaboratoryLevel extends BaseLevel {
                         }
                     }
                     
-                    // Remove keycard, light, and beacon from scene
-                    this.scene.remove(pickup);
-                    if (pickup.userData.light) {
-                        this.scene.remove(pickup.userData.light);
-                    }
-                    if (pickup.userData.beacon) {
-                        this.scene.remove(pickup.userData.beacon);
-                    }
+                    this.disposeKeycard(pickup);
                     this.pickups.splice(i, 1);
                     
                     // Update door visuals
@@ -697,7 +698,6 @@ export class LaboratoryLevel extends BaseLevel {
         const portalGeometry = new THREE.RingGeometry(1, 3, 8);
         const portalMaterial = new THREE.MeshBasicMaterial({
             color: 0x00ff00,
-            emissive: 0x00ff00,
             side: THREE.DoubleSide,
             transparent: true,
             opacity: 0.8
@@ -708,10 +708,7 @@ export class LaboratoryLevel extends BaseLevel {
         this.exitPortal.rotation.x = Math.PI / 2;
         this.scene.add(this.exitPortal);
         
-        // Add a bright light
-        const portalLight = new THREE.PointLight(0x00ff00, 2, 20);
-        portalLight.position.set(0, 2, -75);
-        this.scene.add(portalLight);
+        this.portalLight.intensity = 2;
         
         // Add inner glow
         const innerGeometry = new THREE.CircleGeometry(1, 8);
@@ -791,7 +788,29 @@ export class LaboratoryLevel extends BaseLevel {
         // No need to update them here
     }
     
+    createWall(x, y, z, width, height, depth, material) {
+        const wall = super.createWall(x, y, z, width, height, depth, material);
+        if (wall.material === this.wallMaterial) setWallPanelUVs(wall.geometry);
+        return wall;
+    }
+
+    disposeKeycard(pickup) {
+        for (const object of [pickup, pickup.userData.beacon]) {
+            if (!object) continue;
+            this.scene.remove(object);
+            object.traverse(child => {
+                child.geometry?.dispose();
+                child.material?.dispose();
+            });
+        }
+    }
+
     clearLevel() {
+        this.pickups.forEach(pickup => this.disposeKeycard(pickup));
+        this.surfaceTextures?.forEach(texture => texture.dispose());
+        this.surfaceTextures = [];
+        if (this.portalLight) this.scene.remove(this.portalLight);
+        this.portalLight = null;
         // Call parent cleanup to handle intervals, timeouts, walls, etc.
         if (super.cleanup) {
             super.cleanup();

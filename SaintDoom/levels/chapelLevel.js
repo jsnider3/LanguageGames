@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
+import { createStoneTexture } from '../utils/StoneTexture.js';
 import { THEME } from '../modules/config/theme.js';
 // Desecrated Chapel Level
 // The first objective - find and cleanse the chapel
@@ -22,7 +23,8 @@ export class ChapelLevel extends BaseLevel {
         
         // Materials
         const floorMaterial = new THREE.MeshStandardMaterial({
-            color: THEME.materials.floor.chapel,
+            color: 0xa99b85,
+            map: createStoneTexture(5, 20),
             roughness: 0.9,
             metalness: 0.1
         });
@@ -53,26 +55,68 @@ export class ChapelLevel extends BaseLevel {
         // Add environmental details
         this.addEnvironmentalDetails();
         
+        this.addArchitecture();
+
         // Create exit door to armory (always visible)
         this.createExitDoor();
         
         return this.walls;
     }
     
+    addArchitecture() {
+        const stone = new THREE.MeshStandardMaterial({ color: 0x5a5146, roughness: 0.95 });
+        const brass = new THREE.MeshStandardMaterial({ color: 0x78603f, metalness: 0.55, roughness: 0.6 });
+        const lamp = new THREE.MeshBasicMaterial({ color: 0xffbd75 });
+        const beamGeometry = new THREE.BoxGeometry(0.16, 0.16, 1);
+        const beam = (from, to) => {
+            const mesh = new THREE.Mesh(beamGeometry, stone);
+            mesh.position.copy(from).add(to).multiplyScalar(0.5);
+            mesh.scale.z = from.distanceTo(to);
+            mesh.lookAt(to);
+            this.scene.add(mesh);
+        };
+        for (const z of [5, -5, -15, -25]) {
+            for (const side of [-1, 1]) {
+                const pilaster = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.4, 0.35), stone);
+                pilaster.position.set(side * 5.18, 1.7, z);
+                this.scene.add(pilaster);
+                beam(new THREE.Vector3(side * 5.2, 3.25, z), new THREE.Vector3(side * 2.5, 3.8, z));
+                beam(new THREE.Vector3(side * 2.5, 3.8, z), new THREE.Vector3(0, 3.98, z));
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 0.28), brass);
+                frame.position.set(side * 5.05, 2.2, z);
+                this.scene.add(frame);
+                const glow = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.36, 0.11), lamp);
+                glow.position.copy(frame.position);
+                this.scene.add(glow);
+            }
+        }
+        const runner = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 36), new THREE.MeshStandardMaterial({ color: 0x4b1a16, roughness: 1 }));
+        runner.rotation.x = -Math.PI / 2;
+        runner.position.set(0, 0.012, -10);
+        this.scene.add(runner);
+        for (const side of [-1, 1]) {
+            const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 36), brass);
+            edge.rotation.x = -Math.PI / 2;
+            edge.position.set(side * 1.1, 0.014, -10);
+            this.scene.add(edge);
+        }
+    }
+
     createCorridor(floorMaterial, wallMaterial) {
         // Main corridor floor (40x10)
         const corridorFloor = new THREE.Mesh(
-            new THREE.PlaneGeometry(10, 40),
+            new THREE.PlaneGeometry(11, 44),
             floorMaterial
         );
         corridorFloor.rotation.x = -Math.PI / 2;
         corridorFloor.position.set(0, 0, -10);
         corridorFloor.receiveShadow = true;
+        this.markAsFloor(corridorFloor);
         this.scene.add(corridorFloor);
         
         // Corridor ceiling with missile entry hole
         const corridorCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry(10, 40),
+            new THREE.PlaneGeometry(11, 44),
             wallMaterial
         );
         corridorCeiling.rotation.x = Math.PI / 2;
@@ -132,6 +176,7 @@ export class ChapelLevel extends BaseLevel {
         chapelFloor.rotation.x = -Math.PI / 2;
         chapelFloor.position.set(0, 0, -zPosition - 10);
         chapelFloor.receiveShadow = true;
+        this.markAsFloor(chapelFloor);
         this.scene.add(chapelFloor);
         
         // Chapel ceiling (higher)
@@ -224,15 +269,15 @@ export class ChapelLevel extends BaseLevel {
     
     addLighting() {
         // Corridor lights (dim, flickering)
-        const corridorLight1 = new THREE.PointLight(0xffaa00, 0.5, 10);
+        const corridorLight1 = new THREE.PointLight(0xffc58b, 1.2, 15);
         corridorLight1.position.set(0, 3, 0);
         this.scene.add(corridorLight1);
         
-        const corridorLight2 = new THREE.PointLight(0xffaa00, 0.5, 10);
+        const corridorLight2 = new THREE.PointLight(0xffc58b, 1.2, 15);
         corridorLight2.position.set(0, 3, -10);
         this.scene.add(corridorLight2);
         
-        const corridorLight3 = new THREE.PointLight(0xffaa00, 0.5, 10);
+        const corridorLight3 = new THREE.PointLight(0xffc58b, 1.2, 15);
         corridorLight3.position.set(0, 3, -20);
         this.scene.add(corridorLight3);
         
@@ -242,17 +287,8 @@ export class ChapelLevel extends BaseLevel {
         chapelLight.castShadow = true;
         this.scene.add(chapelLight);
         
-        // Flickering effect
-        const flicker = () => {
-            corridorLight1.intensity = 0.5 + Math.random() * 0.2;
-            corridorLight2.intensity = 0.5 + Math.random() * 0.2;
-            corridorLight3.intensity = 0.5 + Math.random() * 0.2;
-            
-            if (!this.chapelCleansed) {
-                setTimeout(flicker, 100 + Math.random() * 200);
-            }
-        };
-        flicker();
+        this.corridorLights = [corridorLight1, corridorLight2, corridorLight3];
+        this.lightTime = 0;
     }
     
     addEnvironmentalDetails() {
@@ -325,6 +361,10 @@ export class ChapelLevel extends BaseLevel {
     }
     
     update(deltaTime, input, player) {
+        this.lightTime += deltaTime;
+        this.corridorLights?.forEach((light, index) => {
+            light.intensity = 1.15 + Math.sin(this.lightTime * 3 + index * 2) * 0.08;
+        });
         // Call parent update
         if (super.update) {
             super.update(deltaTime, input, player);

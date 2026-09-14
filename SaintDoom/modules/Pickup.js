@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from './GameConfig.js';
 import { GeometryCache, AudioManager } from './Utils.js';
+import { createPickupGlow } from '../utils/PickupGlow.js';
 
 export class Pickup {
     constructor(scene, position, type) {
@@ -60,10 +61,8 @@ export class Pickup {
                 g.add(fallback);
             }
         }
-        // Glow light
-        const light = new THREE.PointLight(0xffffff, 0.4, 3);
-        light.userData.isPickupLight = true;
-        this.group.add(light);
+        this.glow = createPickupGlow(0xffffff);
+        this.group.add(this.glow);
     }
 
     update(deltaTime, player, game) {
@@ -115,16 +114,16 @@ export class Pickup {
     destroy() {
         if (!this.group) return;
         this.scene.remove(this.group);
-        // Dispose simple materials/geometries if created here (mostly from cache)
+        // Core geometry is cached; the glow and materials belong to this pickup.
+        const materials = new Set();
         this.group.traverse(child => {
             if (child.isMesh) {
-                // Using cached geometries; avoid disposing cache. Dispose materials we created.
-                if (child.material && !child.material.isDisposed) {
-                    // Some materials are reused; skip disposal to avoid side effects.
-                }
+                if (Array.isArray(child.material)) child.material.forEach(material => materials.add(material));
+                else if (child.material) materials.add(child.material);
             }
         });
+        materials.forEach(material => material.dispose());
+        this.glow.geometry.dispose();
         this.group = null;
     }
 }
-

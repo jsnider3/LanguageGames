@@ -1,704 +1,303 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaintDoom: Unholy Retribution</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
-            background: #000;
-            cursor: crosshair;
-        }
-        
-        #gameCanvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
-        
-        #hud {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #fff;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            font-size: 18px;
-            font-weight: bold;
-            z-index: 100;
-            pointer-events: none;
-            user-select: none;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 90%;
-        }
-        
-        .hud-bar {
-            display: inline-block;
-            margin: 0 5px;
-            background: rgba(0,0,0,0.7);
-            padding: 8px 15px;
-            border: 2px solid #444;
-            white-space: nowrap;
-        }
-        
-        #health {
-            color: #ff4444;
-            border-color: #ff4444;
-        }
-        
-        #armor {
-            color: #4444ff;
-            border-color: #4444ff;
-        }
-        
-        #ammo {
-            color: #ffff44;
-            border-color: #ffff44;
-        }
-        
-        #crosshair {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            pointer-events: none;
-            z-index: 101;
-        }
-        
-        #crosshair::before,
-        #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.7);
-        }
-        
-        #crosshair::before {
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 2px;
-            transform: translateY(-50%);
-        }
-        
-        #crosshair::after {
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            transform: translateX(-50%);
-        }
-        
-        #startScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(180deg, #1a0000 0%, #000 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
-            z-index: 1000;
-            color: #fff;
-            padding-top: 150px;
-        }
-        
-        #startScreen h1 {
-            font-size: 60px;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px #ff0000;
-            font-family: 'Times New Roman', serif;
-        }
-        
-        #startScreen h2 {
-            font-size: 24px;
-            margin-bottom: 40px;
-            color: #888;
-        }
-        
-        #startButton {
-            padding: 15px 40px;
-            font-size: 24px;
-            background: #800000;
-            color: #fff;
-            border: 2px solid #ff0000;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: 'Courier New', monospace;
-        }
-        
-        #startButton:hover {
-            background: #ff0000;
-            box-shadow: 0 0 20px #ff0000;
-        }
-        
-        .quote {
-            position: absolute;
-            bottom: 40px;
-            font-style: italic;
-            color: #666;
-            font-size: 16px;
-        }
-        
-        #instructions {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: #fff;
-            font-size: 14px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            display: none;
-            z-index: 99;
-        }
-        
-        #pauseMenu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 1001;
-            backdrop-filter: blur(5px);
-        }
-        
-        #pauseMenu h2 {
-            font-size: 48px;
-            color: #fff;
-            margin-bottom: 40px;
-            text-shadow: 0 0 10px #ff0000;
-            font-family: 'Times New Roman', serif;
-        }
-        
-        .menu-options {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            align-items: center;
-        }
-        
-        .menu-button {
-            background: linear-gradient(135deg, #660000, #330000);
-            border: 2px solid #ff0000;
-            color: #fff;
-            padding: 15px 40px;
-            font-size: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: 'Courier New', monospace;
-            text-transform: uppercase;
-            min-width: 250px;
-        }
-        
-        .menu-button:hover {
-            background: linear-gradient(135deg, #880000, #440000);
-            transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-        }
-        
-        #settingsPanel {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95);
-            padding: 30px;
-            border: 2px solid #ff0000;
-            border-radius: 10px;
-            color: #fff;
-            z-index: 1002;
-            display: none;
-        }
-        
-        #deathScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(100,0,0,0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1003;
-            font-family: 'Times New Roman', serif;
-        }
-        
-        #deathScreen h2 {
-            font-size: 72px;
-            color: #ff0000;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #880000;
-            margin-bottom: 20px;
-        }
-        
-        #settingsPanel h3 {
-            margin-bottom: 20px;
-            color: #ff0000;
-        }
-        
-        #settingsPanel label {
-            display: block;
-            margin-bottom: 15px;
-        }
-        
-        #settingsPanel input[type="range"] {
-            width: 200px;
-            vertical-align: middle;
-            margin-left: 10px;
-        }
-        
-        .settings-value {
-            display: inline-block;
-            width: 40px;
-            text-align: right;
-            margin-left: 10px;
-        }
-        
-        #creditsScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #000000, #1a0000);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 1000;
-        }
-        
-        /* Loading Screen Styles */
-        #loadingScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(ellipse at center, #1a0000 0%, #000000 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-            font-family: 'Courier New', monospace;
-        }
-        
-        .loading-content {
-            text-align: center;
-            color: #fff;
-        }
-        
-        #loadingScreen h2 {
-            font-size: 48px;
-            color: #ff0000;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #880000;
-            margin-bottom: 30px;
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .loading-bar-container {
-            width: 400px;
-            height: 30px;
-            border: 2px solid #ff0000;
-            background: #1a0000;
-            margin: 0 auto 20px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .loading-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #ff0000, #ff4444);
-            width: 0%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px #ff0000;
-        }
-        
-        #loadingText {
-            color: #ffaaaa;
-            font-size: 18px;
-            margin-bottom: 30px;
-            animation: fadeInOut 2s infinite;
-        }
-        
-        @keyframes fadeInOut {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
-        }
-        
-        .loading-tips {
-            margin-top: 40px;
-            padding: 20px;
-            border-top: 1px solid #440000;
-            max-width: 500px;
-        }
-        
-        #loadingTip {
-            color: #888;
-            font-size: 14px;
-            font-style: italic;
-        }
-        
-        #creditsScreen h2 {
-            font-size: 48px;
-            color: #ff0000;
-            margin-bottom: 40px;
-            text-shadow: 0 0 10px #ff0000;
-            font-family: 'Times New Roman', serif;
-        }
-        
-        #levelSelectScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #000000, #1a0000);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 2000;
-        }
-        
-        #levelSelectScreen h2 {
-            font-size: 48px;
-            color: #ff0000;
-            margin-bottom: 40px;
-            text-shadow: 0 0 10px #ff0000;
-            font-family: 'Times New Roman', serif;
-        }
-        
-        .level-select-btn {
-            min-width: 350px;
-            margin: 5px;
-        }
-        
-        .level-select-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-    </style>
-</head>
-<body>
-    <div id="pauseMenu">
-        <h2>PAUSED</h2>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#100f0e" />
+    <meta name="saintdoom-build" content="20260914-refresh1" />
+    <meta
+      name="description"
+      content="An ancient saint. A modern arsenal. A descent into Hell. SaintDoom is a browser-based first-person crusade."
+    />
+    <title>SaintDoom — Unholy Retribution</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23b74432' d='M27 6h10v16h16v10H37v26H27V32H11V22h16z'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles/game.css" />
+  </head>
+  <body>
+    <canvas id="gameCanvas" aria-label="SaintDoom game world"></canvas>
+    <main id="startScreen" class="screen title-screen">
+      <header class="title-header">
+        <span class="brand"
+          ><span class="small-cross" aria-hidden="true">✝</span> VATICAN BLACK
+          OPERATIONS</span
+        ><span class="classification"
+          >PROTOCOL LAZARUS <span class="status-dot"></span> ACTIVE</span
+        >
+      </header>
+      <div class="sanctum" aria-hidden="true">
+        <img src="./assets/sanctum.svg" alt="" /><span class="art-caption"
+          >RELIC VII / THE BLESSED BLADE</span
+        >
+      </div>
+      <section class="title-content">
+        <p class="eyebrow">
+          <span></span> SEVEN TIMES CALLED. SEVEN TIMES RETURNED.
+        </p>
+        <h1>SAINT<span>DOOM</span></h1>
+        <p class="subtitle">UNHOLY RETRIBUTION</p>
+        <p class="premise">Heaven sent you.<br />Hell remembers.</p>
+        <p class="synopsis">
+          Resurrected for one final crusade. Descend into a fallen black site,
+          reclaim the sacred, and close the gates below.
+        </p>
+        <div class="title-actions">
+          <button id="startButton" class="primary-button">
+            <span
+              >BEGIN CRUSADE<small>Deploy to the Desecrated Chapel</small></span
+            ><span aria-hidden="true">↗</span>
+          </button>
+          <button id="tutorialButton" class="text-button">
+            Vatican prologue <span>Learn the controls →</span>
+          </button>
+        </div>
+        <nav class="title-nav" aria-label="Main menu">
+          <button id="levelSelectButton">Chapters</button
+          ><button id="mainSettingsButton">Settings</button
+          ><button id="creditsButton">Credits</button>
+        </nav>
+        <p id="launchError" class="error-message" role="alert" hidden></p>
+      </section>
+      <footer class="title-footer">
+        <span
+          ><span class="status-dot"></span> SINGLE PLAYER / FIRST-PERSON
+          CRUSADE</span
+        >
+        <p>“Death is merely an inconvenience.”</p>
+        <span class="desktop-note">KEYBOARD + MOUSE REQUIRED</span>
+      </footer>
+    </main>
+
+    <section
+      id="levelSelectScreen"
+      class="screen chapter-screen"
+      style="display: none"
+      aria-labelledby="chapterTitle"
+    >
+      <div class="screen-heading">
+        <div>
+          <p class="eyebrow">THE DESCENT</p>
+          <h2 id="chapterTitle">Choose your chapter.</h2>
+          <p class="muted">Enter any chapter with its starting loadout.</p>
+        </div>
+        <button id="backToMenuBtn" class="text-button">← Back to title</button>
+      </div>
+      <div id="chapterGrid" class="chapter-grid"></div>
+    </section>
+
+    <section
+      id="pauseMenu"
+      class="screen overlay"
+      style="display: none"
+      aria-labelledby="pauseTitle"
+    >
+      <div class="menu-panel">
+        <p class="eyebrow">TAKE A BREATH, SAINT.</p>
+        <h2 id="pauseTitle">Crusade paused.</h2>
+        <p id="pauseHint" class="muted">Your fight can wait.</p>
         <div class="menu-options">
-            <button class="menu-button" id="resumeButton">Resume</button>
-            <button class="menu-button" id="restartButton">Restart Level</button>
-            <button class="menu-button" id="settingsButton">Settings</button>
-            <button class="menu-button" id="quitButton">Quit to Title</button>
+          <button class="primary-button" id="resumeButton">
+            Return to the fight <span aria-hidden="true">→</span></button
+          ><button class="menu-button" id="restartButton">
+            Restart chapter</button
+          ><button class="menu-button" id="settingsButton">
+            Settings & controls</button
+          ><button class="text-button" id="quitButton">Return to title</button>
         </div>
-    </div>
-    
-    <div id="settingsPanel">
-        <h3>Settings</h3>
-        <label>
-            Mouse Sensitivity: 
-            <input type="range" id="mouseSensitivity" min="1" max="20" value="8">
-            <span class="settings-value" id="sensitivityValue">8</span>
-        </label>
-        <label>
-            Volume: 
-            <input type="range" id="volume" min="0" max="100" value="50">
-            <span class="settings-value" id="volumeValue">50%</span>
-        </label>
-        <button class="menu-button" id="closeSettings">Close</button>
-    </div>
-    
-    <div id="deathScreen" style="display:none;">
-        <h2>YOU HAVE FALLEN</h2>
-        <p style="color: #ccc; margin: 20px 0;">But death is merely an inconvenience...</p>
+      </div>
+    </section>
+
+    <section
+      id="settingsPanel"
+      class="screen overlay"
+      style="display: none"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settingsTitle"
+    >
+      <div class="settings-card">
+        <p class="eyebrow">MAKE YOURSELF AT HOME</p>
+        <h2 id="settingsTitle">Field settings.</h2>
+        <label for="mouseSensitivity"
+          >Mouse sensitivity
+          <output id="sensitivityValue" for="mouseSensitivity">4</output></label
+        ><input type="range" id="mouseSensitivity" min="1" max="20" value="4" />
+        <label for="volume"
+          >Master volume
+          <output id="volumeValue" for="volume">50%</output></label
+        ><input type="range" id="volume" min="0" max="100" value="50" />
+        <label for="fov"
+          >Field of view <output id="fovValue" for="fov">80°</output></label
+        ><input type="range" id="fov" min="65" max="110" value="80" />
+        <label class="toggle-label" for="motion"
+          ><span>Head bob & camera shake</span
+          ><input type="checkbox" id="motion" checked
+        /></label>
+        <div class="controls-grid">
+          <span><kbd>W A S D</kbd> Move</span><span><kbd>MOUSE</kbd> Look</span
+          ><span><kbd>LMB</kbd> Attack</span
+          ><span><kbd>RMB</kbd> Block with sword</span
+          ><span><kbd>1 – 4</kbd> Weapons</span
+          ><span><kbd>E</kbd> Interact</span><span><kbd>SHIFT</kbd> Sprint</span
+          ><span><kbd>R</kbd> Holy rage</span
+          ><span><kbd>TAB</kbd> Facility map</span
+          ><span><kbd>ESC</kbd> Pause</span>
+        </div>
+        <button class="primary-button" id="closeSettings">
+          Done <span aria-hidden="true">✓</span>
+        </button>
+        <p class="settings-note">
+          Settings save automatically on this browser.
+        </p>
+      </div>
+    </section>
+
+    <section
+      id="creditsScreen"
+      class="screen overlay"
+      style="display: none"
+      aria-labelledby="creditsTitle"
+    >
+      <div class="menu-panel">
+        <p class="eyebrow">THE HANDS BEHIND THE CRUSADE</p>
+        <h2 id="creditsTitle">SaintDoom.</h2>
+        <p class="credits-copy">
+          A DOOM-inspired first-person shooter with a holy twist. Part of the
+          Language Games collection.
+        </p>
+        <p class="muted">
+          Original game created with Claude Opus 4.5.<br />Built with Three.js.
+          Forged in the browser.
+        </p>
+        <p class="credits-quote">
+          “Through seven deaths, the Saint achieves martyrdom, and Hell itself
+          shall learn to fear the righteous.”
+        </p>
+        <button class="menu-button" id="backFromCredits">
+          ← Back to title
+        </button>
+      </div>
+    </section>
+
+    <section
+      id="deathScreen"
+      class="screen overlay"
+      style="display: none"
+      aria-labelledby="deathTitle"
+    >
+      <div class="menu-panel">
+        <p class="eyebrow">DEATH IS MERELY AN INCONVENIENCE</p>
+        <h2 id="deathTitle">You have fallen.</h2>
+        <p id="deathQuote" class="muted"></p>
+        <p id="deathCount" class="death-count"></p>
         <div class="menu-options">
-            <button class="menu-button" id="respawnButton">RISE AGAIN</button>
-            <button class="menu-button" id="deathQuitButton">RETURN TO TITLE</button>
+          <button class="primary-button" id="respawnButton">
+            Rise again <span aria-hidden="true">↑</span></button
+          ><button class="text-button" id="deathQuitButton">
+            Return to title
+          </button>
         </div>
-    </div>
-    
-    <div id="startScreen">
-        <h1>SAINTDOOM</h1>
-        <h2>Unholy Retribution</h2>
-        <div class="menu-options">
-            <button class="menu-button" id="startButton">BEGIN CRUSADE</button>
-            <button class="menu-button" id="levelSelectButton">LEVEL SELECT</button>
-            <button class="menu-button" id="loadButton" style="display:none;">Continue</button>
-            <button class="menu-button" id="mainSettingsButton">Settings</button>
-            <button class="menu-button" id="creditsButton">Credits</button>
+      </div>
+    </section>
+
+    <div id="gameUI" aria-label="Game status">
+      <div class="top-hud">
+        <div>
+          <p class="eyebrow">CURRENT CHAPTER</p>
+          <span id="levelValue">Desecrated Chapel</span>
         </div>
-        <div class="quote">"Seven times called, seven times I answer."</div>
-    </div>
-    
-    <div id="levelSelectScreen" style="display:none;">
-        <h2>LEVEL SELECT</h2>
-        <div class="menu-options" style="max-height: 400px; overflow-y: auto;">
-            <button class="menu-button level-select-btn" data-level="tutorial">Tutorial - Vatican Inquisition</button>
-            <button class="menu-button level-select-btn" data-level="chapel">Chapter 1 - Desecrated Chapel</button>
-            <button class="menu-button level-select-btn" data-level="armory">Chapter 2 - The Armory</button>
-            <button class="menu-button level-select-btn" data-level="laboratory">Chapter 3 - Laboratory Complex</button>
-            <button class="menu-button level-select-btn" data-level="containment">Chapter 4 - Containment Area</button>
-            <button class="menu-button level-select-btn" data-level="tunnels">Chapter 5 - Tunnel Network</button>
-            <button class="menu-button level-select-btn" data-level="spawning">Chapter 6 - Spawning Grounds</button>
-            <button class="menu-button level-select-btn" data-level="observatory">Chapter 7 - Observatory Tower</button>
-            <button class="menu-button level-select-btn" data-level="communications">Chapter 8 - Communications Tower</button>
-            <button class="menu-button level-select-btn" data-level="reactor">Chapter 9 - Reactor Core</button>
-            <button class="menu-button level-select-btn" data-level="finalarena">Chapter 10 - Final Arena</button>
-            <hr style="border-color: #444; margin: 10px 0;">
-            <button class="menu-button level-select-btn" data-level="archive" style="color: #ffaa00;">SECRET - Forbidden Archive</button>
-            <button class="menu-button level-select-btn" data-level="techfacility" style="color: #ffaa00;">SECRET - Black Site Omega</button>
-            <button class="menu-button" id="backToMenuBtn">Back to Menu</button>
+        <div class="combat-stats">
+          <span><small>SOULS</small><b id="killsValue">0</b></span
+          ><span><small>SCORE</small><b id="scoreValue">0</b></span>
         </div>
-        <div style="color: #666; margin-top: 20px; font-size: 14px;">
-            <p id="levelDescription">Select a level to begin</p>
+      </div>
+      <div id="objective" aria-live="polite">
+        <span class="objective-label">YOUR OBJECTIVE</span
+        ><span id="objectiveText">Find the desecrated chapel.</span>
+      </div>
+      <div id="crosshair" aria-hidden="true"></div>
+      <div id="comboIndicator" aria-live="off"></div>
+      <div id="hud">
+        <div id="health" class="vital">
+          <span class="vital-label">VITALITY</span
+          ><span class="vital-number" id="healthValue">100</span>
+          <div class="meter"><i id="healthFill"></i></div>
         </div>
-    </div>
-    
-    <div id="creditsScreen" style="display:none;">
-        <h2>Credits</h2>
-        <div style="color: #888; text-align: center; max-width: 600px; margin: 20px auto;">
-            <p>A DOOM-inspired FPS with a holy twist</p>
-            <p style="margin-top: 20px;">Built with Three.js</p>
-            <p style="margin-top: 40px; font-style: italic;">"Through seven deaths, the Saint achieves martyrdom,<br/>
-            and Hell itself shall learn to fear the righteous."</p>
+        <div id="armor" class="vital">
+          <span class="vital-label">ARMOR</span
+          ><span class="vital-number" id="armorValue">0</span>
+          <div class="meter"><i id="armorFill"></i></div>
         </div>
-        <button class="menu-button" id="backFromCredits">Back</button>
-    </div>
-    
-    <canvas id="gameCanvas"></canvas>
-    
-    <div id="crosshair"></div>
-    
-    <div id="hud">
-        <div id="health" class="hud-bar">HEALTH: <span id="healthValue">100</span></div>
-        <div id="armor" class="hud-bar">ARMOR: <span id="armorValue">0</span></div>
-        <div id="ammo" class="hud-bar">BLESSED: ∞</div>
-        <div id="rage" class="hud-bar" style="border-color: #ff00ff;">HOLY RAGE: <span id="rageValue">0</span>%</div>
-    </div>
-    
-    <!-- Top HUD elements -->
-    <div style="position: fixed; top: 10px; right: 10px; z-index: 100; pointer-events: none;">
-        <div id="level" class="hud-bar" style="border-color: #00ffff; color: #00ffff;">LEVEL: <span id="levelValue">1</span></div>
-    </div>
-    
-    <div style="position: fixed; top: 60px; right: 10px; z-index: 100; pointer-events: none;">
-        <div id="score" class="hud-bar" style="border-color: #ffff00; color: #ffff00;">SCORE: <span id="scoreValue">0</span></div>
-    </div>
-    
-    <div style="position: fixed; top: 110px; right: 10px; z-index: 100; pointer-events: none;">
-        <div id="kills" class="hud-bar" style="border-color: #ff8800; color: #ff8800;">KILLS: <span id="killsValue">0</span></div>
-    </div>
-    
-    <div id="instructions" style="position: fixed; top: 170px; left: 10px;">
-        WASD - Move<br>
-        Mouse - Look<br>
-        Left Click - Attack<br>
-        Right Click - Block (Sword)<br>
-        1 - Holy Sword<br>
-        2 - Blessed Shotgun<br>
-        3 - Holy Water Grenades<br>
-        4 - Crucifix Launcher<br>
-        R - Holy Rage (when full)<br>
-        Shift - Sprint<br>
-        ESC - Pause
-    </div>
-    
-    <div id="clickToResume" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 24px; text-shadow: 2px 2px 4px black; z-index: 100; pointer-events: none;">
-        Click to Resume
-    </div>
-    
-    <!-- Loading Screen -->
-    <div id="loadingScreen" style="display:none;">
-        <div class="loading-content">
-            <h2>LOADING</h2>
-            <div class="loading-bar-container">
-                <div class="loading-bar"></div>
-            </div>
-            <p id="loadingText">Preparing holy weapons...</p>
-            <div class="loading-tips">
-                <p id="loadingTip">TIP: Use holy water grenades to create safe zones</p>
-            </div>
+        <div class="weapon-hud">
+          <span id="weaponName">BLESSED SWORD</span>
+          <div id="weaponSlots" class="weapon-slots">
+            <span data-weapon="sword"><kbd>1</kbd> Sword</span
+            ><span data-weapon="shotgun"><kbd>2</kbd> Shotgun</span
+            ><span data-weapon="holywater"><kbd>3</kbd> Holy water</span
+            ><span data-weapon="crucifix"><kbd>4</kbd> Crucifix</span>
+          </div>
         </div>
+        <div id="ammo" class="vital">
+          <span class="vital-label" id="ammoLabel">BLESSED STEEL</span
+          ><span class="vital-number" id="ammoValue">∞</span>
+        </div>
+        <div id="rage" class="vital">
+          <span class="vital-label">HOLY RAGE <kbd>R</kbd></span
+          ><span id="rageValue" class="rage-number">0%</span>
+          <div class="meter"><i id="rageFill"></i></div>
+        </div>
+      </div>
+      <div id="instructions">
+        <span><kbd>E</kbd> Interact</span><span><kbd>TAB</kbd> Map</span
+        ><span><kbd>ESC</kbd> Pause / controls</span>
+      </div>
     </div>
-    
+    <div id="clickToResume" style="display: none">
+      Click to return to the fight
+    </div>
+    <section
+      id="loadingScreen"
+      class="screen overlay"
+      style="display: none"
+      role="status"
+    >
+      <div class="loading-content">
+        <span class="loading-cross" aria-hidden="true">✝</span>
+        <p class="eyebrow">PROTOCOL LAZARUS</p>
+        <h2>Answer the call.</h2>
+        <div class="loading-bar-container"><div class="loading-bar"></div></div>
+        <p id="loadingText">Preparing your descent…</p>
+        <p id="loadingTip" class="muted">
+          The sword builds rage. The shotgun makes space.
+        </p>
+      </div>
+    </section>
+    <!-- Version changed modules so cached lazy imports cannot keep older code. -->
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
-            }
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/",
+          "./modules/Game.js": "./modules/Game.js?v=20260914-refresh1",
+          "./enemies/possessedScientist.js": "./enemies/possessedScientist.js?v=20260907-world1",
+          "./levels/armoryLevel.js": "./levels/armoryLevel.js?v=20260907-pickups1",
+          "./modules/Pickup.js": "./modules/Pickup.js?v=20260907-pickups1",
+          "./utils/PickupGlow.js": "./utils/PickupGlow.js?v=20260907-pickups1",
+          "./modules/WeaponSystem.js": "./modules/WeaponSystem.js?v=20260907-world1",
+          "./enemies/imp.js": "./enemies/imp.js?v=20260907-world1",
+          "./enemies/brimstoneGolem.js": "./enemies/brimstoneGolem.js?v=20260907-world1",
+          "./levels/baseLevel.js": "./levels/baseLevel.js?v=20260907-world1",
+          "./levels/laboratoryLevel.js": "./levels/laboratoryLevel.js?v=20260907-world1",
+          "./levels/secretArchive.js": "./levels/secretArchive.js?v=20260907-world1",
+          "./levels/observatoryLevel.js": "./levels/observatoryLevel.js?v=20260907-world1",
+          "./levels/communicationsLevel.js": "./levels/communicationsLevel.js?v=20260907-world1",
+          "./utils/ArchiveShelf.js": "./utils/ArchiveShelf.js?v=20260907-world1",
+          "./utils/FacilityTextures.js": "./utils/FacilityTextures.js?v=20260907-world1"
         }
+      }
     </script>
-    <script type="module">
-import { Game } from './modules/Game.js';
-// ============= Classes imported from modules =============
-// InputManager and Player are now imported from ./modules/
-
-
-// ============= PICKUPS =============
-// Moved to modules/Pickup.js
-
-// CollisionSystem class moved to modules/CollisionSystem.js
-
-// ============= MAIN GAME CLASS MOVED TO modules/Game.js =============
-
-// Make Pickup class available globally
-
-// ============= START GAME =============
-window.addEventListener('DOMContentLoaded', () => {
-    // Wait for modules to load
-    let game;
-    
-    // Main start button
-    document.getElementById('startButton').addEventListener('click', () => {
-        if (!game) {
-            game = new Game();
-        }
-        game.init('tutorial');
-    });
-    
-    // Level select button
-    document.getElementById('levelSelectButton').addEventListener('click', () => {
-        document.getElementById('startScreen').style.display = 'none';
-        document.getElementById('levelSelectScreen').style.display = 'flex';
-        
-        // Check unlocked levels (stored in localStorage)
-        // FOR TESTING: All levels unlocked
-        const unlockedLevels = ["tutorial", "chapel", "armory", "laboratory", "containment", 
-                               "tunnels", "spawning", "observatory", "communications", 
-                               "reactor", "finalarena", "archive", "techfacility"];
-        // const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '["tutorial", "chapel"]');
-        document.querySelectorAll('.level-select-btn').forEach(btn => {
-            const level = btn.dataset.level;
-            if (!unlockedLevels.includes(level)) {
-                btn.disabled = true;
-                btn.textContent += ' (Locked)';
-            }
-        });
-    });
-    
-    // Level select buttons
-    document.querySelectorAll('.level-select-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const levelName = e.target.dataset.level;
-            document.getElementById('levelSelectScreen').style.display = 'none';
-            if (!game) {
-                game = new Game();
-            }
-            game.init(levelName);
-        });
-    });
-    
-    // Back to menu button
-    document.getElementById('backToMenuBtn').addEventListener('click', () => {
-        document.getElementById('levelSelectScreen').style.display = 'none';
-        document.getElementById('startScreen').style.display = 'flex';
-    });
-    
-    window.addEventListener('resize', () => {
-        if (game && game.camera && game.renderer) {
-            game.camera.aspect = window.innerWidth / window.innerHeight;
-            game.camera.updateProjectionMatrix();
-            game.renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-    });
-    
-    // Handle pointer lock changes to detect ESC press
-    document.addEventListener('pointerlockchange', () => {
-        const isLocked = document.pointerLockElement === document.body;
-        
-        // If pointer lock was just released and game is running (not paused), show pause menu
-        if (!isLocked && game && game.isRunning && !game.isPaused && !game.gameOver) {
-            game.isPaused = true;
-            document.getElementById('pauseMenu').style.display = 'flex';
-        }
-    });
-    
-    // Main menu buttons
-    document.getElementById('mainSettingsButton').addEventListener('click', () => {
-        document.getElementById('settingsPanel').style.display = 'flex';
-    });
-    
-    document.getElementById('creditsButton').addEventListener('click', () => {
-        document.getElementById('startScreen').style.display = 'none';
-        document.getElementById('creditsScreen').style.display = 'flex';
-    });
-    
-    document.getElementById('backFromCredits').addEventListener('click', () => {
-        document.getElementById('creditsScreen').style.display = 'none';
-        document.getElementById('startScreen').style.display = 'flex';
-    });
-    
-    // Pause menu buttons
-    document.getElementById('resumeButton').addEventListener('click', () => {
-        if (game) game.togglePause();
-    });
-    
-    document.getElementById('restartButton').addEventListener('click', () => {
-        if (game) game.restartLevel();
-    });
-    
-    document.getElementById('settingsButton').addEventListener('click', () => {
-        document.getElementById('settingsPanel').style.display = 'flex';
-    });
-    
-    document.getElementById('quitButton').addEventListener('click', () => {
-        if (game) game.quitToTitle();
-    });
-    
-    // Death screen buttons
-    document.getElementById('respawnButton').addEventListener('click', () => {
-        document.getElementById('deathScreen').style.display = 'none';
-        if (game) game.respawnPlayer();
-    });
-    
-    document.getElementById('deathQuitButton').addEventListener('click', () => {
-        document.getElementById('deathScreen').style.display = 'none';
-        if (game) game.quitToTitle();
-    });
-    
-    // Settings panel
-    document.getElementById('closeSettings').addEventListener('click', () => {
-        document.getElementById('settingsPanel').style.display = 'none';
-    });
-    
-    document.getElementById('mouseSensitivity').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('sensitivityValue').textContent = value;
-        if (game && game.player) {
-            game.player.mouseSensitivity = parseFloat(value) * 0.001;
-        }
-    });
-    
-    document.getElementById('volume').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('volumeValue').textContent = value + '%';
-        // Would apply to audio system if implemented
-    });
-});
-    </script>
-</body>
+    <script type="module" src="./main.js?v=20260907-world1"></script>
+  </body>
 </html>

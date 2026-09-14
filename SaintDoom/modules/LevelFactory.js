@@ -198,9 +198,7 @@ export class LevelFactory {
             
             // Setup game level reference
             this.game.level = new FallbackLevel(this.game.scene);
-            if (levelData && levelData.walls) {
-                this.game.level.walls = levelData.walls;
-            }
+            this.game.level.walls = Array.isArray(levelData) ? levelData : (levelData?.walls || level.walls || []);
             
             // Configure player weapons
             if (config.weapons) {
@@ -266,7 +264,7 @@ export class LevelFactory {
         
         try {
             // Add cache-busting timestamp to force reload
-            const moduleUrl = `${modulePath}?t=${Date.now()}`;
+            const moduleUrl = modulePath;
             console.log(`[LevelFactory] Loading level module: ${moduleUrl}`);
             const module = await import(moduleUrl);
             const LevelClass = module[className];
@@ -318,9 +316,7 @@ export class LevelFactory {
         
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) {
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 500); // Small delay for smooth transition
+            loadingScreen.style.display = 'none';
         }
     }
     

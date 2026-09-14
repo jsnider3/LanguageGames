@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createArchiveShelf } from '../utils/ArchiveShelf.js';
+import { createPickupGlow } from '../utils/PickupGlow.js';
 import { BaseLevel } from './baseLevel.js';
 
 export class SecretArchive extends BaseLevel {
@@ -48,6 +50,8 @@ export class SecretArchive extends BaseLevel {
         this.candleLight = [];
         this.dustParticles = null;
         this.whisperingSounds = [];
+        this.ambientAnimations = [];
+        this.ambientTime = 0;
         
         this.currentSection = 'entrance';
         this.sectionsVisited = new Set();
@@ -508,47 +512,7 @@ export class SecretArchive extends BaseLevel {
     }
 
     createBookshelf(height, width) {
-        const shelfGroup = new THREE.Group();
-        
-        // Shelf structure
-        const shelfGeometry = new THREE.BoxGeometry(width, height, 0.5);
-        const shelfMaterial = new THREE.MeshPhongMaterial({
-            color: 0x4a3520
-        });
-        const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
-        shelf.position.y = height / 2;
-        shelfGroup.add(shelf);
-        
-        // Books
-        const bookColors = [0x330000, 0x003300, 0x000033, 0x333300, 0x330033];
-        const rows = Math.floor(height);
-        const booksPerRow = Math.floor(width * 3);
-        
-        for (let row = 0; row < rows; row++) {
-            for (let i = 0; i < booksPerRow; i++) {
-                const bookHeight = 0.8 + Math.random() * 0.4;
-                const bookWidth = 0.2 + Math.random() * 0.2;
-                const bookGeometry = new THREE.BoxGeometry(bookWidth, bookHeight, 0.4);
-                const bookMaterial = new THREE.MeshPhongMaterial({
-                    color: bookColors[Math.floor(Math.random() * bookColors.length)]
-                });
-                const book = new THREE.Mesh(bookGeometry, bookMaterial);
-                
-                book.position.x = -width / 2 + (i / booksPerRow) * width + bookWidth / 2;
-                book.position.y = row + bookHeight / 2;
-                book.position.z = 0.25;
-                
-                // Some books are slightly pulled out
-                if (Math.random() < 0.1) {
-                    book.position.z += 0.2;
-                    book.rotation.y = (Math.random() - 0.5) * 0.2;
-                }
-                
-                shelfGroup.add(book);
-            }
-        }
-        
-        return shelfGroup;
+        return createArchiveShelf(height, width);
     }
 
     createFloatingBooks(position) {
@@ -570,16 +534,13 @@ export class SecretArchive extends BaseLevel {
             
             this.scene.add(book);
             
-            // Animate floating
-            const floatAnimation = () => {
-                book.position.y += Math.sin(Date.now() * 0.001 + i) * 0.01;
-                book.rotation.y += 0.01;
-                book.rotation.z = Math.sin(Date.now() * 0.002 + i) * 0.1;
-                
-                requestAnimationFrame(floatAnimation);
-            };
-            floatAnimation();
-            
+            const baseY = book.position.y;
+            this.ambientAnimations.push((time, delta) => {
+                book.position.y = baseY + Math.sin(time + i) * 0.3;
+                book.rotation.y += delta * 0.6;
+                book.rotation.z = Math.sin(time * 2 + i) * 0.1;
+            });
+
             this.cursedBooks.push(book);
         }
     }
@@ -643,16 +604,12 @@ export class SecretArchive extends BaseLevel {
         
         this.candleLight.push(light);
         
-        // Animate flame
-        const animateFlame = () => {
-            flame.scale.y = 1 + Math.sin(Date.now() * 0.01) * 0.2;
-            flame.position.x = Math.sin(Date.now() * 0.005) * 0.01;
-            light.intensity = 0.5 + Math.sin(Date.now() * 0.008) * 0.1;
-            
-            requestAnimationFrame(animateFlame);
-        };
-        animateFlame();
-        
+        this.ambientAnimations.push(time => {
+            flame.scale.y = 1 + Math.sin(time * 10) * 0.2;
+            flame.position.x = Math.sin(time * 5) * 0.01;
+            light.intensity = 0.5 + Math.sin(time * 8) * 0.1;
+        });
+
         return candleGroup;
     }
 
@@ -872,11 +829,8 @@ export class SecretArchive extends BaseLevel {
         book.position.y = 0.1;
         tomeGroup.add(book);
         
-        // Small glow effect
-        const glowLight = new THREE.PointLight(0xff4400, 0.5, 3);
-        glowLight.position.y = 0.5;
-        tomeGroup.add(glowLight);
-        
+        tomeGroup.add(createPickupGlow(0xff8844, 0.7));
+
         tomeGroup.position.copy(position);
         tomeGroup.position.y += 1;
         this.scene.add(tomeGroup);
@@ -991,14 +945,10 @@ export class SecretArchive extends BaseLevel {
         this.dustParticles = new THREE.Points(particles, particleMaterial);
         this.scene.add(this.dustParticles);
         
-        // Animate dust
-        const animateDust = () => {
-            this.dustParticles.rotation.y += 0.0001;
-            
-            requestAnimationFrame(animateDust);
-        };
-        animateDust();
-        
+        this.ambientAnimations.push((time, delta) => {
+            this.dustParticles.rotation.y += delta * 0.006;
+        });
+
         // Ambient fog
         this.scene.fog = new THREE.Fog(0x1a1a1a, 10, 80);
         
@@ -1064,27 +1014,23 @@ export class SecretArchive extends BaseLevel {
         return scrollGroup;
     }
 
-        // Update and interaction methods
-        update(deltaTime) {
-            // Keep local reference up-to-date (used by legacy helper methods in this file)
-            this.player = this.game ? this.game.player : this.player;
-            const player = this.player;
-            
-            // Check for tome collection
-            this.ancientTomes.forEach(tome => {
-                if (!tome.collected && player) {
-                    const distance = tome.mesh.position.distanceTo(
-                        player.position || player.mesh?.position
-                    );
-                    
-                    if (distance < 2) {
-                        tome.collected = true;
+    update(deltaTime) {
+        this.ambientTime += deltaTime;
+        this.ambientAnimations.forEach(animate => animate(this.ambientTime, deltaTime));
+        this.player = this.game ? this.game.player : this.player;
+        const player = this.player;
+
+        this.ancientTomes.forEach(tome => {
+            if (!tome.collected && player) {
+                const distance = tome.mesh.position.distanceTo(player.position || player.mesh?.position);
+                if (distance < 2) {
+                    tome.collected = true;
                     tome.mesh.visible = false;
                     this.onTomeCollected(tome);
                 }
             }
         });
-        
+
         // Update knowledge corruption
         if (this.knowledge.forbidden > 50) {
             this.applyCorruption();
@@ -1296,19 +1242,11 @@ export class SecretArchive extends BaseLevel {
         const mist = new THREE.Mesh(mistGeometry, mistMaterial);
         crystalGroup.add(mist);
         
-        // Animate mist
-        const animateMist = () => {
-            mist.rotation.y += 0.01;
-            mist.scale.set(
-                1 + Math.sin(Date.now() * 0.001) * 0.1,
-                1 + Math.cos(Date.now() * 0.001) * 0.1,
-                1 + Math.sin(Date.now() * 0.001) * 0.1
-            );
-            
-            requestAnimationFrame(animateMist);
-        };
-        animateMist();
-        
+        this.ambientAnimations.push((time, delta) => {
+            mist.rotation.y += delta * 0.6;
+            mist.scale.set(1 + Math.sin(time) * 0.1, 1 + Math.cos(time) * 0.1, 1 + Math.sin(time) * 0.1);
+        });
+
         return crystalGroup;
     }
 
@@ -1577,6 +1515,15 @@ export class SecretArchive extends BaseLevel {
     }
 
     clearLevel() {
+        this.ambientAnimations = [];
+        this.cursedBooks = [];
+        this.candleLight = [];
+        if (this.dustParticles) {
+            this.scene.remove(this.dustParticles);
+            this.dustParticles.geometry.dispose();
+            this.dustParticles.material.dispose();
+            this.dustParticles = null;
+        }
         if (super.cleanup) {
             super.cleanup();
         }

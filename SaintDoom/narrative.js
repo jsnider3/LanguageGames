@@ -251,34 +251,10 @@ export class NarrativeSystem {
     }
     
     updateObjectiveDisplay() {
-        let objectiveEl = document.getElementById('objective');
-        if (!objectiveEl) {
-            objectiveEl = document.createElement('div');
-            objectiveEl.id = 'objective';
-            objectiveEl.style.cssText = `
-                position: fixed;
-                top: 140px;
-                right: 20px;
-                color: white;
-                font-size: 14px;
-                font-family: 'Courier New', monospace;
-                text-shadow: 2px 2px 4px black;
-                background: rgba(0,0,0,0.7);
-                padding: 10px;
-                border-left: 3px solid gold;
-                z-index: 99;
-                max-width: 250px;
-                pointer-events: none;
-            `;
-            document.body.appendChild(objectiveEl);
-        }
-        
-        objectiveEl.innerHTML = `
-            <div style="color: gold; margin-bottom: 5px; font-size: 12px;">OBJECTIVE</div>
-            <div style="font-size: 13px;">${this.currentObjective}</div>
-        `;
+        const objective = document.getElementById('objectiveText');
+        if (objective) objective.textContent = this.currentObjective;
     }
-    
+
     onEnemyKilled(enemyType) {
         if (!this.flags.firstDemonKill && enemyType.includes('demon')) {
             this.flags.firstDemonKill = true;

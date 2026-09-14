@@ -754,59 +754,53 @@ export class CommunicationsLevel extends BaseLevel {
     }
 
     createLightningStorms() {
-        // Create lightning storm effects
+        // Keep three flash lights and bolt buffers for the lifetime of the level.
+        // Changing intensity is cheap; adding/removing lights rebuilds shaders.
         for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-                this.createLightning();
-            }, Math.random() * 10000);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60), 3));
+            const material = new THREE.LineBasicMaterial({
+                color: 0xaaaaff, transparent: true, opacity: 0, depthWrite: false
+            });
+            const bolt = new THREE.Line(geometry, material);
+            bolt.frustumCulled = false;
+            const light = new THREE.PointLight(0xaaaaff, 0, 200);
+            this.scene.add(bolt, light);
+            this.lightningStorms.push({ bolt, light, remaining: 0, delay: Math.random() * 10 });
         }
     }
 
-    createLightning() {
-        const lightningGeometry = new THREE.BufferGeometry();
-        const points = [];
-        
-        // Create jagged lightning path
-        let currentPos = new THREE.Vector3(
-            (Math.random() - 0.5) * 100,
-            this.towerHeight + 50,
-            (Math.random() - 0.5) * 100
-        );
-        
-        for (let i = 0; i < 20; i++) {
-            points.push(currentPos.clone());
-            currentPos.add(new THREE.Vector3(
-                (Math.random() - 0.5) * 10,
-                -5,
-                (Math.random() - 0.5) * 10
-            ));
+    createLightning(storm = this.lightningStorms.find(item => item.remaining <= 0)) {
+        if (!storm) return;
+        let x = (Math.random() - 0.5) * 100;
+        let y = this.towerHeight + 50;
+        let z = (Math.random() - 0.5) * 100;
+        storm.light.position.set(x, y, z);
+        const positions = storm.bolt.geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+            positions.setXYZ(i, x, y, z);
+            x += (Math.random() - 0.5) * 10;
+            y -= 5;
+            z += (Math.random() - 0.5) * 10;
         }
-        
-        lightningGeometry.setFromPoints(points);
-        
-        const lightningMaterial = new THREE.LineBasicMaterial({
-            color: 0xaaaaff,
-            linewidth: 3
-        });
-        
-        const lightning = new THREE.Line(lightningGeometry, lightningMaterial);
-        this.scene.add(lightning);
-        
-        // Lightning flash
-        const flash = new THREE.PointLight(0xaaaaff, 3, 200);
-        flash.position.copy(points[0]);
-        this.scene.add(flash);
-        
-        // Remove lightning after short time
-        setTimeout(() => {
-            this.scene.remove(lightning);
-            this.scene.remove(flash);
-        }, 200);
-        
-        // Schedule next lightning
-        setTimeout(() => {
-            this.createLightning();
-        }, 5000 + Math.random() * 10000);
+        positions.needsUpdate = true;
+        storm.remaining = 0.2;
+        storm.light.intensity = 3;
+        storm.bolt.material.opacity = 1;
+    }
+
+    updateLightning(deltaTime) {
+        for (const storm of this.lightningStorms) {
+            if (storm.remaining > 0) {
+                storm.remaining = Math.max(0, storm.remaining - deltaTime);
+                storm.light.intensity = 3 * storm.remaining / 0.2;
+                storm.bolt.material.opacity = storm.remaining > 0 ? 1 : 0;
+                if (storm.remaining === 0) storm.delay = 5 + Math.random() * 10;
+            } else {
+                storm.delay -= deltaTime;
+                if (storm.delay <= 0) this.createLightning(storm);
+            }
+        }
     }
 
     createClouds() {
@@ -1085,6 +1079,7 @@ export class CommunicationsLevel extends BaseLevel {
 
     update(deltaTime) {
         super.update(deltaTime);
+        this.updateLightning(deltaTime);
         
         // Animate wind particles
         if (this.windEffect) {
@@ -1254,6 +1249,11 @@ export class CommunicationsLevel extends BaseLevel {
     }
 
     cleanup() {
+        for (const {bolt, light} of this.lightningStorms) {
+            this.scene.remove(bolt, light);
+            bolt.geometry.dispose();
+            bolt.material.dispose();
+        }
         super.cleanup();
         
         this.platforms = [];

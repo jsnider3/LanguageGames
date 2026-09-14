@@ -5,12 +5,27 @@ import { GAME_CONFIG } from './GameConfig.js';
 
 export class AudioManager {
     static audioContext = null;
+    static masterGain = null;
+    static volume = 0.5;
 
     static getContext() {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.masterGain = this.audioContext.createGain();
+            this.masterGain.gain.value = this.volume;
+            this.masterGain.connect(this.audioContext.destination);
         }
         return this.audioContext;
+    }
+
+    static getOutput() {
+        this.getContext();
+        return this.masterGain;
+    }
+
+    static setVolume(volume) {
+        this.volume = Math.min(1, Math.max(0, volume));
+        if (this.masterGain) this.masterGain.gain.setValueAtTime(this.volume, this.audioContext.currentTime);
     }
 
     static playSound(config) {
@@ -31,7 +46,7 @@ export class AudioManager {
         );
 
         oscillator.connect(gainNode);
-        gainNode.connect(context.destination);
+        gainNode.connect(AudioManager.getOutput());
 
         const volume = (config.volume || GAME_CONFIG.AUDIO.DEFAULT_GAIN) * volumeVariation;
         gainNode.gain.setValueAtTime(volume, context.currentTime);
@@ -68,7 +83,7 @@ export class AudioManager {
         osc.frequency.setValueAtTime(60, context.currentTime);
         osc.frequency.exponentialRampToValueAtTime(30, context.currentTime + 1.5);
         osc.connect(gain);
-        gain.connect(context.destination);
+        gain.connect(AudioManager.getOutput());
         gain.gain.setValueAtTime(0.25, context.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 1.5);
         osc.start();
@@ -84,7 +99,7 @@ export class AudioManager {
         osc.frequency.setValueAtTime(220, context.currentTime);
         osc.frequency.exponentialRampToValueAtTime(880, context.currentTime + 0.3);
         osc.connect(gain);
-        gain.connect(context.destination);
+        gain.connect(AudioManager.getOutput());
         gain.gain.setValueAtTime(0.2, context.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.4);
         osc.start();
@@ -99,7 +114,7 @@ export class AudioManager {
         osc.type = 'square';
         osc.frequency.setValueAtTime(1100, context.currentTime);
         osc.connect(gain);
-        gain.connect(context.destination);
+        gain.connect(AudioManager.getOutput());
         gain.gain.setValueAtTime(0.1, context.currentTime);
         gain.gain.setValueAtTime(0.0, context.currentTime + 0.05);
         osc.start();

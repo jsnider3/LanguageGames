@@ -33,6 +33,8 @@ import { AlienHybrid } from '../enemies/alienHybrid.js';
 
 import { FacilityMap } from './FacilityMap.js';
 import { Pickup } from './Pickup.js';
+import { readSettings } from './Settings.js';
+import { getChapter } from './Chapters.js';
 
 export class Game {
     constructor() {
@@ -90,6 +92,9 @@ export class Game {
         
         // Debug mode
         this.debugMode = false;
+        this.settings = readSettings();
+        this.isLoadingLevel = false;
+        this._animationFrame = null;
     }
 
     async init(levelName = 'tutorial') {
@@ -97,7 +102,7 @@ export class Game {
         
         // Initialize persistent level states
         this.levelStates = new Map();
-        this.loadLevelStates();
+        // A new crusade starts with fresh objectives. Return trips use this session map.
         
         this.setupRenderer();
         this.setupScene();
@@ -154,12 +159,14 @@ export class Game {
         
         this.player = new Player(this.camera);
         this.player.game = this; // Set game reference
+        this.applySettings(this.settings);
         this.scene.add(this.player.shadowMesh); // Add shadow-casting mesh to scene
         
         // Register player with physics system
         if (this.physicsManager) {
             this.physicsManager.registerEntity(this.player, {
                 hasGravity: true,
+                integrateHorizontal: false,
                 isFlying: false,
                 mass: 1,
                 radius: 0.4,
@@ -203,28 +210,27 @@ export class Game {
         
         // Hide start screen and show game UI
         document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('hud').style.display = 'flex';
         // Only show instructions for non-tutorial levels
         if (levelName !== 'tutorial') {
             const instructions = document.getElementById('instructions');
-            if (instructions) instructions.style.display = 'block';
+            if (instructions) instructions.style.display = 'flex';
         }
         
         // Initialize UI after level is loaded
         this.cacheDomElements();
-        this.updateHUD(true);
+        this.updateHUD();
         
         // Start intro sequence only for tutorial level
         if (this.narrativeSystem && levelName === 'tutorial') {
             await this.narrativeSystem.startIntroSequence();
         }
         
-        // Request pointer lock when game starts
-        setTimeout(() => {
-            document.body.requestPointerLock();
-        }, 100);
-        
-        // Start the game loop
+        document.body.classList.add('in-game');
         this.isRunning = true;
+        this.pauseGame();
+        document.getElementById('pauseTitle').textContent = 'Your crusade awaits.';
+        document.getElementById('pauseHint').textContent = 'Click below to capture the mouse. Press Esc to pause.';
         this.animate();
     }
 
@@ -342,9 +348,9 @@ Player: ${playerPos}`;
     animate() {
         if (!this.isRunning) return;
         
-        requestAnimationFrame(() => this.animate());
+        this._animationFrame = requestAnimationFrame(() => this.animate());
         
-        const deltaTime = this.clock.getDelta();
+        const deltaTime = Math.min(this.clock.getDelta(), 0.05);
         
         this.update(deltaTime);
         this.renderer.render(this.scene, this.camera);
@@ -440,7 +446,7 @@ Player: ${playerPos}`;
     }
 
     update(deltaTime) {
-        if (this.isPaused || this.gameOver) return;
+        if (this.isPaused || this.gameOver || this.isLoadingLevel) return;
         
         // Debug: Track player position changes
         const oldPlayerX = this.player ? this.player.position.x : 0;
@@ -456,6 +462,7 @@ Player: ${playerPos}`;
             // Update physics system so player can walk in transition zones
             if (this.physicsManager && this.level && this.level.walls) {
                 this.physicsManager.update(deltaTime, this.level.walls);
+                this.collisionSystem.checkPlayerWallCollisions(this.player, this.level.walls, deltaTime, this.level, []);
             }
             
             // Allow weapon usage during transitions
@@ -631,8 +638,8 @@ Player: ${playerPos}`;
     }
     
     updatePlayer(deltaTime, input) {
-        this.player.update(deltaTime, input);
         this.player.applyMouseLook(input.mouseDeltaX, input.mouseDeltaY);
+        this.player.update(deltaTime, input);
     }
     
     handleWeaponInput(input) {
@@ -819,6 +826,7 @@ Player: ${playerPos}`;
     }
     
     applyCameraEffects() {
+        if (this.settings.motion === false) { this.cameraShake = 0; return; }
         if (this.cameraShake > 0) {
             const shakeX = (Math.random() - 0.5) * this.cameraShake;
             const shakeY = (Math.random() - 0.5) * this.cameraShake;
@@ -991,129 +999,18 @@ Player: ${playerPos}`;
         
         const quote = deathQuotes[Math.min(this.deathCount - 1, 6)];
         
-        // Remove any existing death screen first
-        const existingDeathScreen = document.getElementById('deathScreen');
-        if (existingDeathScreen) {
-            existingDeathScreen.remove();
-        }
-        
-        // Create death screen
-        const deathScreen = document.createElement('div');
-        deathScreen.id = 'deathScreen';
-        deathScreen.style.position = 'fixed';
-        deathScreen.style.top = '0';
-        deathScreen.style.left = '0';
-        deathScreen.style.width = '100%';
-        deathScreen.style.height = '100%';
-        deathScreen.style.background = 'rgba(100, 0, 0, 0.9)';
+        if (this.deathCount >= 7) this.martyrdomMode = true;
+        this.inputManager.reset();
+        this.facilityMap?.hide();
+        const deathScreen = document.getElementById('deathScreen');
         deathScreen.style.display = 'flex';
-        deathScreen.style.flexDirection = 'column';
-        deathScreen.style.justifyContent = 'center';
-        deathScreen.style.alignItems = 'center';
-        deathScreen.style.zIndex = '2000';
-        deathScreen.style.color = '#fff';
-        
-        deathScreen.innerHTML = `
-            <h1 style="font-size: 60px; color: #ff0000; text-shadow: 0 0 20px #ff0000;">YOU HAVE FALLEN</h1>
-            <p style="font-size: 24px; margin: 20px; font-style: italic;">${quote}</p>
-            <p style="font-size: 18px; margin: 20px;">Death Count: ${this.deathCount} / 7</p>
-            <button id="respawnButton" style="
-                padding: 15px 40px;
-                font-size: 24px;
-                background: #800000;
-                color: #fff;
-                border: 2px solid #ff0000;
-                cursor: pointer;
-                margin-top: 20px;
-                transition: all 0.2s;
-                outline: none;
-                user-select: none;
-                position: relative;
-                z-index: 2001;
-            " onmouseover="this.style.background='#aa0000'; this.style.transform='scale(1.05)'" 
-               onmouseout="this.style.background='#800000'; this.style.transform='scale(1)'"
-               onmousedown="this.style.transform='scale(0.95)'"
-               onmouseup="this.style.transform='scale(1.05)'">RISE AGAIN</button>
-        `;
-        
-        document.body.appendChild(deathScreen);
-        
-        // Activate martyrdom mode on 7th death
-        if (this.deathCount >= 7) {
-            this.martyrdomMode = true;
-            deathScreen.querySelector('h1').textContent = 'MARTYRDOM MODE';
-            deathScreen.querySelector('h1').style.color = '#ffff00';
-            
-            // Only show divine wrath option if not used yet this death
-            if (!this.divineWrathUsed) {
-                deathScreen.querySelector('#respawnButton').textContent = 'UNLEASH DIVINE WRATH';
-            } else {
-                deathScreen.querySelector('#respawnButton').textContent = 'RESPAWN';
-                // Add note that divine wrath was already used
-                const note = document.createElement('p');
-                note.textContent = 'Divine Wrath already unleashed';
-                note.style.color = '#888888';
-                note.style.fontSize = '14px';
-                note.style.marginTop = '10px';
-                deathScreen.querySelector('#respawnButton').parentNode.appendChild(note);
-            }
-        }
-        
-        // Prevent pointer lock capture while death screen is visible
-        const preventPointerLock = (e) => {
-            if (document.getElementById('deathScreen')) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        };
-        
-        // Temporarily block pointer lock requests on the canvas
-        if (this.renderer && this.renderer.domElement) {
-            this.renderer.domElement.addEventListener('click', preventPointerLock, true);
-        }
-        
-        // Respawn button handler
-        const respawnBtn = document.getElementById('respawnButton');
-        if (respawnBtn) {
-            // Prevent default browser behavior
-            respawnBtn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            });
-            
-            // Handle actual click
-            respawnBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Remove death screen immediately
-                const deathScreenToRemove = document.getElementById('deathScreen');
-                if (deathScreenToRemove) {
-                    deathScreenToRemove.remove();
-                }
-                
-                // Remove the pointer lock prevention after a short delay
-                setTimeout(() => {
-                    if (this.renderer && this.renderer.domElement) {
-                        this.renderer.domElement.removeEventListener('click', preventPointerLock, true);
-                    }
-                }, 100);
-                
-                this.respawn();
-            });
-            
-            // Also handle keyboard Enter/Space on the button
-            respawnBtn.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    respawnBtn.click();
-                }
-            });
-            
-            // Focus the button so Enter key works immediately
-            respawnBtn.focus();
-        }
-        
+        document.getElementById('deathTitle').textContent = this.martyrdomMode ? 'Martyrdom awakened.' : 'You have fallen.';
+        document.getElementById('deathQuote').textContent = quote;
+        document.getElementById('deathCount').textContent = `Resurrections: ${this.deathCount} / 7`;
+        const respawnButton = document.getElementById('respawnButton');
+        respawnButton.textContent = this.martyrdomMode && !this.divineWrathUsed ? 'Unleash divine wrath ↑' : 'Rise again ↑';
+        respawnButton.focus();
+
         // Play death sound
         this.playDeathSound();
     }
@@ -1135,27 +1032,16 @@ Player: ${playerPos}`;
         const clickToResume = document.getElementById('clickToResume');
         if (clickToResume) clickToResume.style.display = 'none';
         
-        // Re-capture pointer lock for gameplay (with error handling)
-        if (this.renderer && this.renderer.domElement) {
-            // Use a longer delay to ensure death screen is fully removed
-            setTimeout(() => {
-                if (this.renderer && this.renderer.domElement) {
-                    // Only request pointer lock if death screen is gone
-                    if (!document.getElementById('deathScreen')) {
-                        // Use document.body for consistency
-                        document.body.requestPointerLock().catch(err => {
-                            // Silently ignore - user can click to re-capture
-                            console.log('Click game area to resume');
-                        });
-                    }
-                }
-            }, 500); // Increased delay to ensure UI is ready
-        }
-        
+        document.getElementById('deathScreen').style.display = 'none';
+        this.player.endRage();
+        this.player.pitch = 0;
+        this.player.yaw = 0;
+
         // Reset player stats
         this.player.health = this.player.maxHealth;
         this.player.armor = 0;
-        this.player.position.set(0, 1.7, 5); // Spawn slightly back from center
+        const spawn = this.levelFactory.getLevelConfig(this.currentLevel)?.playerStartPosition;
+        this.player.position.copy(spawn || new THREE.Vector3(0, 1.7, 5));
         this.player.velocity.set(0, 0, 0);
         this.player.rage = 0;
         
@@ -1226,6 +1112,8 @@ Player: ${playerPos}`;
         
         // Play respawn sound
         this.playRespawnSound();
+        this.updateHUD();
+        this.resumeGame();
     }
     
     createRespawnEffect() {
@@ -1278,7 +1166,7 @@ Player: ${playerPos}`;
         oscillator.frequency.exponentialRampToValueAtTime(25, audioContext.currentTime + 2);
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
@@ -1330,7 +1218,7 @@ Player: ${playerPos}`;
         
         oscillator.connect(filter);
         filter.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
@@ -1353,7 +1241,7 @@ Player: ${playerPos}`;
             oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(AudioManager.getOutput());
             
             gainNode.gain.setValueAtTime(0, audioContext.currentTime);
             gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1 + index * 0.1);
@@ -1371,94 +1259,54 @@ Player: ${playerPos}`;
     }
     
     updateHUD() {
-        if (!this._dom) {
-            this.cacheDomElements();
+        const set = (id, value) => {
+            const el = document.getElementById(id);
+            if (el && el.textContent !== String(value)) el.textContent = String(value);
+        };
+        const fill = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.style.width = `${Math.max(0, Math.min(100, value))}%`;
+        };
+        const player = this.player;
+        set('healthValue', Math.max(0, Math.ceil(player.health)));
+        set('armorValue', Math.floor(player.armor));
+        set('levelValue', getChapter(this.currentLevel)?.name || this.currentLevel);
+        set('scoreValue', this.score.toLocaleString());
+        set('killsValue', this.kills);
+        fill('healthFill', player.health / player.maxHealth * 100);
+        fill('armorFill', player.armor / player.maxArmor * 100);
+        document.getElementById('health')?.classList.toggle('low', player.health <= 25);
+        const ready = player.rage >= player.maxRage;
+        set('rageValue', player.isRaging ? 'ACTIVE' : ready ? 'READY' : `${Math.floor(player.rage / player.maxRage * 100)}%`);
+        fill('rageFill', player.isRaging ? player.rageTimer / player.rageDuration * 100 : player.rage / player.maxRage * 100);
+        document.getElementById('rage')?.classList.toggle('ready', ready);
+        document.getElementById('rage')?.classList.toggle('active', player.isRaging);
+        const weapons = {
+            sword: ['BLESSED SWORD', 'BLESSED STEEL', '∞'],
+            shotgun: ['BLESSED SHOTGUN', 'SHELLS', player.ammo.shells],
+            holywater: ['HOLY WATER', 'VIALS', player.holyWaterCount],
+            crucifix: ['CRUCIFIX LAUNCHER', 'CRUCIFIXES', player.ammo.rockets]
+        };
+        const [name, label, ammo] = weapons[player.currentWeapon] || ['UNARMED', 'AMMO', '—'];
+        set('weaponName', name);
+        set('ammoLabel', label);
+        set('ammoValue', ammo);
+        document.querySelectorAll('[data-weapon]').forEach(slot => {
+            const weapon = slot.getAttribute('data-weapon');
+            slot.classList.toggle('available', player.weapons.includes(weapon));
+            slot.classList.toggle('selected', player.currentWeapon === weapon);
+        });
+        set('comboIndicator', this.combo > 1 && this.comboTimer > 0 ? `${Math.min(this.combo, 5)}× RETRIBUTION` : '');
+    }
+
+    applySettings(settings) {
+        this.settings = settings;
+        if (this.player) this.player.mouseSensitivity = settings.sensitivity * 0.001;
+        if (this.camera) {
+            this.camera.fov = settings.fov;
+            this.camera.updateProjectionMatrix();
         }
-        
-        // Create/update coordinates display
-        let coordsEl = document.getElementById('coordinates');
-        if (!coordsEl) {
-            coordsEl = document.createElement('div');
-            coordsEl.id = 'coordinates';
-            coordsEl.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                color: #00ff00;
-                font-family: monospace;
-                font-size: 16px;
-                background: rgba(0,0,0,0.8);
-                padding: 8px;
-                border: 1px solid #00ff00;
-                z-index: 1000;
-                text-shadow: 0 0 3px #00ff00;
-            `;
-            document.body.appendChild(coordsEl);
-        }
-        
-        // Update coordinates
-        if (this.player && coordsEl) {
-            coordsEl.innerHTML = `X: ${this.player.position.x.toFixed(1)}<br>Z: ${this.player.position.z.toFixed(1)}`;
-        }
-        
-        // Safely update health value
-        const healthEl = this._dom.healthEl || document.getElementById('healthValue');
-        if (healthEl) healthEl.textContent = Math.max(0, Math.floor(this.player.health));
-        
-        // Safely update armor value
-        const armorEl = this._dom.armorEl || document.getElementById('armorValue');
-        if (armorEl) armorEl.textContent = Math.floor(this.player.armor);
-        
-        // Update level display
-        const levelEl = this._dom.levelEl || document.getElementById('levelValue');
-        if (levelEl && this.level) levelEl.textContent = this.level.levelNumber;
-        
-        // Update score display
-        const scoreEl = this._dom.scoreEl || document.getElementById('scoreValue');
-        if (scoreEl) scoreEl.textContent = this.score;
-        
-        // Update kills display
-        const killsEl = this._dom.killsEl || document.getElementById('killsValue');
-        if (killsEl) killsEl.textContent = this.kills;
-        
-        // Update rage display
-        const ragePercent = Math.floor((this.player.rage / this.player.maxRage) * 100);
-        const rageBar = this._dom.rageBar || document.getElementById('rage');
-        
-        if (rageBar) {
-            if (this.player.isRaging) {
-                rageBar.style.borderColor = '#ffff00';
-                rageBar.innerHTML = `HOLY RAGE: <span style="color: #ffff00;">ACTIVE!</span>`;
-            } else if (this.player.rage >= this.player.maxRage) {
-                rageBar.style.borderColor = '#ff00ff';
-                rageBar.innerHTML = `HOLY RAGE: <span style="color: #ff00ff;">READY!</span>`;
-            } else {
-                rageBar.style.borderColor = '#ff00ff';
-                rageBar.innerHTML = `HOLY RAGE: <span id="rageValue">${ragePercent}</span>%`;
-            }
-        }
-        
-        // Update ammo display
-        const ammoEl = this._dom.ammoEl || document.getElementById('ammo');
-        if (ammoEl) {
-            switch(this.player.currentWeapon) {
-                case 'shotgun':
-                    ammoEl.innerHTML = `SHELLS: <span>${this.player.ammo.shells}</span>`;
-                    ammoEl.style.borderColor = '#ff8800';
-                    break;
-                case 'holywater':
-                    ammoEl.innerHTML = `HOLY WATER: <span>${this.player.holyWaterCount}</span>`;
-                    ammoEl.style.borderColor = '#00ccff';
-                    break;
-                case 'crucifix':
-                    ammoEl.innerHTML = `CRUCIFIXES: <span>${this.player.ammo.rockets}</span>`;
-                    ammoEl.style.borderColor = '#ffaa00';
-                    break;
-                default: // sword
-                    ammoEl.innerHTML = 'BLESSED: ∞';
-                    ammoEl.style.borderColor = '#ffff44';
-            }
-        }
+        AudioManager.setVolume(settings.volume / 100);
     }
 
     addScore(points) {
@@ -1476,91 +1324,86 @@ Player: ${playerPos}`;
         // Show floating score text (could be enhanced with actual floating text)
     }
     
-    togglePause() {
-        this.isPaused = !this.isPaused;
-        const pauseMenu = document.getElementById('pauseMenu');
-        const clickToResume = document.getElementById('clickToResume');
-        
-        if (this.isPaused) {
-            pauseMenu.style.display = 'flex';
-            document.exitPointerLock();
-            if (clickToResume) clickToResume.style.display = 'none';
-        } else {
-            pauseMenu.style.display = 'none';
+    pauseGame() {
+        this.isPaused = true;
+        this.inputManager?.reset();
+        this.facilityMap?.hide();
+        document.getElementById('pauseTitle').textContent = 'Crusade paused.';
+        document.getElementById('pauseHint').textContent = 'Your fight can wait.';
+        document.getElementById('pauseMenu').style.display = 'flex';
+        document.getElementById('resumeButton').focus();
+        if (document.pointerLockElement) document.exitPointerLock();
+    }
+
+    async resumeGame() {
+        if (!this.isRunning || this.gameOver || this.isLoadingLevel) return;
+        this.inputManager.reset();
+        try {
+            await document.body.requestPointerLock();
+            if (!document.pointerLockElement || !this.isRunning || this.gameOver) return;
+            this.isPaused = false;
+            this.clock.getDelta();
+            document.getElementById('pauseMenu').style.display = 'none';
             document.getElementById('settingsPanel').style.display = 'none';
-            // Attempt to reacquire pointer lock immediately on resume
-            if (document.body.requestPointerLock) {
-                try { document.body.requestPointerLock(); } catch (e) {}
-            }
-            // Show click to resume message briefly (in case lock was denied)
-            if (clickToResume) {
-                clickToResume.style.display = 'block';
-                setTimeout(() => {
-                    clickToResume.style.display = 'none';
-                }, 1500);
-            }
+            AudioManager.getContext().resume().catch(() => {});
+        } catch {
+            this.pauseGame();
+            document.getElementById('pauseHint').textContent = 'Mouse capture was unavailable. Click Return to the fight to try again.';
         }
     }
-    
-    restartLevel() {
-        // Reset player health and position
-        this.player.health = this.martyrdomMode ? 200 : 100;
-        this.player.position.set(0, 1.7, 5);
-        this.player.velocity.set(0, 0, 0);
-        this.camera.rotation.set(0, 0, 0);
-        
-        // Clear enemies
-        this.enemies.forEach(enemy => {
-            if (enemy.mesh) {
-                this.scene.remove(enemy.mesh);
-            }
-        });
-        this.enemies = [];
-        
-        // Reload the current level to respawn enemies and reset everything
-        this.loadLevel(this.currentLevel);
-        
-        // Close menus and resume
-        document.getElementById('pauseMenu').style.display = 'none';
-        document.getElementById('settingsPanel').style.display = 'none';
-        this.isPaused = false;
-        this.gameOver = false;
-        document.body.requestPointerLock();
+
+    togglePause() {
+        if (this.isPaused) this.resumeGame();
+        else this.pauseGame();
     }
-    
-    respawnPlayer() {
-        // Reset player health and position
+
+    async restartLevel() {
+        this.pauseGame();
+        this.player.endRage();
         this.player.health = this.player.maxHealth;
-        this.player.armor = 50; // Give some armor on respawn
-        this.player.isDead = false;
-        
-        // Reset player position to spawn point
-        this.player.position.set(0, 1.7, 0);
-        this.player.velocity.set(0, 0, 0);
+        this.player.armor = 0;
+        this.player.rage = 0;
         this.player.pitch = 0;
         this.player.yaw = 0;
-        
-        // Update camera
-        this.camera.position.copy(this.player.position);
-        this.camera.rotation.set(0, 0, 0);
-        
-        // Hide death screen and resume game
-        document.getElementById('deathScreen').style.display = 'none';
-        document.getElementById('hud').style.display = 'flex';
-        
-        // Resume game
-        this.isPaused = false;
-        this.isRunning = true;
-        
-        // Don't automatically request pointer lock - player will click canvas to resume
-        // document.getElementById('gameCanvas').requestPointerLock();
+        if (this.zoneManager) {
+            this.zoneManager.activeTransition = null;
+            this.isTransitioning = false;
+            this.zoneManager._deferredLoadResolve = null;
+        }
+        this.levelStates.delete(this.currentLevel);
+        this.gameOver = false;
+        await this.loadLevel(this.currentLevel);
+        this.updateHUD();
     }
-    
+
+    respawnPlayer() {
+        this.respawn();
+    }
+
     quitToTitle() {
         // Stop game
         this.isRunning = false;
         this.isPaused = false;
         
+        if (this._animationFrame !== null) cancelAnimationFrame(this._animationFrame);
+        if (this.zoneManager) {
+            this.zoneManager.activeTransition = null;
+            this.isTransitioning = false;
+            this.zoneManager._deferredLoadResolve = null;
+        }
+        this.inputManager?.destroy();
+        this.facilityMap?.destroy();
+        this.currentLevelInstance?.clearLevel?.();
+        this.cleanupPerformanceSystems();
+        this.physicsManager?.clear();
+        this.renderer?.dispose();
+        document.body.classList.remove('in-game');
+        this.hideInteractPrompt();
+        document.getElementById('tutorialControls')?.remove();
+        document.getElementById('subtitle')?.remove();
+        this.hideLoadingScreen();
+        document.getElementById('debugOverlay')?.remove();
+
         // Clear all entities
         this.enemies.forEach(enemy => this.cleanupEnemy(enemy));
         this.enemies = [];
@@ -1585,7 +1428,7 @@ Player: ${playerPos}`;
         if (instructions) instructions.style.display = 'none';
         
         const startScreen = document.getElementById('startScreen');
-        if (startScreen) startScreen.style.display = 'flex';
+        if (startScreen) startScreen.style.display = 'block';
         
         // Exit pointer lock
         document.exitPointerLock();
@@ -1769,7 +1612,6 @@ Player: ${playerPos}`;
         const loadingScreen = document.getElementById('loadingScreen');
         const loadingText = document.getElementById('loadingText');
         const loadingTip = document.getElementById('loadingTip');
-        const loadingBar = document.querySelector('.loading-bar');
         
         if (loadingScreen) {
             loadingScreen.style.display = 'flex';
@@ -1815,56 +1657,28 @@ Player: ${playerPos}`;
                 loadingTip.textContent = tips[Math.floor(Math.random() * tips.length)];
             }
             
-            // Animate loading bar
-            if (loadingBar) {
-                loadingBar.style.width = '0%';
-                let progress = 0;
-                const loadingInterval = setInterval(() => {
-                    progress += Math.random() * 30;
-                    if (progress >= 100) {
-                        progress = 100;
-                        clearInterval(loadingInterval);
-                    }
-                    loadingBar.style.width = progress + '%';
-                }, 200);
-            }
         }
     }
-    
+
     hideLoadingScreen() {
         const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) {
-            // Complete the loading bar first
-            const loadingBar = document.querySelector('.loading-bar');
-            if (loadingBar) {
-                loadingBar.style.width = '100%';
-            }
-            
-            // Hide after a short delay
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 500);
+        if (loadingScreen) loadingScreen.style.display = 'none';
+    }
+
+    async loadLevel(levelName, options = {}) {
+        if (this.isLoadingLevel) return;
+        this.levelLoadOptions = options;
+        this.isLoadingLevel = true;
+        this.showLoadingScreen(levelName);
+        try {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            await this.loadLevelActual(levelName);
+        } finally {
+            this.isLoadingLevel = false;
+            this.hideLoadingScreen();
         }
     }
-    
-    async loadLevel(levelName, options = {}) {
-        // Store options for level setup
-        this.levelLoadOptions = options;
-        
-        // Show loading screen immediately and ensure it's visible
-        this.showLoadingScreen(levelName);
-        
-        // Force a render frame to ensure loading screen is displayed
-        await new Promise(resolve => {
-            requestAnimationFrame(() => {
-                // Use setTimeout to give the loading screen time to be fully rendered
-                setTimeout(resolve, 50);
-            });
-        });
-        
-        await this.loadLevelActual(levelName);
-    }
-    
+
     async loadLevelActual(levelName) {
         // Save current level state before leaving
         if (this.currentLevel && this.currentLevel !== levelName) {
@@ -1932,6 +1746,11 @@ Player: ${playerPos}`;
             this.scene.remove(obj);
         });
         
+        this.pickups.forEach(pickup => this.cleanupPickup(pickup));
+        this.pickups = [];
+        this.currentLevelInstance = null;
+        this.narrativeSystem?.setObjective(getChapter(levelName)?.objective || 'Explore the facility.');
+
         // Create new level using factory (async)
         const levelInstance = await this.levelFactory.createLevel(levelName);
         
@@ -1977,8 +1796,14 @@ Player: ${playerPos}`;
 
             // Ensure the active weapon is visible after level load
             if (this.player && this.weaponSystem) {
-                const weaponToRestore = this.player.currentWeapon || this.weaponSystem.activeWeaponType || 'sword';
-                this.weaponSystem.switchToWeapon(weaponToRestore);
+                if (this.player.weapons.length) {
+                    const weaponToRestore = this.player.currentWeapon || this.player.weapons[0];
+                    this.weaponSystem.switchToWeapon(weaponToRestore);
+                } else {
+                    this.player.currentWeapon = null;
+                    this.weaponSystem.activeWeaponType = null;
+                    Object.values(this.weaponSystem.weapons).forEach(weapon => { if ('hide' in weapon) weapon.hide(); });
+                }
             }
         } else {
             const errorMsg = `[Game] Failed to load level: ${levelName}`;
@@ -2004,10 +1829,7 @@ Player: ${playerPos}`;
         // Optimize level geometry after loading
         this.optimizeLevelGeometry();
         
-        // Hide loading screen after a short delay
-        setTimeout(() => {
-            this.hideLoadingScreen();
-        }, 1000);
+        this.hideLoadingScreen();
     }
 
     /**
@@ -2067,6 +1889,8 @@ Player: ${playerPos}`;
     optimizeLevelGeometry() {
         if (!this.geometryBatcher) return;
         
+        this.scene.updateMatrixWorld(true);
+
         // Batch static geometry
         if (this.level && this.level.walls) {
             this.geometryBatcher.batchWalls(this.level.walls);

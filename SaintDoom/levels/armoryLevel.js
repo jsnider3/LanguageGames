@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BaseLevel } from './baseLevel.js';
 import { THEME } from '../modules/config/theme.js';
+import { createPickupGlow } from '../utils/PickupGlow.js';
 // Chapter 2 - The Armory
 // Deep underground weapons cache with demonic infestation
 
@@ -294,10 +295,16 @@ export class ArmoryLevel extends BaseLevel {
             pickupGroup.add(label);
         }
         
-        // Add glow effect
+        // Glow without a per-item light: removing lights on collection forces
+        // the renderer to compile new shaders for the entire room.
         const glowColor = weaponType === 'ammo' ? 0xffaa00 : 0x00aaff;
-        const glowLight = new THREE.PointLight(glowColor, 0.5, 3);
-        pickupGroup.add(glowLight);
+        pickupGroup.traverse(child => {
+            if (child.isMesh && child.material.emissive) {
+                child.material.emissive.setHex(glowColor);
+                child.material.emissiveIntensity = 0.2;
+            }
+        });
+        pickupGroup.add(createPickupGlow(glowColor, 0.65));
         
         pickupGroup.position.set(x, y, z);
         pickupGroup.userData = { 
@@ -738,11 +745,8 @@ export class ArmoryLevel extends BaseLevel {
                     this.game.narrativeSystem.displaySubtitle(`Collected ${pickup.userData.type}! (${this.weaponsCollected}/4 weapons)`);
                 }
                 
-                // Hide instead of remove for better performance
+                // Hide now, then release the pickup's resources in batch cleanup.
                 pickup.visible = false;
-                if (pickup.userData.light) {
-                    pickup.userData.light.visible = false;
-                }
                 
                 // Mark for cleanup later
                 pickup.userData.pendingRemoval = true;
@@ -953,18 +957,24 @@ export class ArmoryLevel extends BaseLevel {
         for (let i = this.pickups.length - 1; i >= 0; i--) {
             const pickup = this.pickups[i];
             if (pickup && pickup.userData.pendingRemoval) {
-                // Remove from scene
-                if (this.scene && pickup.parent) {
-                    this.scene.remove(pickup);
-                }
-                // Remove light if exists
-                if (pickup.userData.light && pickup.userData.light.parent) {
-                    this.scene.remove(pickup.userData.light);
-                }
+                this.disposePickup(pickup);
                 // Remove from array
                 this.pickups.splice(i, 1);
             }
         }
+    }
+
+    disposePickup(pickup) {
+        if (pickup.parent) pickup.parent.remove(pickup);
+        const geometries = new Set();
+        const materials = new Set();
+        pickup.traverse(child => {
+            if (child.geometry) geometries.add(child.geometry);
+            if (Array.isArray(child.material)) child.material.forEach(material => materials.add(material));
+            else if (child.material) materials.add(child.material);
+        });
+        geometries.forEach(geometry => geometry.dispose());
+        materials.forEach(material => material.dispose());
     }
     
     createBoundaryWalls(material) {
@@ -1118,16 +1128,7 @@ export class ArmoryLevel extends BaseLevel {
         // Remove pickup meshes from scene before clearing array
         if (this.pickups) {
             this.pickups.forEach(pickup => {
-                if (pickup && pickup.parent) {
-                    this.scene.remove(pickup);
-                }
-                // Dispose pickup geometry/materials
-                if (pickup) {
-                    pickup.traverse(child => {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) child.material.dispose();
-                    });
-                }
+                if (pickup) this.disposePickup(pickup);
             });
         }
         this.pickups = [];

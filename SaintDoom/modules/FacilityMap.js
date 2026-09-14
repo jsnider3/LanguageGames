@@ -116,12 +116,14 @@ export class FacilityMap {
      * Set up keyboard controls for the map
      */
     setupControls() {
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Tab') {
+        this.handleKeyDown = (e) => {
+            const game = this.zoneManager.game;
+            if (e.key === 'Tab' && !e.repeat && game.isRunning && !game.isPaused && !game.gameOver) {
                 e.preventDefault();
                 this.toggle();
             }
-        });
+        };
+        document.addEventListener('keydown', this.handleKeyDown);
     }
     
     /**
@@ -330,6 +332,7 @@ export class FacilityMap {
      * Clean up the map
      */
     destroy() {
+        document.removeEventListener('keydown', this.handleKeyDown);
         if (this.mapContainer) {
             this.mapContainer.remove();
         }

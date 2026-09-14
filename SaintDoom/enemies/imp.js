@@ -252,18 +252,13 @@ export class Imp extends BaseEnemy {
         const trail = new THREE.Points(trailGeometry, trailMaterial);
         this.scene.add(trail);
         
-        // Add light to fireball
-        const light = new THREE.PointLight(0xff6600, 0.5, 5);
-        light.position.copy(fireball.position);
-        this.scene.add(light);
-        
+        // The self-lit fireball and additive trail need no changing scene light.
         this.scene.add(fireball);
         
         // Store projectile data
         this.projectiles.push({
             mesh: fireball,
             trail: trail,
-            light: light,
             velocity: direction.multiplyScalar(this.projectileSpeed),
             lifetime: 3000,
             startTime: Date.now(),
@@ -279,7 +274,6 @@ export class Imp extends BaseEnemy {
             projectile.mesh.position.add(
                 projectile.velocity.clone().multiplyScalar(deltaTime)
             );
-            projectile.light.position.copy(projectile.mesh.position);
             
             // Update trail
             const positions = projectile.trail.geometry.attributes.position.array;
@@ -364,13 +358,11 @@ export class Imp extends BaseEnemy {
         const projectile = this.projectiles[index];
         this.scene.remove(projectile.mesh);
         this.scene.remove(projectile.trail);
-        this.scene.remove(projectile.light);
         // Dispose geometry/materials
         projectile.mesh.geometry.dispose();
         projectile.mesh.material.dispose();
         projectile.trail.geometry.dispose();
         projectile.trail.material.dispose();
-        projectile.light.dispose();
         this.projectiles.splice(index, 1);
     }
     

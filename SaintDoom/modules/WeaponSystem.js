@@ -248,7 +248,7 @@ class HolyWaterWeapon {
             const gainNode = audioContext.createGain();
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(AudioManager.getOutput());
             
             oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
@@ -287,7 +287,7 @@ class HolyWaterWeapon {
         
         whiteNoise.connect(filter);
         filter.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         whiteNoise.start();
     }
@@ -319,29 +319,19 @@ class CrucifixLauncher {
         // Vertical beam
         const vBeam = new THREE.Mesh(
             new THREE.BoxGeometry(0.1, 0.6, 0.05),
-            new THREE.MeshStandardMaterial({
-                color: THEME.lights.point.holy,
-                emissive: THEME.effects.explosion.fire,
-                emissiveIntensity: 0.5
-            })
+            new THREE.MeshBasicMaterial({ color: THEME.lights.point.holy })
         );
         group.add(vBeam);
         
         // Horizontal beam
         const hBeam = new THREE.Mesh(
             new THREE.BoxGeometry(0.4, 0.1, 0.05),
-            new THREE.MeshStandardMaterial({
-                color: THEME.lights.point.holy,
-                emissive: THEME.effects.explosion.fire,
-                emissiveIntensity: 0.5
-            })
+            new THREE.MeshBasicMaterial({ color: THEME.lights.point.holy })
         );
         hBeam.position.y = 0.15;
         group.add(hBeam);
         
-        // Add holy glow
-        const glowLight = new THREE.PointLight(THEME.effects.explosion.fire, 2, 5);
-        group.add(glowLight);
+        // Self-lit gold remains visible without recompiling the room on each shot.
         
         const direction = this.player.getForwardVector();
         group.position.copy(this.player.camera.position);
@@ -409,6 +399,12 @@ class CrucifixLauncher {
             
             if (hit || projectile.lifetime <= 0) {
                 this.scene.remove(projectile.mesh);
+                projectile.mesh.traverse(child => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
                 this.projectiles.splice(i, 1);
                 
                 if (hit) {
@@ -441,7 +437,7 @@ class CrucifixLauncher {
             const gainNode = audioContext.createGain();
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(AudioManager.getOutput());
             
             oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
@@ -467,7 +463,7 @@ class CrucifixLauncher {
             const gainNode = audioContext.createGain();
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(AudioManager.getOutput());
             
             oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
@@ -697,7 +693,7 @@ class RangedCombat {
         bass.type = 'sine';
         bass.frequency.setValueAtTime(40, audioContext.currentTime);
         bass.connect(bassGain);
-        bassGain.connect(audioContext.destination);
+        bassGain.connect(AudioManager.getOutput());
         
         bassGain.gain.setValueAtTime(0.8, audioContext.currentTime);
         bassGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
@@ -710,7 +706,7 @@ class RangedCombat {
         crack.frequency.setValueAtTime(800, audioContext.currentTime);
         crack.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
         crack.connect(crackGain);
-        crackGain.connect(audioContext.destination);
+        crackGain.connect(AudioManager.getOutput());
         
         crackGain.gain.setValueAtTime(0.4, audioContext.currentTime);
         crackGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
@@ -744,7 +740,7 @@ class RangedCombat {
         click.type = 'square';
         click.frequency.setValueAtTime(1000, audioContext.currentTime);
         click.connect(gain);
-        gain.connect(audioContext.destination);
+        gain.connect(AudioManager.getOutput());
         
         gain.gain.setValueAtTime(0.1, audioContext.currentTime);
         gain.gain.setValueAtTime(0, audioContext.currentTime + 0.02);
@@ -838,7 +834,7 @@ class MeleeCombat {
         oscillator2.connect(filter);
         noise.connect(filter);
         filter.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         // Metallic ring frequencies
         oscillator1.type = 'triangle';
@@ -894,7 +890,7 @@ class MeleeCombat {
         oscillator3.connect(filter);
         distortion.connect(filter);
         filter.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         // Low thud
         oscillator1.type = 'sine';
@@ -938,7 +934,7 @@ class MeleeCombat {
         const gainNode = audioContext.createGain();
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         // Metal clang sound
         oscillator.type = 'triangle';
@@ -979,7 +975,7 @@ class MeleeCombat {
         const tip = new THREE.Mesh(tipGeometry, bladeMaterial);
         tip.userData.isWeapon = true;
         // Place so the cone base meets the top of the blade and apex extends upward
-        tip.position.set(0, 0.66, 0);
+        tip.position.set(0, 1.26, 0);
         swordGroup.add(tip);
 
         // Fuller (blood groove) runs along the blade on Y
@@ -1062,6 +1058,7 @@ class MeleeCombat {
         this.swordMesh.renderOrder = 10;
 
         // Default local transform; will be attached to hand grip
+        this.swordMesh.scale.setScalar(0.72);
         this.swordMesh.position.set(0, 0, 0);
         this.swordMesh.rotation.set(0, 0, 0);
         this.hide();
@@ -1114,6 +1111,7 @@ class MeleeCombat {
     createArmModel() {
         // Create arm group
         this.armGroup = new THREE.Group();
+        this.armGroup.userData.isWeapon = true;
         // FPS hands should not be culled and should render after world
         this.armGroup.frustumCulled = false;
         this.armGroup.renderOrder = 10;
@@ -1142,6 +1140,19 @@ class MeleeCombat {
         this.forearm.position.set(-0.18, -0.08, -0.48);
         this.armGroup.add(this.forearm);
         
+        // Join the arm segments at the elbow instead of leaving a visible gap.
+        const shoulder = new THREE.Vector3(0, -0.04, -0.01);
+        const elbow = new THREE.Vector3(-0.15, -0.08, -0.37);
+        const wristPosition = new THREE.Vector3(-0.27, -0.10, -0.68);
+        const alignLimb = (mesh, from, to, length) => {
+            const direction = to.clone().sub(from);
+            mesh.position.copy(from).add(to).multiplyScalar(0.5);
+            mesh.scale.y = direction.length() / length;
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+        };
+        alignLimb(this.upperArm, shoulder, elbow, 0.38);
+        alignLimb(this.forearm, elbow, wristPosition, 0.36);
+
         // Create wrist and hand
         const wristGeometry = new THREE.CylinderGeometry(0.05, 0.055, 0.08, 10);
         const wrist = new THREE.Mesh(wristGeometry, armMaterial);
@@ -1201,6 +1212,7 @@ class MeleeCombat {
         // Parent sword to the hand grip so they move together
         this.gripGroup.add(this.swordMesh);
         // Align guard at palm; slight inward tilt for a natural hold
+        this.swordMesh.scale.setScalar(0.72);
         this.swordMesh.position.set(0, 0, 0);
         this.swordMesh.rotation.set(-0.10, -0.10, -0.25);
     }
@@ -1213,6 +1225,7 @@ class MeleeCombat {
         this.gripGroup.rotation.set(0, 0, 0);
 
         // Maintain slight default sword tilt inside grip
+        this.swordMesh.scale.setScalar(0.72);
         this.swordMesh.position.set(0, 0, 0);
         this.swordMesh.rotation.set(-0.02, -0.10, -0.18);
 
@@ -1458,7 +1471,7 @@ class MeleeCombat {
         oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(AudioManager.getOutput());
         
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);

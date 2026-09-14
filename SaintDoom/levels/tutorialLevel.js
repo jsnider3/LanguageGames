@@ -66,6 +66,7 @@ export class TutorialLevel extends BaseLevel {
         chamberFloor.rotation.x = -Math.PI / 2;
         chamberFloor.position.set(0, 0, 0);
         chamberFloor.receiveShadow = true;
+        this.markAsFloor(chamberFloor);
         this.scene.add(chamberFloor);
         
         // Chamber ceiling (higher, cathedral-like)
@@ -785,7 +786,7 @@ export class TutorialLevel extends BaseLevel {
         this.game.narrativeSystem.setObjective("Listen to the Inquisitor's instructions");
         
         // Start tutorial sequence after a delay
-        this.addTimeout(() => this.nextTutorialStep(), 3000);
+        this.introInstructionDelay = 3;
     }
     
     showTutorialControls(controls) {
@@ -897,6 +898,10 @@ export class TutorialLevel extends BaseLevel {
     update(deltaTime) {
         // Call parent update
         super.update(deltaTime);
+        if (this.introInstructionDelay > 0) {
+            this.introInstructionDelay -= deltaTime;
+            if (this.introInstructionDelay <= 0) this.nextTutorialStep();
+        }
         
         // Animate the Cardinal with subtle idle movement
         if (this.inquisitorGroup) {
@@ -1193,6 +1198,12 @@ export class TutorialLevel extends BaseLevel {
         // Traverse and collect all objects to remove
         const objectsToRemove = [];
         this.scene.traverse((child) => {
+            // Preserve the camera's complete weapon hierarchy on level changes.
+            let ancestor = child;
+            while (ancestor) {
+                if (ancestor === this.game.camera || ancestor === this.game.player?.shadowMesh) return;
+                ancestor = ancestor.parent;
+            }
             // Keep the camera
             if (child === this.game.camera) {
                 return;

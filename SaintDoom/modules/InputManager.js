@@ -22,6 +22,8 @@ export class InputManager {
 
     setupEventListeners() {
         this._boundHandlers.keydown = (e) => {
+            if (this.gameRef && (!this.gameRef.isRunning || this.gameRef.isPaused || this.gameRef.gameOver)) return;
+            if (e.repeat && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyR', 'F3'].includes(e.code)) return;
             this.keys[e.code] = true;
 
             // F3 toggles debug mode
@@ -46,7 +48,7 @@ export class InputManager {
         };
 
         this._boundHandlers.mousedown = (e) => {
-            this.mouseButtons[e.button] = true;
+            if (this.isPointerLocked && (!this.gameRef || (this.gameRef.isRunning && !this.gameRef.isPaused && !this.gameRef.gameOver))) this.mouseButtons[e.button] = true;
         };
 
         this._boundHandlers.mouseup = (e) => {
@@ -55,25 +57,22 @@ export class InputManager {
 
         this._boundHandlers.mousemove = (e) => {
             if (this.isPointerLocked) {
-                this.mouseDeltaX = e.movementX;
-                this.mouseDeltaY = e.movementY;
+                this.mouseDeltaX += e.movementX;
+                this.mouseDeltaY += e.movementY;
             }
         };
 
         this._boundHandlers.pointerlockchange = () => {
-            // Check both document.body and the canvas element for pointer lock
             this.isPointerLocked = document.pointerLockElement === document.body ||
-                                  document.pointerLockElement === document.getElementById('gameCanvas') ||
-                                  document.pointerLockElement !== null;
-            if (!this.isPointerLocked) {
-                this.mouseDeltaX = 0;
-                this.mouseDeltaY = 0;
-            }
+                document.pointerLockElement === document.getElementById('gameCanvas');
+            this.reset();
         };
 
         this._boundHandlers.contextmenu = (e) => {
-            e.preventDefault();
+            if (this.isPointerLocked) e.preventDefault();
         };
+        this._boundHandlers.blur = () => this.reset();
+        window.addEventListener('blur', this._boundHandlers.blur);
 
         window.addEventListener('keydown', this._boundHandlers.keydown);
         window.addEventListener('keyup', this._boundHandlers.keyup);
@@ -91,7 +90,7 @@ export class InputManager {
             left: this.keys['KeyA'] || false,
             right: this.keys['KeyD'] || false,
             jump: this.keys['Space'] || false,
-            sprint: this.keys['ShiftLeft'] || false,
+            sprint: this.keys['ShiftLeft'] || this.keys['ShiftRight'] || false,
             attack: this.mouseButtons[0] || false,
             block: this.mouseButtons[2] || false,
             weapon1: this.keys['Digit1'] || false,
@@ -128,6 +127,7 @@ export class InputManager {
 
     /** Remove all event listeners to prevent leaks across level changes */
     destroy() {
+        window.removeEventListener('blur', this._boundHandlers.blur);
         window.removeEventListener('keydown', this._boundHandlers.keydown);
         window.removeEventListener('keyup', this._boundHandlers.keyup);
         window.removeEventListener('mousedown', this._boundHandlers.mousedown);

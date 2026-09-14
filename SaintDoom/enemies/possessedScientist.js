@@ -236,14 +236,8 @@ export class PossessedScientist extends BaseEnemy {
         rightPupil.position.set(0.06, 1.42, -0.17);
         group.add(rightPupil);
         
-        // Stronger red glow from eyes
-        const leftEyeLight = new THREE.PointLight(0xff0000, 0.8, 2);
-        leftEyeLight.position.set(-0.06, 1.42, -0.2);
-        group.add(leftEyeLight);
-        
-        const rightEyeLight = new THREE.PointLight(0xff0000, 0.8, 2);
-        rightEyeLight.position.set(0.06, 1.42, -0.2);
-        group.add(rightEyeLight);
+        // The self-lit eyes stay visible without adding two scene lights per
+        // enemy. Spawning or killing a scientist must not rebuild room shaders.
         
         // Messy gray hair
         const hairGeometry = new THREE.SphereGeometry(0.2, 6, 4);
@@ -373,10 +367,13 @@ export class PossessedScientist extends BaseEnemy {
         
         // Make enemy face player when chasing or attacking
         if ((this.state === 'chasing' || this.state === 'attacking') && this.target) {
-            const direction = new THREE.Vector3()
-                .subVectors(this.target.position, this.position)
-                .normalize();
-            this.mesh.lookAt(this.target.position);
+            // The scientist's eyes and coat front face local -Z; Group.lookAt
+            // points +Z at the target. Turn the model's actual front toward them.
+            const dx = this.target.position.x - this.position.x;
+            const dz = this.target.position.z - this.position.z;
+            if (dx !== 0 || dz !== 0) {
+                this.mesh.rotation.y = Math.atan2(-dx, -dz);
+            }
             this.mesh.rotation.x = 0; // Keep upright
             this.mesh.rotation.z = 0;
         }

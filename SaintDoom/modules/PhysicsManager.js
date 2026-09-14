@@ -34,6 +34,7 @@ export class PhysicsManager {
     registerEntity(entity, options = {}) {
         const physicsData = {
             entity: entity,
+            integrateHorizontal: options.integrateHorizontal !== false,
             isFlying: options.isFlying || false,
             hasGravity: options.hasGravity !== false, // Default true
             mass: options.mass || 1,
@@ -297,7 +298,12 @@ export class PhysicsManager {
             // Update position based on velocity
             if (entity.velocity && entity.position) {
                 const movement = entity.velocity.clone().multiplyScalar(cappedDeltaTime);
-                entity.position.add(movement);
+                if (physicsData.integrateHorizontal) {
+                    entity.position.add(movement);
+                } else {
+                    // The collision system owns X/Z movement for the player.
+                    entity.position.y += movement.y;
+                }
                 
                 // Aggressive ground enforcement - never let entities sink
                 const minGroundY = physicsData.groundOffset;

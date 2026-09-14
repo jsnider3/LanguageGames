@@ -646,6 +646,11 @@ export class BaseLevel {
     /**
      * Clean up level resources
      */
+    // Game and ZoneManager use clearLevel; subclasses usually implement cleanup.
+    clearLevel() {
+        this.cleanup();
+    }
+
     cleanup() {
         // Clear intervals and timeouts
         this.intervals.forEach(interval => clearInterval(interval));

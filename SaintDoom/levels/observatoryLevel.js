@@ -54,9 +54,7 @@ export class ObservatoryLevel extends BaseLevel {
             // Floor platform
             const floorGeometry = new THREE.CylinderGeometry(towerRadius, towerRadius, 1, 16);
             const floorMaterial = new THREE.MeshLambertMaterial({ 
-                color: floor % 2 === 0 ? 0x2a2a4a : 0x1a1a3a,
-                transparent: true,
-                opacity: 0.9
+                color: floor % 2 === 0 ? 0x2a2a4a : 0x1a1a3a
             });
             const floorPlatform = new THREE.Mesh(floorGeometry, floorMaterial);
             floorPlatform.position.set(0, floorY, 0);
@@ -70,9 +68,7 @@ export class ObservatoryLevel extends BaseLevel {
                 
                 const wallGeometry = new THREE.BoxGeometry(3, floorHeight - 2, 0.5);
                 const wallMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0x3a3a5a,
-                    transparent: true,
-                    opacity: 0.8
+                    color: 0x3a3a5a
                 });
                 const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                 wall.position.set(x, floorY + floorHeight/2, z);

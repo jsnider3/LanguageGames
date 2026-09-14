@@ -9,6 +9,7 @@ import logger, { LogCategory, logPlayerAction } from './Logger.js';
 export class Player {
     constructor(camera) {
         this.camera = camera;
+        this.game = null;
         this.position = new THREE.Vector3(0, GAME_CONFIG.PLAYER.MOVEMENT.BASE_HEIGHT, 0);
         
         // Add getter/setter to track position changes
@@ -126,8 +127,8 @@ export class Player {
         this.updateRage(deltaTime, input);
         this.camera.position.copy(this.position);
         
-        if (this.velocity.length() > 0.1) {
-            this.bobAmount += this.bobSpeed;
+        if (this.game?.settings?.motion !== false && this.velocity.length() > 0.1) {
+            this.bobAmount += this.bobSpeed * deltaTime * 60;
             const bobOffset = Math.sin(this.bobAmount * Math.PI * 2) * 0.05;
             this.camera.position.y = this.position.y + bobOffset;
         } else {
@@ -236,8 +237,9 @@ export class Player {
         }
         
         // Apply to velocity with friction
-        this.velocity.x = this.velocity.x * this.friction + moveVector.x * (1 - this.friction);
-        this.velocity.z = this.velocity.z * this.friction + moveVector.z * (1 - this.friction);
+        const friction = Math.pow(this.friction, deltaTime * 60);
+        this.velocity.x = this.velocity.x * friction + moveVector.x * (1 - friction);
+        this.velocity.z = this.velocity.z * friction + moveVector.z * (1 - friction);
         
         // Don't update position here - let collision system handle it
     }
